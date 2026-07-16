@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Snake & Candy</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
+<style>
+  :root {
+    --bg: #1b1025;
+    --grid: #241533;
+    --candy: #ff5da2;
+    --p1: #4ade80;
+    --p1-dark: #22c55e;
+    --p2: #60a5fa;
+    --p2-dark: #3b82f6;
+    --text: #f5f0ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at top, #2b1a3f, #120a1c 70%);
+    font-family: 'Trebuchet MS', system-ui, sans-serif;
+    color: var(--text);
+    padding: 10px 0 30px;
+    box-sizing: border-box;
+  }
+  h1 {
+    margin: 8px 0 4px;
+    font-size: 2rem;
+    letter-spacing: 1px;
+    text-shadow: 0 0 12px rgba(255,93,162,0.6);
+  }
+  #subtitle { margin: 0 0 12px; opacity: 0.75; font-size: 0.9rem; }
+
+  #menu, #gameOver {
+    background: rgba(20, 10, 30, 0.85);
+    border: 2px solid #3d2255;
+    border-radius: 16px;
+    padding: 24px 32px;
+    text-align: center;
+    box-shadow: 0 0 30px rgba(0,0,0,0.5);
+    max-width: 360px;
+  }
+  #menu button, #gameOver button {
+    display: block;
+    width: 220px;
+    margin: 10px auto;
+    padding: 12px;
+    font-size: 1.05rem;
+    border: none;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--candy), #b23b6f);
+    color: white;
+    cursor: pointer;
+    font-weight: bold;
+    transition: transform 0.1s ease;
+  }
+  #menu button.secondary {
+    background: #3d2255;
+  }
+  #menu button:hover, #gameOver button:hover { transform: scale(1.04); }
+  #menu p, #gameOver p { opacity: 0.8; font-size: 0.85rem; line-height: 1.5; }
+
+  #joinCodeInput {
+    display: block;
+    width: 220px;
+    margin: 10px auto;
+    padding: 10px;
+    font-size: 1rem;
+    border-radius: 8px;
+    border: 1px solid #3d2255;
+    background: #120a1c;
+    color: var(--text);
+    text-align: center;
+    letter-spacing: 1px;
+  }
+
+  #roomCode {
+    font-size: 1.7rem;
+    font-weight: bold;
+    letter-spacing: 2px;
+    margin: 8px 0;
+    padding: 8px;
+    background: #120a1c;
+    border-radius: 8px;
+    word-break: break-all;
+  }
+
+  #hud {
+    display: flex;
+    gap: 28px;
+    margin-bottom: 8px;
+    font-size: 1.1rem;
+    font-weight: bold;
+  }
+  #hud .p1 { color: var(--p1); }
+  #hud .p2 { color: var(--p2); }
+
+  canvas {
+    background: var(--grid);
+    border: 3px solid #3d2255;
+    border-radius: 10px;
+    box-shadow: 0 0 24px rgba(0,0,0,0.6) inset;
+    max-width: 92vw;
+    height: auto;
+    touch-action: none;
+  }
+
+  #wrap { display: none; flex-direction: column; align-items: center; }
+  #hint { margin-top: 10px; font-size: 0.8rem; opacity: 0.6; text-align: center; }
+  .hidden { display: none !important; }
+
+  #touchControls {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    width: 92vw;
+    max-width: 480px;
+    margin-top: 16px;
+  }
+  .dpad {
+    display: grid;
+    grid-template-columns: 46px 46px 46px;
+    grid-template-rows: 46px 46px 46px;
+    gap: 4px;
+  }
+  .dpad-label {
+    text-align: center;
+    font-size: 0.75rem;
+    opacity: 0.7;
+    margin-bottom: 4px;
+  }
+  .dpad-btn {
+    border: none;
+    border-radius: 8px;
+    background: #3d2255;
+    color: var(--text);
+    font-size: 1.2rem;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .dpad-btn:active { background: var(--candy); }
+  .dpad-btn.up { grid-column: 2; grid-row: 1; }
+  .dpad-btn.left { grid-column: 1; grid-row: 2; }
+  .dpad-btn.right { grid-column: 3; grid-row: 2; }
+  .dpad-btn.down { grid-column: 2; grid-row: 3; }
+</style>
+</head>
+<body>
+
+<h1>🐍 Snake &amp; Candy</h1>
+<p id="subtitle">Slither around, gobble candy, don't bite yourself.</p>
+
+<div id="menu">
+  <div id="modeChoice">
+    <p>Pick a mode to start:</p>
+    <button id="btn1p">1 Player</button>
+    <button id="btn2p">2 Player — Same Device</button>
+    <button id="btnOnline">2 Player — Online</button>
+    <p>1P: Arrow keys or WASD.<br>Same device: P1 = WASD, P2 = Arrows.<br>Online: each player uses Arrows or WASD on their own device.</p>
+  </div>
+
+  <div id="onlineChoice" class="hidden">
+    <p>Play with a friend on another device:</p>
+    <button id="btnHost">Create Room</button>
+    <p style="margin:6px 0;">— or —</p>
+    <input id="joinCodeInput" placeholder="Enter room code">
+    <button id="btnJoin">Join Room</button>
+    <button id="btnOnlineBack" class="secondary">Back</button>
+  </div>
+
+  <div id="onlineStatus" class="hidden">
+    <p id="onlineStatusText">Connecting...</p>
+    <div id="roomCodeBox" class="hidden">
+      <p>Send this code to your friend:</p>
+      <div id="roomCode"></div>
+      <button id="btnCopyCode">Copy Code</button>
+    </div>
+    <button id="btnOnlineCancel" class="secondary">Cancel</button>
+  </div>
+</div>
+
+<div id="wrap">
+  <div id="hud">
+    <div class="p1" id="score1">Score: 0</div>
+    <div class="p2 hidden" id="score2">Score: 0</div>
+  </div>
+  <canvas id="board" width="480" height="480"></canvas>
+  <div id="hint">Press <b>Space</b> to pause. Press <b>R</b> to restart. On mobile, use the buttons below.</div>
+
+  <div id="touchControls">
+    <div>
+      <div class="dpad-label" id="dpad1Label">Move</div>
+      <div class="dpad" id="dpad1" data-player="1">
+        <button class="dpad-btn up" data-dir="up">▲</button>
+        <button class="dpad-btn left" data-dir="left">◀</button>
+        <button class="dpad-btn right" data-dir="right">▶</button>
+        <button class="dpad-btn down" data-dir="down">▼</button>
+      </div>
+    </div>
+    <div id="dpad2Wrap" class="hidden">
+      <div class="dpad-label">Player 2</div>
+      <div class="dpad" id="dpad2" data-player="2">
+        <button class="dpad-btn up" data-dir="up">▲</button>
+        <button class="dpad-btn left" data-dir="left">◀</button>
+        <button class="dpad-btn right" data-dir="right">▶</button>
+        <button class="dpad-btn down" data-dir="down">▼</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="gameOver" class="hidden">
+  <p id="goText" style="font-size:1.2rem;"></p>
+  <button id="btnAgain">Play Again</button>
+  <button id="btnMenu">Back to Menu</button>
+</div>
+
+<script>
+(function () {
+  const CELLS = 24;
+  const canvas = document.getElementById('board');
+  const ctx = canvas.getContext('2d');
+  const cellSize = canvas.width / CELLS;
+
+  const menuEl = document.getElementById('menu');
+  const wrapEl = document.getElementById('wrap');
+  const gameOverEl = document.getElementById('gameOver');
+  const goText = document.getElementById('goText');
+  const score1El = document.getElementById('score1');
+  const score2El = document.getElementById('score2');
+
+  let mode = 1; // 1 or 2
+  let running = false;
+  let paused = false;
+  let tickMs = 130;
+  let timer = null;
+
+  // Online multiplayer state
+  let netRole = null; // null | 'host' | 'guest'
+  let peer = null;
+  let conn = null;
+
+  let snake1, snake2, candy, dir1, dir2, nextDir1, nextDir2, score1, score2, alive1, alive2;
+
+  function resetState() {
+    snake1 = [{x: 5, y: 12}, {x: 4, y: 12}, {x: 3, y: 12}];
+    dir1 = {x: 1, y: 0};
+    nextDir1 = dir1;
+    score1 = 0;
+    alive1 = true;
+
+    if (mode === 2) {
+      snake2 = [{x: 18, y: 12}, {x: 19, y: 12}, {x: 20, y: 12}];
+      dir2 = {x: -1, y: 0};
+      nextDir2 = dir2;
+      score2 = 0;
+      alive2 = true;
+    } else {
+      snake2 = null;
+    }
+
+    candy = spawnCandy();
+    updateHud();
+  }
+
+  function spawnCandy() {
+    let pos;
+    while (true) {
+      pos = { x: Math.floor(Math.random() * CELLS), y: Math.floor(Math.random() * CELLS) };
+      const hitS1 = snake1.some(s => s.x === pos.x && s.y === pos.y);
+      const hitS2 = snake2 ? snake2.some(s => s.x === pos.x && s.y === pos.y) : false;
+      if (!hitS1 && !hitS2) return pos;
+    }
+  }
+
+  function updateHud() {
+    score1El.textContent = `Score: ${score1}`;
+    if (mode === 2) {
+      score2El.classList.remove('hidden');
+      score2El.textContent = `Score: ${score2}`;
+    } else {
+      score2El.classList.add('hidden');
+    }
+  }
+
+  function inBounds(p) {
+    return p.x >= 0 && p.x < CELLS && p.y >= 0 && p.y < CELLS;
+  }
+
+  function selfOrOtherHit(head, self, other) {
+    if (self.some(s => s.x === head.x && s.y === head.y)) return true;
+    if (other && other.some(s => s.x === head.x && s.y === head.y)) return true;
+    return false;
+  }
+
+  // step() is the authoritative simulation. It runs locally for 1P and
+  // same-device 2P, and on the HOST device for online play. The guest
+  // never runs this — it just renders state pushed over the data channel.
+  function step() {
+    if (!running || paused) return;
+
+    dir1 = nextDir1;
+    const head1 = { x: snake1[0].x + dir1.x, y: snake1[0].y + dir1.y };
+
+    let head2 = null;
+    if (mode === 2 && alive2) {
+      dir2 = nextDir2;
+      head2 = { x: snake2[0].x + dir2.x, y: snake2[0].y + dir2.y };
+    }
+
+    if (alive1) {
+      if (!inBounds(head1) || selfOrOtherHit(head1, snake1, snake2)) {
+        alive1 = false;
+      }
+    }
+    if (mode === 2 && alive2) {
+      if (!inBounds(head2) || selfOrOtherHit(head2, snake2, snake1)) {
+        alive2 = false;
+      }
+    }
+    if (mode === 2 && alive1 && alive2 && head1.x === head2.x && head1.y === head2.y) {
+      alive1 = false;
+      alive2 = false;
+    }
+
+    if (mode === 1 && !alive1) {
+      return endGame();
+    }
+    if (mode === 2 && !alive1 && !alive2) {
+      return endGame();
+    }
+
+    if (alive1) {
+      snake1.unshift(head1);
+      if (head1.x === candy.x && head1.y === candy.y) {
+        score1 += 10;
+        candy = spawnCandy();
+      } else {
+        snake1.pop();
+      }
+    }
+
+    if (mode === 2 && alive2) {
+      snake2.unshift(head2);
+      if (head2.x === candy.x && head2.y === candy.y) {
+        score2 += 10;
+        candy = spawnCandy();
+      } else {
+        snake2.pop();
+      }
+    }
+
+    updateHud();
+    draw();
+    broadcastState();
+  }
+
+  function broadcastState() {
+    if (netRole === 'host' && conn && conn.open) {
+      conn.send({ type: 'state', snake1, snake2, candy, score1, score2, alive1, alive2 });
+    }
+  }
+
+  function draw() {
+    ctx.fillStyle = '#241533';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+    for (let i = 1; i < CELLS; i++) {
+      ctx.beginPath();
+      ctx.moveTo(i * cellSize, 0);
+      ctx.lineTo(i * cellSize, canvas.height);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0, i * cellSize);
+      ctx.lineTo(canvas.width, i * cellSize);
+      ctx.stroke();
+    }
+
+    ctx.save();
+    const cx = candy.x * cellSize + cellSize / 2;
+    const cy = candy.y * cellSize + cellSize / 2;
+    ctx.fillStyle = '#ff5da2';
+    ctx.beginPath();
+    ctx.arc(cx, cy, cellSize * 0.35, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.beginPath();
+    ctx.arc(cx - cellSize * 0.1, cy - cellSize * 0.1, cellSize * 0.08, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    drawSnake(snake1, '#22c55e', '#4ade80', alive1);
+    if (mode === 2) drawSnake(snake2, '#3b82f6', '#60a5fa', alive2);
+  }
+
+  function drawSnake(snake, dark, light, alive) {
+    if (!snake) return;
+    snake.forEach((seg, i) => {
+      ctx.fillStyle = i === 0 ? light : dark;
+      if (!alive) ctx.globalAlpha = 0.35;
+      const pad = 1.5;
+      ctx.fillRect(seg.x * cellSize + pad, seg.y * cellSize + pad, cellSize - pad * 2, cellSize - pad * 2);
+      ctx.globalAlpha = 1;
+    });
+  }
+
+  function endGame() {
+    running = false;
+    clearInterval(timer);
+    let msg;
+    if (mode === 1) {
+      msg = `Game over! Final score: ${score1}`;
+    } else {
+      if (!alive1 && !alive2 && score1 === score2) {
+        msg = `Draw! Both scored ${score1}`;
+      } else if ((!alive1 && !alive2 && score1 > score2) || (alive1 && !alive2)) {
+        msg = `Green wins! ${score1} - ${score2}`;
+      } else {
+        msg = `Blue wins! ${score2} - ${score1}`;
+      }
+    }
+    goText.textContent = msg;
+    gameOverEl.classList.remove('hidden');
+    wrapEl.style.display = 'none';
+
+    if (netRole === 'host' && conn && conn.open) {
+      conn.send({ type: 'gameover', msg });
+    }
+  }
+
+  function startGame(selectedMode) {
+    mode = selectedMode;
+    resetState();
+    running = true;
+    paused = false;
+    menuEl.classList.add('hidden');
+    gameOverEl.classList.add('hidden');
+    wrapEl.style.display = 'flex';
+    updateTouchControlsVisibility();
+    draw();
+    clearInterval(timer);
+    timer = setInterval(step, tickMs);
+
+    if (netRole === 'host' && conn && conn.open) {
+      conn.send({ type: 'restart' });
+    }
+  }
+
+  document.getElementById('btn1p').addEventListener('click', () => startGame(1));
+  document.getElementById('btn2p').addEventListener('click', () => startGame(2));
+
+  document.getElementById('btnAgain').addEventListener('click', () => {
+    if (netRole === 'guest') {
+      if (conn && conn.open) conn.send({ type: 'restart-request' });
+    } else {
+      startGame(mode);
+    }
+  });
+
+  document.getElementById('btnMenu').addEventListener('click', () => {
+    clearInterval(timer);
+    running = false;
+    gameOverEl.classList.add('hidden');
+    wrapEl.style.display = 'none';
+    if (netRole) teardownPeer();
+    showPanel('modeChoice');
+    menuEl.classList.remove('hidden');
+  });
+
+  // ---------- Online multiplayer (PeerJS, peer-to-peer) ----------
+
+  function showPanel(id) {
+    ['modeChoice', 'onlineChoice', 'onlineStatus'].forEach(p => {
+      document.getElementById(p).classList.toggle('hidden', p !== id);
+    });
+  }
+
+  function setStatus(text) {
+    document.getElementById('onlineStatusText').textContent = text;
+  }
+
+  document.getElementById('btnOnline').addEventListener('click', () => showPanel('onlineChoice'));
+  document.getElementById('btnOnlineBack').addEventListener('click', () => showPanel('modeChoice'));
+  document.getElementById('btnOnlineCancel').addEventListener('click', () => {
+    teardownPeer();
+    showPanel('modeChoice');
+  });
+  document.getElementById('btnCopyCode').addEventListener('click', () => {
+    const code = document.getElementById('roomCode').textContent;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(code).catch(() => {});
+    }
+  });
+
+  document.getElementById('btnHost').addEventListener('click', hostRoom);
+  document.getElementById('btnJoin').addEventListener('click', joinRoom);
+
+  function teardownPeer() {
+    clearInterval(timer);
+    running = false;
+    if (conn) { try { conn.close(); } catch (e) {} conn = null; }
+    if (peer) { try { peer.destroy(); } catch (e) {} peer = null; }
+    netRole = null;
+  }
+
+  function handleRemoteDisconnect() {
+    if (running) {
+      running = false;
+      clearInterval(timer);
+      goText.textContent = 'Your friend disconnected.';
+      gameOverEl.classList.remove('hidden');
+      wrapEl.style.display = 'none';
+    }
+  }
+
+  // Short, easy-to-read room codes instead of PeerJS's long default IDs.
+  // Avoids ambiguous characters (0/O, 1/I/L) since these get read aloud or typed.
+  const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  function generateRoomCode() {
+    let code = '';
+    for (let i = 0; i < 4; i++) {
+      code += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+    }
+    return code;
+  }
+
+  function hostRoom(attemptsLeft) {
+    if (attemptsLeft === undefined) attemptsLeft = 5;
+    netRole = 'host';
+    showPanel('onlineStatus');
+    document.getElementById('roomCodeBox').classList.add('hidden');
+    setStatus('Setting up room...');
+
+    const code = generateRoomCode();
+    peer = new Peer(code);
+    peer.on('open', id => {
+      document.getElementById('roomCode').textContent = id;
+      document.getElementById('roomCodeBox').classList.remove('hidden');
+      setStatus('Share this code with your friend, then wait for them to join.');
+    });
+    peer.on('connection', c => {
+      conn = c;
+      conn.on('open', () => {
+        setStatus('Friend connected! Starting game...');
+        setTimeout(() => beginOnlineGame('host'), 500);
+      });
+      conn.on('data', handleHostData);
+      conn.on('close', handleRemoteDisconnect);
+    });
+    peer.on('error', err => {
+      if (err.type === 'unavailable-id' && attemptsLeft > 0) {
+        // that code was already taken by someone else's active room, try a fresh one
+        if (peer) { try { peer.destroy(); } catch (e) {} peer = null; }
+        hostRoom(attemptsLeft - 1);
+      } else {
+        setStatus('Connection error: ' + err.type + '. Try again.');
+      }
+    });
+  }
+
+  function joinRoom() {
+    const code = document.getElementById('joinCodeInput').value.trim().toUpperCase();
+    if (!code) { alert('Enter a room code first.'); return; }
+    netRole = 'guest';
+    showPanel('onlineStatus');
+    document.getElementById('roomCodeBox').classList.add('hidden');
+    setStatus('Connecting to room...');
+
+    peer = new Peer();
+    peer.on('open', () => {
+      conn = peer.connect(code, { reliable: true });
+      conn.on('open', () => {
+        setStatus('Connected! Starting game...');
+        beginOnlineGame('guest');
+      });
+      conn.on('data', handleGuestData);
+      conn.on('close', handleRemoteDisconnect);
+    });
+    peer.on('error', err => setStatus('Connection error: ' + err.type + '. Check the code and try again.'));
+  }
+
+  function beginOnlineGame(role) {
+    mode = 2;
+    menuEl.classList.add('hidden');
+    gameOverEl.classList.add('hidden');
+    wrapEl.style.display = 'flex';
+    updateTouchControlsVisibility();
+
+    if (role === 'host') {
+      resetState();
+      running = true;
+      paused = false;
+      draw();
+      clearInterval(timer);
+      timer = setInterval(step, tickMs);
+    } else {
+      // guest: no local simulation, just wait for state pushes
+      running = true;
+    }
+  }
+
+  function handleHostData(msg) {
+    if (msg.type === 'input') {
+      if (!(msg.dir.x === -dir2.x && msg.dir.y === -dir2.y)) {
+        nextDir2 = msg.dir;
+      }
+    } else if (msg.type === 'restart-request') {
+      startGame(2);
+    }
+  }
+
+  function handleGuestData(msg) {
+    if (msg.type === 'state') {
+      snake1 = msg.snake1;
+      snake2 = msg.snake2;
+      candy = msg.candy;
+      score1 = msg.score1;
+      score2 = msg.score2;
+      alive1 = msg.alive1;
+      alive2 = msg.alive2;
+      updateHud();
+      draw();
+    } else if (msg.type === 'gameover') {
+      running = false;
+      goText.textContent = msg.msg;
+      gameOverEl.classList.remove('hidden');
+      wrapEl.style.display = 'none';
+    } else if (msg.type === 'restart') {
+      gameOverEl.classList.add('hidden');
+      wrapEl.style.display = 'flex';
+      running = true;
+    }
+  }
+
+  // ---------- Input ----------
+
+  // Single entry point for "move this player in this direction," used by
+  // both keyboard and the on-screen touch D-pads. `player` (1 or 2) only
+  // matters in local same-device 2P mode, where two snakes share one screen.
+  function applyDirection(newDir, player) {
+    if (!newDir) return;
+
+    if (netRole === 'guest') {
+      if (conn && conn.open) conn.send({ type: 'input', dir: newDir });
+      return;
+    }
+    if (netRole === 'host') {
+      if (!(newDir.x === -dir1.x && newDir.y === -dir1.y)) nextDir1 = newDir;
+      return;
+    }
+    if (mode === 1) {
+      if (!(newDir.x === -dir1.x && newDir.y === -dir1.y)) nextDir1 = newDir;
+      return;
+    }
+    // local same-device 2P
+    if (player === 2) {
+      if (!(newDir.x === -dir2.x && newDir.y === -dir2.y)) nextDir2 = newDir;
+    } else {
+      if (!(newDir.x === -dir1.x && newDir.y === -dir1.y)) nextDir1 = newDir;
+    }
+  }
+
+  function updateTouchControlsVisibility() {
+    const twoLocalPlayers = (mode === 2 && !netRole);
+    document.getElementById('dpad2Wrap').classList.toggle('hidden', !twoLocalPlayers);
+    document.getElementById('dpad1Label').textContent = twoLocalPlayers ? 'Player 1' : 'Move';
+  }
+
+  document.querySelectorAll('.dpad-btn').forEach(btn => {
+    const dirMap = { up: { x: 0, y: -1 }, down: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
+    btn.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      if (!running) return;
+      const player = Number(btn.closest('.dpad').dataset.player);
+      applyDirection(dirMap[btn.dataset.dir], player);
+    });
+  });
+
+  window.addEventListener('keydown', (e) => {
+    const key = e.key;
+
+    if (key === ' ') {
+      if (running && netRole !== 'guest') paused = !paused;
+      e.preventDefault();
+      return;
+    }
+    if (key.toLowerCase() === 'r' && running) {
+      if (netRole === 'host') {
+        startGame(2);
+      } else if (netRole === 'guest') {
+        if (conn && conn.open) conn.send({ type: 'restart-request' });
+      } else {
+        startGame(mode);
+      }
+      return;
+    }
+
+    const isWASD = ['w', 'a', 's', 'd'].includes(key.toLowerCase());
+    const isArrow = key.startsWith('Arrow');
+    if (!isWASD && !isArrow) return;
+
+    let newDir = null;
+    if (key === 'ArrowUp' || key.toLowerCase() === 'w') newDir = { x: 0, y: -1 };
+    else if (key === 'ArrowDown' || key.toLowerCase() === 's') newDir = { x: 0, y: 1 };
+    else if (key === 'ArrowLeft' || key.toLowerCase() === 'a') newDir = { x: -1, y: 0 };
+    else if (key === 'ArrowRight' || key.toLowerCase() === 'd') newDir = { x: 1, y: 0 };
+
+    if (newDir) {
+      // In local same-device 2P, WASD always drives player 1 and Arrows
+      // always drive player 2, regardless of online/1P branching above.
+      const player = (mode === 2 && !netRole) ? (isWASD ? 1 : 2) : 1;
+      applyDirection(newDir, player);
+    }
+
+    if (isArrow) e.preventDefault();
+  });
+})();
+</script>
+
+</body>
+</html>
