@@ -170,9 +170,117 @@ The answer changes completely with skill level, which was the surprise:
 ⚠️ These numbers come from **simulated** players, not real ones. Treat them as a
 rough guide — the honest test is six actual humans.
 
+### 🤖 Bots and team modes
+
+**Game mode** and **Computer players** pickers sit on the main menu.
+
+| Mode | Snakes | How it works |
+|---|---|---|
+| Free for all | you + 0–5 bots | Last snake alive wins |
+| 1 v 1 | 2 | Two teams of one |
+| 2 v 2 | 4 | Two teams of two |
+| 3 v 3 | 6 | Two teams of three |
+
+- **Empty seats fill with bots automatically** in team modes. Play 3v3 on your
+  own if you like — you get five bots.
+- Humans are dealt out **alternately**, so two friends land on opposite teams
+  rather than both on one side.
+- **Team colour beats personal colour.** In team games the glow around your
+  snake shows 🔴 Red or 🔵 Blue, because which side someone's on matters more
+  than which colour they picked.
+- **No friendly fire.** Thor's hammer skips teammates and Iron Man's laser
+  passes straight through them to hit the enemy behind. You *can* still crash
+  into a teammate's body — that's just part of the game.
+- A team is out when all its snakes have crashed. If both teams fall on the same
+  tick, the higher **team total** wins.
+- Bots get **random skins**, so they use abilities too. They obey the same 15
+  second cooldown as you — tested.
+
+**Bot difficulty**
+
+| Level | How it plays |
+|---|---|
+| 🙂 Easy | Wanders, makes a mistake about a third of the time, rarely uses abilities |
+| 😐 Medium | Chases the nearest fruit, avoids danger, uses abilities sensibly |
+| 😈 Hard | Also runs a flood-fill to check it isn't sealing itself into a pocket, and uses abilities aggressively |
+
+### 📊 How hard are the bots really? (simulated 1v1, 150 rounds)
+
+Modelling "you" as a beginner who misreacts half the time:
+
+| Bot level | You win | Your score | Bot's score |
+|---|---|---|---|
+| 🙂 Easy | **51%** | 156 | 206 |
+| 😐 Medium | **13%** | 190 | 354 |
+| 😈 Hard | **8%** | 179 | 371 |
+
+- **Easy is a genuinely fair match** for a beginner — near enough a coin flip.
+- **Medium already wins 87% of the time**, and Hard is only a little above that.
+  The big jump is easy→medium, not medium→hard.
+- The bots aren't cheating to do it. They see exactly what you see and share
+  your cooldowns; they're just consistent. The flood-fill is what stops Hard
+  bots trapping themselves, which is how most snake bots die.
+
+If Medium feels brutal, raise its `mistake` value (0.12) in `BOT_LEVELS` near
+the top of the file — that one number is most of the difficulty.
+
 ---
 
-## ⚠️ What still needs doing---
+## ⚠️ What still needs doing### 🤖 Bots and team modes
+
+**Game mode** and **Computer players** pickers sit on the main menu.
+
+| Mode | Snakes | How it works |
+|---|---|---|
+| Free for all | you + 0–5 bots | Last snake alive wins |
+| 1 v 1 | 2 | Two teams of one |
+| 2 v 2 | 4 | Two teams of two |
+| 3 v 3 | 6 | Two teams of three |
+
+- **Empty seats fill with bots automatically** in team modes. Play 3v3 on your
+  own if you like — you get five bots.
+- Humans are dealt out **alternately**, so two friends land on opposite teams
+  rather than both on one side.
+- **Team colour beats personal colour.** In team games the glow around your
+  snake shows 🔴 Red or 🔵 Blue, because which side someone's on matters more
+  than which colour they picked.
+- **No friendly fire.** Thor's hammer skips teammates and Iron Man's laser
+  passes straight through them to hit the enemy behind. You *can* still crash
+  into a teammate's body — that's just part of the game.
+- A team is out when all its snakes have crashed. If both teams fall on the same
+  tick, the higher **team total** wins.
+- Bots get **random skins**, so they use abilities too. They obey the same 15
+  second cooldown as you — tested.
+
+**Bot difficulty**
+
+| Level | How it plays |
+|---|---|
+| 🙂 Easy | Wanders, makes a mistake about a third of the time, rarely uses abilities |
+| 😐 Medium | Chases the nearest fruit, avoids danger, uses abilities sensibly |
+| 😈 Hard | Also runs a flood-fill to check it isn't sealing itself into a pocket, and uses abilities aggressively |
+
+### 📊 How hard are the bots really? (simulated 1v1, 150 rounds)
+
+Modelling "you" as a beginner who misreacts half the time:
+
+| Bot level | You win | Your score | Bot's score |
+|---|---|---|---|
+| 🙂 Easy | **51%** | 156 | 206 |
+| 😐 Medium | **13%** | 190 | 354 |
+| 😈 Hard | **8%** | 179 | 371 |
+
+- **Easy is a genuinely fair match** for a beginner — near enough a coin flip.
+- **Medium already wins 87% of the time**, and Hard is only a little above that.
+  The big jump is easy→medium, not medium→hard.
+- The bots aren't cheating to do it. They see exactly what you see and share
+  your cooldowns; they're just consistent. The flood-fill is what stops Hard
+  bots trapping themselves, which is how most snake bots die.
+
+If Medium feels brutal, raise its `mistake` value (0.12) in `BOT_LEVELS` near
+the top of the file — that one number is most of the difficulty.
+
+---
 
 ## ⚠️ What still needs doing
 
@@ -189,6 +297,9 @@ watching for:
 - Do the abilities feel fun or frustrating? Especially Thor's hammer, which the
   simulation says is the strongest against good players.
 - Does the ability button get in the way on a phone?
+- Are Easy bots actually beatable for a real beginner, and is Medium too big a
+  jump? The simulation says easy→medium is a cliff.
+- In team modes, is it obvious at a glance who's on your side?
 
 Any of those are easy to tune — they're just numbers in the file.
 
@@ -203,11 +314,8 @@ Any of those are easy to tune — they're just numbers in the file.
 3. **High score list** that survives closing the tab
 4. **"Add to Home Screen"** so it feels like a real iPhone/iPad app (no App
    Store, no $99 developer account — a small change to the file)
-5. **Computer opponents (bots)** so 1-player isn't lonely, and so you can
-   practise 6-player without rounding up five friends
-6. **Team mode** — 3 versus 3
-7. **A homepage listing several games**, once there's a second game
-8. **Respawn mode** — instead of watching after you crash, come back small and
+5. **A homepage listing several games**, once there's a second game
+6. **Respawn mode** — instead of watching after you crash, come back small and
    play to a time limit. Good if people get bored waiting
 
 ---

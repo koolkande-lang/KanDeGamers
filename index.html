@@ -56,6 +56,20 @@
     border-color: #ffb3d4; opacity: 1; box-shadow: 0 0 14px rgba(255,93,162,0.55);
   }
 
+  #formatRow, #botRow, #botDiffRow { display: flex; gap: 5px; justify-content: center; margin: 0 0 6px; }
+  #menu #formatRow button, #menu #botRow button, #menu #botDiffRow button {
+    display: block; flex: 1; width: auto; margin: 0; padding: 8px 2px;
+    font-size: 0.74rem; line-height: 1.2; border-radius: 9px;
+    background: #2c1a3d; border: 2px solid transparent; opacity: 0.7;
+  }
+  #menu #formatRow button.active, #menu #botRow button.active,
+  #menu #botDiffRow button.active {
+    background: linear-gradient(135deg, var(--candy), #b23b6f);
+    border-color: #ffb3d4; opacity: 1;
+  }
+  #menu #botRow button { flex: 0 0 34px; }
+  #menu #botRow button:disabled, #menu #botDiffRow button:disabled { opacity: 0.25; }
+
   #colorRow { display: flex; gap: 8px; justify-content: center; margin: 0 0 4px; flex-wrap: wrap; }
   #menu #colorRow button {
     display: block; width: 40px; height: 40px; margin: 0; padding: 0;
@@ -269,6 +283,15 @@
     <p class="fieldLabel">Your name:</p>
     <input id="nameInput" maxlength="12" placeholder="Player">
 
+    <p class="fieldLabel">Game mode:</p>
+    <div id="formatRow"></div>
+    <p id="formatNote" class="note"></p>
+
+    <p class="fieldLabel">Computer players:</p>
+    <div id="botRow"></div>
+    <div id="botDiffRow"></div>
+    <p id="botNote" class="note"></p>
+
     <button id="btnPath" class="secondary">🏆 Path of Prey <span id="pathMini"></span></button>
 
     <button id="btn1p">1 Player</button>
@@ -366,6 +389,23 @@
   //  Constants
   // ============================================================
   const MAX_PLAYERS = 6;
+
+  // size 0 == free-for-all, take whoever turns up.
+  const FORMATS = {
+    ffa:   { label: 'Free for all', size: 0, teams: false },
+    '1v1': { label: '1 v 1',        size: 2, teams: true },
+    '2v2': { label: '2 v 2',        size: 4, teams: true },
+    '3v3': { label: '3 v 3',        size: 6, teams: true }
+  };
+  const TEAMS = [
+    { name: 'Red',  colour: '#ef4444', light: '#fca5a5', emoji: '🔴' },
+    { name: 'Blue', colour: '#3b82f6', light: '#93c5fd', emoji: '🔵' }
+  ];
+  const BOT_LEVELS = {
+    easy:   { label: '🙂 Easy',   lookahead: 0,  mistake: 0.35, aggression: 0.15 },
+    medium: { label: '😐 Medium', lookahead: 40, mistake: 0.12, aggression: 0.55 },
+    hard:   { label: '😈 Hard',   lookahead: 90, mistake: 0.02, aggression: 0.95 }
+  };
   const MIN_LEN = 3;
   const START_LEN = 3;
   const EFFECT_MS = 5000;
@@ -392,6 +432,8 @@
     // Superman is still purely cosmetic.
   };
   const abilityFor = p => (p ? ABILITIES[p.skinKey] || null : null);
+  const teamPlay = () => FORMATS[matchFormat].teams;
+  const sameTeam = (a, b) => a.team !== null && a.team !== undefined && a.team === b.team;
   const isTiny = (q, now) => q.abKind === 'tiny' && now < (q.abUntil || 0);
   const webActive = (q, now) => q.abKind === 'web' && now < (q.abUntil || 0);
   const hammerActive = (q, now) => q.abKind === 'hammer' && now < (q.abUntil || 0);
@@ -687,6 +729,9 @@
   let running = false, paused = false, roundOver = false;
   let rafId = null, broadcastTimer = null;
   let mode = 'solo';     // 'solo' | 'local2' | 'online'
+  let matchFormat = 'ffa';
+  let botCount = 0;
+  let botLevel = 'medium';
   let myIndex = 0;       // which player this device controls
 
   let tickMs = 230, difficultyName = 'Easy', difficultyEmoji = '🐌';
@@ -752,6 +797,57 @@
     try { saved = localStorage.getItem('scColor'); } catch (e) {}
     selectColor(PALETTE.some(c => c.key === saved) ? saved : 'green', false);
   })();
+
+  // ---- format / bot pickers ----
+  function buildPicker(rowId, items, getActive, onPick) {
+    const row = $(rowId);
+    row.innerHTML = '';
+    items.forEach(it => {
+      const b = document.createElement('button');
+      b.innerHTML = it.label;
+      b.dataset.key = it.key;
+      b.addEventListener('click', () => { onPick(it.key); refreshPickers(); });
+      row.appendChild(b);
+    });
+  }
+
+  function refreshPickers() {
+    const fmt = FORMATS[matchFormat];
+    Array.from($('formatRow').children).forEach(b =>
+      b.classList.toggle('active', b.dataset.key === matchFormat));
+    $('formatNote').textContent = fmt.size
+      ? `${fmt.size} snakes, two teams. Empty slots are filled with bots.`
+      : 'Everyone for themselves. Last snake alive wins.';
+
+    // Team modes have a fixed size, so the bot count isn't yours to choose.
+    const locked = !!fmt.size;
+    Array.from($('botRow').children).forEach(b => {
+      b.classList.toggle('active', !locked && Number(b.dataset.key) === botCount);
+      b.disabled = locked;
+    });
+    Array.from($('botDiffRow').children).forEach(b =>
+      b.classList.toggle('active', b.dataset.key === botLevel));
+    $('botNote').textContent = locked
+      ? 'Bots fill whatever seats are left over.'
+      : (botCount ? `${botCount} bot${botCount > 1 ? 's' : ''} will join you.`
+                  : 'No bots — just you (and anyone online).');
+  }
+
+  buildPicker('formatRow', Object.entries(FORMATS).map(([k, v]) =>
+    ({ key: k, label: v.label.replace(/ /g, '<br>') })), null, k => { matchFormat = k; try { localStorage.setItem('scFormat', k); } catch (e) {} });
+  buildPicker('botRow', [0,1,2,3,4,5].map(i => ({ key: String(i), label: String(i) })),
+    null, k => { botCount = Number(k); try { localStorage.setItem('scBots', k); } catch (e) {} });
+  buildPicker('botDiffRow', Object.entries(BOT_LEVELS).map(([k, v]) =>
+    ({ key: k, label: v.label })), null, k => { botLevel = k; try { localStorage.setItem('scBotLevel', k); } catch (e) {} });
+  (function () {
+    try {
+      const f = localStorage.getItem('scFormat'); if (FORMATS[f]) matchFormat = f;
+      const b = parseInt(localStorage.getItem('scBots') || '0', 10);
+      if (b >= 0 && b <= 5) botCount = b;
+      const d = localStorage.getItem('scBotLevel'); if (BOT_LEVELS[d]) botLevel = d;
+    } catch (e) {}
+  })();
+  refreshPickers();
 
   const nameInput = $('nameInput');
   (function () {
@@ -883,6 +979,7 @@
     for (let i = 0; i < START_LEN; i++) cells.push({ x: hx - s.dir.x * i, y: hy - s.dir.y * i });
     return {
       idx, name, colorKey, skinKey: skinByKey(skinKey).key,
+      team: null, isBot: false,
       trailKey: trailByKey(trailKey).key, particles: [], lastParticleAt: 0,
       cells, dir: { ...s.dir }, nextDir: { ...s.dir },
       score: 0, alive: true, tailFrom: null,
@@ -906,10 +1003,42 @@
     });
   }
 
+  const BOT_NAMES = ['Nibbles', 'Fang', 'Rex', 'Zip', 'Coil', 'Slick'];
+
+  // Fills a roster out with bots and stamps team numbers on it.
+  function buildRoster(humans) {
+    const fmt = FORMATS[matchFormat];
+    const roster = humans.map(h => ({ ...h, isBot: false }));
+    const target = Math.min(MAX_PLAYERS, fmt.size || (humans.length + botCount));
+
+    const skinKeys = SKINS.map(s => s.key);
+    let b = 0;
+    while (roster.length < target) {
+      roster.push({
+        name: '🤖 ' + BOT_NAMES[b % BOT_NAMES.length],
+        colorKey: null,                                  // assignColors picks a free one
+        skinKey: skinKeys[Math.floor(Math.random() * skinKeys.length)],
+        trailKey: 'none',
+        isBot: true
+      });
+      b++;
+    }
+
+    // Alternating, so humans end up split across the two teams rather than
+    // all bunched on one side.
+    roster.forEach((p, i) => { p.team = fmt.teams ? (i % 2) : null; });
+    return roster.slice(0, MAX_PLAYERS);
+  }
+
   function startRound(roster) {
     const withColors = assignColors(roster);
     setBoardSize(cellsForPlayers(withColors.length));
-    players = withColors.map((p, i) => makePlayer(i, p.name, p.colorKey, p.skinKey, p.trailKey));
+    players = withColors.map((p, i) => {
+      const pl = makePlayer(i, p.name, p.colorKey, p.skinKey, p.trailKey);
+      pl.team = (p.team === 0 || p.team === 1) ? p.team : null;
+      pl.isBot = !!p.isBot;
+      return pl;
+    });
     const now = nowMs();
     players.forEach(p => { p.lastMoveAt = now - tickMs; p.moveMs = tickMs; });
     fruits = [];
@@ -1074,6 +1203,7 @@
       end = { x, y };
       for (const q of players) {
         if (q === p || !q.alive || isTiny(q, now)) continue;
+        if (sameTeam(p, q)) continue;                 // the beam passes through teammates
         if (q.cells.some(c => c.x === x && c.y === y)) { hit = q; break; }
       }
       if (hit) break;
@@ -1127,6 +1257,7 @@
       const c = hammerCell(p, now);
       for (const q of players) {
         if (q === p || !q.alive || isTiny(q, now)) continue;
+        if (sameTeam(p, q)) continue;                 // no friendly fire
         const h = q.cells[0];
         // 3x3 kill zone around the hammer — landable, but you have to aim.
         if (Math.abs(h.x - c.x) <= 1 && Math.abs(h.y - c.y) <= 1) q.alive = false;
@@ -1156,7 +1287,127 @@
     return false;
   }
 
-  // The snake this device is actually steering.
+  // ============================================================
+  //  Bots  (host / local only — guests just watch them move)
+  // ============================================================
+  const BOT_DIRS = [DIRS.up, DIRS.down, DIRS.left, DIRS.right];
+
+  function occupancySet() {
+    const occ = new Set();
+    for (const q of players) {
+      if (!q.alive) continue;
+      for (const c of q.cells) occ.add(c.y * CELLS + c.x);
+    }
+    return occ;
+  }
+
+  const inBounds = (x, y) => x >= 0 && x < CELLS && y >= 0 && y < CELLS;
+
+  // How much open space can this square reach? Stops bots cheerfully sealing
+  // themselves into a pocket, which is the number one way a naive bot dies.
+  function openSpace(startX, startY, occ, limit) {
+    if (limit <= 0) return 0;
+    const seen = new Set([startY * CELLS + startX]);
+    const queue = [[startX, startY]];
+    let count = 0;
+    while (queue.length && count < limit) {
+      const [x, y] = queue.shift();
+      count++;
+      for (const d of BOT_DIRS) {
+        const nx = x + d.x, ny = y + d.y, k = ny * CELLS + nx;
+        if (!inBounds(nx, ny) || occ.has(k) || seen.has(k)) continue;
+        seen.add(k);
+        queue.push([nx, ny]);
+      }
+    }
+    return count;
+  }
+
+  function botThink(p, now) {
+    const lvl = BOT_LEVELS[botLevel] || BOT_LEVELS.medium;
+    const h = p.cells[0];
+    const occ = occupancySet();
+    // Our own tail is about to move out of the way, so it isn't really solid.
+    const tail = p.cells[p.cells.length - 1];
+    occ.delete(tail.y * CELLS + tail.x);
+
+    const safe = BOT_DIRS.filter(d => {
+      if (d.x === -p.dir.x && d.y === -p.dir.y) return false;      // no suicide reversal
+      const nx = h.x + d.x, ny = h.y + d.y;
+      if (!inBounds(nx, ny)) return webActive(p, now);             // Spidey may risk it
+      return !occ.has(ny * CELLS + nx);
+    });
+
+    if (!safe.length) return;                                      // doomed anyway
+
+    if (Math.random() < lvl.mistake) {
+      applyDirTo(p, safe[Math.floor(Math.random() * safe.length)]);
+      botMaybeAbility(p, now, lvl);
+      return;
+    }
+
+    // Nearest fruit, ignoring bananas unless we're long enough to want one.
+    let target = null, bestD = 1e9;
+    for (const f of fruits) {
+      if (f.type === 'banana' && p.cells.length < 8) continue;
+      const d = Math.abs(f.x - h.x) + Math.abs(f.y - h.y);
+      if (d < bestD) { bestD = d; target = f; }
+    }
+
+    let best = safe[0], bestScore = -1e9;
+    for (const d of safe) {
+      const nx = h.x + d.x, ny = h.y + d.y;
+      let score = 0;
+      if (target) score -= (Math.abs(target.x - nx) + Math.abs(target.y - ny));
+      if (lvl.lookahead > 0) score += openSpace(nx, ny, occ, lvl.lookahead) * 0.55;
+      // Give hostile snakes' heads a wide berth.
+      for (const q of players) {
+        if (q === p || !q.alive || sameTeam(p, q)) continue;
+        const qh = q.cells[0];
+        const dist = Math.abs(qh.x - nx) + Math.abs(qh.y - ny);
+        if (dist <= 2) score -= (3 - dist) * 6;
+      }
+      if (score > bestScore) { bestScore = score; best = d; }
+    }
+    applyDirTo(p, best);
+    botMaybeAbility(p, now, lvl);
+  }
+
+  function enemyInLine(p) {
+    const d = p.dir, h = p.cells[0];
+    let x = h.x, y = h.y;
+    for (let i = 1; i <= LASER_RANGE; i++) {
+      x += d.x; y += d.y;
+      if (!inBounds(x, y)) return false;
+      for (const q of players) {
+        if (q === p || !q.alive || sameTeam(p, q)) continue;
+        if (q.cells.some(c => c.x === x && c.y === y)) return true;
+      }
+    }
+    return false;
+  }
+
+  function botMaybeAbility(p, now, lvl) {
+    const ab = abilityFor(p);
+    if (!ab || now < (p.abReadyAt || 0)) return;
+    const h = p.cells[0];
+    const enemyNear = players.some(q => q !== p && q.alive && !sameTeam(p, q) &&
+      Math.abs(q.cells[0].x - h.x) <= 5 && Math.abs(q.cells[0].y - h.y) <= 5);
+    const fruitNear = fruits.some(f =>
+      Math.abs(f.x - h.x) <= SMASH_RADIUS && Math.abs(f.y - h.y) <= SMASH_RADIUS);
+    const wallNear = h.x < 3 || h.x >= CELLS - 3 || h.y < 3 || h.y >= CELLS - 3;
+
+    let want = false;
+    if (ab.key === 'hammer') want = enemyNear;
+    else if (ab.key === 'laser') want = enemyInLine(p);
+    else if (ab.key === 'web') want = wallNear;
+    else if (ab.key === 'smash') want = fruitNear;
+    else if (ab.key === 'tiny') want = enemyNear;
+    else if (ab.key === 'hack') want = true;
+
+    if (want && Math.random() < lvl.aggression) useAbility(p, now);
+  }
+
   // The snake this device is actually steering.
   function myPlayer() {
     if (!players.length) return null;
@@ -1167,9 +1418,18 @@
   function aliveCount() { return players.filter(p => p.alive).length; }
 
   function roundShouldEnd() {
+    if (teamPlay()) {
+      // A team is out when every one of its snakes has crashed.
+      const red = players.some(p => p.alive && p.team === 0);
+      const blue = players.some(p => p.alive && p.team === 1);
+      return !(red && blue);
+    }
     if (players.length <= 1) return aliveCount() === 0;
     return aliveCount() <= 1;
   }
+
+  const teamScore = t => players.filter(p => p.team === t)
+                                .reduce((sum, p) => sum + p.score, 0);
 
   function update(now) {
     if (!running || paused || roundOver) return;
@@ -1178,6 +1438,8 @@
       if (!p.alive) continue;
       p.moveMs = tickMs / speedMultFor(p, now);
       if (now - p.lastMoveAt >= p.moveMs) {
+        // Think only when about to move — once per bot per move, not per frame.
+        if (p.isBot) botThink(p, now);
         p.lastMoveAt += p.moveMs;
         // If the tab was backgrounded, don't try to replay a hundred moves.
         if (now - p.lastMoveAt > p.moveMs * 3) p.lastMoveAt = now;
@@ -1293,7 +1555,11 @@
     const skin = skinByKey(p.skinKey);
     const bodyDark  = skin.dark  || col.dark;
     const bodyLight = skin.light || col.light;
-    const showAura = !!skin.dark;
+    // In team games the aura shows your TEAM, not your personal colour — which
+    // side someone is on matters far more than which colour they picked.
+    const teamCol = (p.team === 0 || p.team === 1) ? TEAMS[p.team] : null;
+    const auraCol = teamCol ? teamCol.light : col.light;
+    const showAura = !!skin.dark || !!teamCol;
 
     // Ant-Man shrinks further while intangible, so you can SEE he's phasing.
     const tinyNow = isTiny(p, now);
@@ -1306,7 +1572,7 @@
       const fromTail = m - 1 - i;
       const w = base * Math.min(1, 0.38 + 0.62 * (fromTail / 3));
       if (showAura) {
-        ctx.strokeStyle = col.light;
+        ctx.strokeStyle = auraCol;
         ctx.lineWidth = w + cellSize * 0.16;
         ctx.beginPath();
         ctx.moveTo(pts[i].x, pts[i].y);
@@ -1351,7 +1617,7 @@
     const head = pts[0];
 
     if (showAura) {
-      ctx.fillStyle = col.light;
+      ctx.fillStyle = auraCol;
       ctx.beginPath();
       ctx.arc(head.x, head.y, base * 0.56 + cellSize * 0.09, 0, Math.PI * 2);
       ctx.fill();
@@ -1619,6 +1885,16 @@
   function updateHud() {
     const now = nowMs();
     hudEl.innerHTML = '';
+    if (teamPlay()) {
+      [0, 1].forEach(t => {
+        const tag = document.createElement('div');
+        tag.className = 'hudPlayer';
+        tag.style.background = 'rgba(0,0,0,0.45)';
+        tag.innerHTML = `<span>${TEAMS[t].emoji}</span>` +
+          `<span style="color:${TEAMS[t].light}">${TEAMS[t].name}</span> ${teamScore(t)}`;
+        hudEl.appendChild(tag);
+      });
+    }
     players.forEach(p => {
       const col = colorByKey(p.colorKey);
       const d = document.createElement('div');
@@ -1626,7 +1902,9 @@
       let fx = '';
       if (p.alive && p.boostUntil > now) fx = ' ⚡';
       else if (p.alive && p.slowUntil > now) fx = ' ❄️';
-      d.innerHTML = `<span class="dot" style="background:${col.light}"></span>` +
+      const ring = (p.team === 0 || p.team === 1)
+        ? `box-shadow:0 0 0 2px ${TEAMS[p.team].colour}` : '';
+      d.innerHTML = `<span class="dot" style="background:${col.light};${ring}"></span>` +
                     `<span style="color:${col.light}">${escapeHtml(p.name)}</span> ${p.score}${fx}`;
       hudEl.appendChild(d);
     });
@@ -1705,8 +1983,9 @@
       (b.alive - a.alive) || (b.score - a.score));
     return sorted.map((p, i) => {
       const col = colorByKey(p.colorKey);
+      const tm = (p.team === 0 || p.team === 1) ? TEAMS[p.team].emoji + ' ' : '';
       return `<div style="display:flex;gap:8px;justify-content:center;align-items:center;padding:3px;">
-        <span>${i + 1}.</span>
+        <span>${i + 1}.</span><span>${tm}</span>
         <span class="dot" style="background:${col.light}"></span>
         <span style="color:${col.light}">${escapeHtml(p.name)}</span>
         <span>${p.score}</span>${p.alive ? ' <span>👑</span>' : ''}</div>`;
@@ -1721,7 +2000,18 @@
     stopRenderLoop();
 
     let msg;
-    if (players.length === 1) {
+    if (teamPlay()) {
+      const red = players.some(p => p.alive && p.team === 0);
+      const blue = players.some(p => p.alive && p.team === 1);
+      if (red && !blue)      msg = `${TEAMS[0].emoji} Team Red wins!`;
+      else if (blue && !red) msg = `${TEAMS[1].emoji} Team Blue wins!`;
+      else {
+        const r = teamScore(0), b = teamScore(1);
+        msg = r === b ? `Draw! ${r} each`
+            : (r > b ? `${TEAMS[0].emoji} Team Red wins on points ${r}-${b}`
+                     : `${TEAMS[1].emoji} Team Blue wins on points ${b}-${r}`);
+      }
+    } else if (players.length === 1) {
       msg = `Game over! Score: ${players[0].score}`;
     } else {
       const survivors = players.filter(p => p.alive);
@@ -1788,14 +2078,14 @@
     matchConns = null;
     mode = n === 2 ? 'local2' : 'solo';
     myIndex = 0;
-    const roster = [{ name: myDisplayName(), colorKey: myColorKey,
+    const humans = [{ name: myDisplayName(), colorKey: myColorKey,
                       skinKey: mySkinKey, trailKey: myTrailKey }];
     if (n === 2) {
       const other = PALETTE.find(c => c.key !== myColorKey) || PALETTE[1];
-      roster.push({ name: 'Player 2', colorKey: other.key,
+      humans.push({ name: 'Player 2', colorKey: other.key,
                     skinKey: 'classic', trailKey: 'none' });
     }
-    startRound(roster);
+    startRound(buildRoster(humans));
   }
 
   $('btn1p').addEventListener('click', () => startLocal(1));
@@ -1857,10 +2147,10 @@
     if (netRole !== 'host') return;
     mode = 'online';
     myIndex = 0;
-    const roster = lobbyRoster();
     matchConns = lobby.map(l => l.conn);
+    const roster = buildRoster(lobbyRoster());   // humans first, bots after
     broadcast({ type: 'begin', ms: tickMs, name: difficultyName,
-                emoji: difficultyEmoji, roster });
+                emoji: difficultyEmoji, roster, fmt: matchFormat });
     startRound(roster);
   }
 
@@ -2060,8 +2350,14 @@
     } else if (msg.type === 'begin') {
       tickMs = msg.ms; difficultyName = msg.name; difficultyEmoji = msg.emoji;
       mode = 'online';
+      if (FORMATS[msg.fmt]) matchFormat = msg.fmt;    // host picks the format
       setBoardSize(cellsForPlayers(msg.roster.length));
-      players = msg.roster.map((p, i) => makePlayer(i, p.name, p.colorKey, p.skinKey, p.trailKey));
+      players = msg.roster.map((p, i) => {
+        const pl = makePlayer(i, p.name, p.colorKey, p.skinKey, p.trailKey);
+        pl.team = (p.team === 0 || p.team === 1) ? p.team : null;
+        pl.isBot = !!p.isBot;
+        return pl;
+      });
       const now = nowMs();
       players.forEach(p => { p.lastMoveAt = now; p.moveMs = tickMs; });
       fruits = [];
@@ -2296,6 +2592,10 @@
     hammerCell, fireLaser, hulkSmash, applyHammers, deflectOffWall,
     ABILITY_COOLDOWN_MS, LASER_RANGE, SMASH_RADIUS, HAMMER_RADIUS,
     roundShouldEnd, aliveCount, assignColors, cellsForPlayers, fruitCountFor,
+    buildRoster, botThink, botMaybeAbility, openSpace, teamScore, sameTeam,
+    teamPlay, FORMATS, TEAMS, BOT_LEVELS,
+    setFormat(f) { matchFormat = f; }, getFormat() { return matchFormat; },
+    setBots(n) { botCount = n; }, setBotLevel(l) { botLevel = l; },
     applyDirTo, tryHack, myPlayer, HACK_MIN, HACK_MAX, HACK_COOLDOWN_MS,
     setRunning(v) { running = v; }, setRoundOver(v) { roundOver = v; },
     setPaused(v) { paused = v; },
