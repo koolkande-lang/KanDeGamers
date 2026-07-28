@@ -54,31 +54,45 @@
 
 **🏆 Path of Prey — reward track**
 
-Every **100 points you score, in any game, ever** earns one reward. Progress is
-saved on your device and never resets.
+Every **100 points you score, in any game, ever** earns one reward. Ten rewards
+in total. Progress is saved on your device and never resets.
 
-| Points | Reward | Look |
-|---|---|---|
-| 100 | 🤖 Iron Man | Red and gold, glowing arc reactor on the head |
-| 200 | 🔨 Thor | Silver and blue, lightning bolt on the head |
-| 300 | 🕷️ Spider-Man | Red with dark blue webbing across the body |
-| 400 | 💚 Hulk | Green with purple bands, drawn 18% chunkier |
-| 500 | 🦸 Superman | Blue and red with a diamond emblem |
-| 600 | 🐜 Ant-Man | Dark red, drawn at 66% size — genuinely tiny |
+Skins and trails **alternate**, so you get something new every 100 points rather
+than waiting ages for the first trail. They're **separate slots** — you can wear
+Hulk with a rainbow trail.
 
-**Classic** is free and uses your chosen colour.
+| Points | Reward | Kind | Look |
+|---|---|---|---|
+| 100 | ⚡ Lightning Trail | Trail | White-and-yellow sparks that flash and vanish fast |
+| 200 | 🤖 Iron Man | Skin | Red and gold, pulsing arc reactor on the head |
+| 300 | 🌈 Rainbow Trail | Trail | Colour-cycling bubbles that drift and shrink |
+| 400 | 🔨 Thor | Skin | Silver and blue, lightning bolt on the head |
+| 500 | ☠️ Poison Trail | Trail | Green bubbles that wobble upward and pop |
+| 600 | 🕷️ Spider-Man | Skin | Red with dark blue webbing across the body |
+| 700 | 💨 Dirt Trail | Trail | Brown clods kicked up that arc and fall |
+| 800 | 💚 Hulk | Skin | Green with purple bands, drawn 18% chunkier |
+| 900 | 🦸 Superman | Skin | Blue and red with a diamond emblem |
+| 1000 | 🐜 Ant-Man | Skin | Dark red, drawn at 66% size — genuinely tiny |
+
+**Classic** skin and **No Trail** are free from the start.
 
 Notes:
 
-- Skins are **cosmetic only** — tested to confirm they never change scoring or
-  collisions. Ant-Man looks smaller but occupies exactly the same squares.
+- Everything here is **cosmetic only** — tested to confirm no skin or trail
+  changes scoring or collisions. Ant-Man looks tiny but fills the same squares.
+- Trails are drawn from each device's own copy of the game, so they cost
+  **nothing** in network traffic even with six players.
+- Particles are capped at 80 per snake and expire on a timer, so they can't pile
+  up and slow the game down.
 - Several players can wear the same skin online. Your chosen colour is drawn as
-  an **aura around your snake**, so you can always find yourself.
-- In same-device 2P, the **better** of the two scores counts toward the Path.
-  Online, only your own snake's score counts — not the winner's.
-- ⚠️ These names are trademarks of Marvel and DC. Fine for a personal project.
-  If this ever goes somewhere bigger, change the `name` fields in the `SKINS`
-  list near the top of the file — nothing else depends on them.
+  an **aura around your snake** so you can always find yourself.
+- In same-device 2P the **better** of the two scores counts. Online, only your
+  own snake's score counts — not the winner's.
+- Roughly 13 games to complete the whole path; the first reward lands in game
+  1–3.
+- ⚠️ The hero names are trademarks of Marvel and DC. Fine for a personal
+  project. To change them, edit the `name` fields in the `SKINS` list near the
+  top of the file — nothing else depends on them.
 
 ---
 
@@ -89,6 +103,8 @@ tests, but no human has actually played the 6-player version. Things worth
 watching for:
 
 - Does 6 snakes on a 40×40 board feel crowded or fun?
+- Do the trails look good, or do they clutter the board and hide the fruit?
+- Are the particles smooth on an older iPad, or do they cause stutter?
 - Is ⚡ too strong? Is ❄️ annoying to be on the receiving end of?
 - Does online play stay smooth with 5 friends, or does it lag?
 - Are the fruits easy to tell apart at small sizes on a phone?
@@ -99,13 +115,18 @@ Any of those are easy to tune — they're just numbers in the file.
 
 ## 💡 Round 4 — if you still want more
 
-1. **High score list** that survives closing the tab
-2. **Sound effects** — crunch on eating, thud on crashing
-3. **"Add to Home Screen"** so it feels like a real iPhone/iPad app (no App
+1. **Sound effects** — crunch on eating, zap for lightning, thud on crashing,
+   fanfare for a reward *(you picked this — next up)*
+2. **Obstacles and maps** — walls and mazes, pick a map before you play:
+   Open, Cross, Maze, Donut *(you picked this — next up)*
+3. **High score list** that survives closing the tab
+4. **"Add to Home Screen"** so it feels like a real iPhone/iPad app (no App
    Store, no $99 developer account — a small change to the file)
-4. **Team mode** — 3 versus 3
-5. **A homepage listing several games**, once there's a second game
-6. **Respawn mode** — instead of watching after you crash, come back small and
+5. **Computer opponents (bots)** so 1-player isn't lonely, and so you can
+   practise 6-player without rounding up five friends
+6. **Team mode** — 3 versus 3
+7. **A homepage listing several games**, once there's a second game
+8. **Respawn mode** — instead of watching after you crash, come back small and
    play to a time limit. Good if people get bored waiting
 
 ---

@@ -164,6 +164,9 @@
   .skinTile .swatch {
     height: 16px; border-radius: 20px; margin: 0 auto 6px; width: 72%;
   }
+  .skinTile .kindTag {
+    font-size: 0.55rem; letter-spacing: 1px; opacity: 0.45; margin-bottom: 1px;
+  }
   .skinTile .sname { font-size: 0.8rem; font-weight: bold; }
   .skinTile .sreq { font-size: 0.68rem; opacity: 0.6; }
   .skinTile .equippedTag { font-size: 0.62rem; color: #fde68a; }
@@ -240,7 +243,8 @@
   <div id="pathPanel" class="hidden">
     <p class="fieldLabel">🏆 Path of Prey</p>
     <p class="note" style="margin-bottom:8px !important;">
-      Every <b>100 points</b> you score — in any game, ever — earns one reward.</p>
+      Every <b>100 points</b> you score — in any game, ever — earns one reward.<br>
+      Skins and trails are separate slots, so you can wear one of each.</p>
 
     <div id="pathTotal"></div>
     <div id="pathBarOuter"><div id="pathBarFill"></div></div>
@@ -372,25 +376,122 @@
   // NOTE: these names are trademarks of Marvel / DC. Fine for a personal
   // project; if this ever goes somewhere bigger, change the `name` fields —
   // nothing else in the code depends on them.
+  // Skins and trails ALTERNATE up the path, so you never wait more than two
+  // rewards for a change of kind.
   const SKINS = [
     { key: 'classic',  name: 'Classic',     unlockAt: 0,
       dark: null, light: null, accent: null, badge: 'none', width: 1 },
-    { key: 'ironman',  name: 'Iron Man',    unlockAt: 100, emoji: '🤖',
+    { key: 'ironman',  name: 'Iron Man',    unlockAt: 200,  emoji: '🤖',
       dark: '#b91c1c', light: '#f59e0b', accent: '#fde68a', badge: 'reactor', width: 1 },
-    { key: 'thor',     name: 'Thor',        unlockAt: 200, emoji: '🔨',
+    { key: 'thor',     name: 'Thor',        unlockAt: 400,  emoji: '🔨',
       dark: '#475569', light: '#e2e8f0', accent: '#60a5fa', badge: 'bolt',    width: 1 },
-    { key: 'spidey',   name: 'Spider-Man',  unlockAt: 300, emoji: '🕷️',
+    { key: 'spidey',   name: 'Spider-Man',  unlockAt: 600,  emoji: '🕷️',
       dark: '#b91c1c', light: '#ef4444', accent: '#1e3a8a', badge: 'web',     width: 1 },
-    { key: 'hulk',     name: 'Hulk',        unlockAt: 400, emoji: '💚',
+    { key: 'hulk',     name: 'Hulk',        unlockAt: 800,  emoji: '💚',
       dark: '#15803d', light: '#4ade80', accent: '#7e22ce', badge: 'none',    width: 1.18 },
-    { key: 'superman', name: 'Superman',    unlockAt: 500, emoji: '🦸',
+    { key: 'superman', name: 'Superman',    unlockAt: 900,  emoji: '🦸',
       dark: '#1d4ed8', light: '#3b82f6', accent: '#dc2626', badge: 'diamond', width: 1 },
-    { key: 'antman',   name: 'Ant-Man',     unlockAt: 600, emoji: '🐜',
+    { key: 'antman',   name: 'Ant-Man',     unlockAt: 1000, emoji: '🐜',
       dark: '#7f1d1d', light: '#dc2626', accent: '#111827', badge: 'none',    width: 0.66 }
   ];
   const skinByKey = k => SKINS.find(s => s.key === k) || SKINS[0];
+
+  // ---- Trails ----
+  // Purely decorative sparks dropped behind the tail. Because they're cosmetic,
+  // every device generates its own — none of this crosses the network.
+  const TRAIL_CAP = 80;   // per snake, so six players can't drown the frame rate
+
+  const TRAILS = [
+    { key: 'none', name: 'No Trail', unlockAt: 0, emoji: '·' },
+
+    { key: 'lightning', name: 'Lightning Trail', unlockAt: 100, emoji: '⚡',
+      every: 40, count: 2, swatch: 'linear-gradient(90deg,#fef08a,#facc15)',
+      spawn: (pt, now, cs) => ({
+        x: pt.x + (Math.random() - 0.5) * cs * 0.5,
+        y: pt.y + (Math.random() - 0.5) * cs * 0.5,
+        born: now, life: 240, a: Math.random() * Math.PI * 2, r: cs * (0.25 + Math.random() * 0.3)
+      }),
+      draw: (c, q, t, cs) => {
+        c.globalAlpha = (1 - t) * 0.95;
+        c.strokeStyle = t < 0.4 ? '#ffffff' : '#facc15';
+        c.lineWidth = Math.max(1, cs * 0.11);
+        const dx = Math.cos(q.a) * q.r, dy = Math.sin(q.a) * q.r;
+        c.beginPath();
+        c.moveTo(q.x - dx, q.y - dy);
+        c.lineTo(q.x + dy * 0.35, q.y - dx * 0.35);
+        c.lineTo(q.x + dx, q.y + dy);
+        c.stroke();
+      } },
+
+    { key: 'rainbow', name: 'Rainbow Trail', unlockAt: 300, emoji: '🌈',
+      every: 28, count: 1,
+      swatch: 'linear-gradient(90deg,#f87171,#fbbf24,#4ade80,#60a5fa,#c084fc)',
+      spawn: (pt, now, cs) => ({
+        x: pt.x, y: pt.y, born: now, life: 900,
+        vx: (Math.random() - 0.5) * cs * 0.0012,
+        vy: (Math.random() - 0.5) * cs * 0.0012,
+        hue: (now / 3) % 360, r: cs * (0.22 + Math.random() * 0.12)
+      }),
+      draw: (c, q, t, cs) => {
+        c.globalAlpha = (1 - t) * 0.85;
+        c.fillStyle = `hsl(${q.hue}, 92%, 62%)`;
+        const age = t * q.life;
+        c.beginPath();
+        c.arc(q.x + q.vx * age, q.y + q.vy * age, q.r * (1 - t * 0.75), 0, Math.PI * 2);
+        c.fill();
+      } },
+
+    { key: 'poison', name: 'Poison Trail', unlockAt: 500, emoji: '☠️',
+      every: 55, count: 1, swatch: 'linear-gradient(90deg,#4ade80,#166534)',
+      spawn: (pt, now, cs) => ({
+        x: pt.x + (Math.random() - 0.5) * cs * 0.4, y: pt.y,
+        born: now, life: 1100, vy: -cs * 0.00035,
+        wob: Math.random() * Math.PI * 2, r: cs * (0.14 + Math.random() * 0.14)
+      }),
+      draw: (c, q, t, cs) => {
+        const age = t * q.life;
+        const x = q.x + Math.sin(q.wob + age / 150) * cs * 0.14;
+        const y = q.y + q.vy * age;
+        c.globalAlpha = (1 - t) * 0.7;
+        c.fillStyle = '#65a30d';
+        c.beginPath(); c.arc(x, y, q.r * (0.7 + t * 0.6), 0, Math.PI * 2); c.fill();
+        c.globalAlpha = (1 - t) * 0.9;
+        c.strokeStyle = '#bef264';
+        c.lineWidth = Math.max(0.8, cs * 0.045);
+        c.beginPath(); c.arc(x, y, q.r * (0.7 + t * 0.6), 0, Math.PI * 2); c.stroke();
+      } },
+
+    { key: 'dirt', name: 'Dirt Trail', unlockAt: 700, emoji: '💨',
+      every: 42, count: 2, swatch: 'linear-gradient(90deg,#d6b48a,#78350f)',
+      spawn: (pt, now, cs) => ({
+        x: pt.x + (Math.random() - 0.5) * cs * 0.45,
+        y: pt.y + (Math.random() - 0.5) * cs * 0.25,
+        born: now, life: 750,
+        vx: (Math.random() - 0.5) * cs * 0.0016,
+        vy: -cs * 0.0011 * Math.random(),
+        g: cs * 0.0000075,
+        r: cs * (0.09 + Math.random() * 0.11),
+        shade: Math.random()
+      }),
+      draw: (c, q, t, cs) => {
+        const age = t * q.life;
+        const x = q.x + q.vx * age;
+        const y = q.y + q.vy * age + 0.5 * q.g * age * age;
+        c.globalAlpha = (1 - t) * 0.75;
+        c.fillStyle = q.shade > 0.5 ? '#92400e' : '#c8a27a';
+        c.fillRect(x - q.r, y - q.r, q.r * 2, q.r * 2);
+      } }
+  ];
+  const trailByKey = k => TRAILS.find(t => t.key === k) || TRAILS[0];
+
+  // The path is both tracks merged and sorted — one reward per 100 points.
+  const PATH = [...SKINS.filter(s => s.unlockAt > 0).map(s => ({ kind: 'skin', item: s })),
+                ...TRAILS.filter(t => t.unlockAt > 0).map(t => ({ kind: 'trail', item: t }))]
+               .sort((a, b) => a.item.unlockAt - b.item.unlockAt);
+
   const rewardsEarned = pts => Math.floor(pts / POINTS_PER_REWARD);
   const isSkinUnlocked = (s, pts) => pts >= s.unlockAt;
+  const nextLockedReward = pts => PATH.find(r => r.item.unlockAt > pts) || null;
   const nextLockedSkin = pts => SKINS.find(s => !isSkinUnlocked(s, pts)) || null;
 
   // ============================================================
@@ -420,6 +521,7 @@
   let myColorKey = 'green';
   let myName = '';
   let mySkinKey = 'classic';
+  let myTrailKey = 'none';
   let pathPoints = 0;     // every point you've ever scored, across all games
 
   // Networking
@@ -495,28 +597,33 @@
   //  Path of Prey
   // ============================================================
   (function loadPath() {
-    let p = 0, s = null;
+    let p = 0, s = null, t = null;
     try {
       p = parseInt(localStorage.getItem('scPathPoints') || '0', 10);
       s = localStorage.getItem('scSkin');
+      t = localStorage.getItem('scTrail');
     } catch (e) {}
     pathPoints = Number.isFinite(p) && p > 0 ? p : 0;
-    // Never leave someone wearing a skin they haven't earned (e.g. if progress
-    // was cleared but the skin choice survived).
-    const wanted = skinByKey(s);
-    mySkinKey = isSkinUnlocked(wanted, pathPoints) ? wanted.key : 'classic';
+    // Never leave someone wearing something they haven't earned (e.g. if
+    // progress was cleared but the equipment choice survived).
+    const wantSkin = skinByKey(s);
+    mySkinKey = isSkinUnlocked(wantSkin, pathPoints) ? wantSkin.key : 'classic';
+    const wantTrail = trailByKey(t);
+    myTrailKey = isSkinUnlocked(wantTrail, pathPoints) ? wantTrail.key : 'none';
   })();
 
   function savePath() {
     try {
       localStorage.setItem('scPathPoints', String(pathPoints));
       localStorage.setItem('scSkin', mySkinKey);
+      localStorage.setItem('scTrail', myTrailKey);
     } catch (e) {}
   }
 
   // Returns the skins crossed by going from `before` to `after` points.
   function newlyUnlocked(before, after) {
-    return SKINS.filter(s => s.unlockAt > 0 && s.unlockAt > before && s.unlockAt <= after);
+    return PATH.filter(r => r.item.unlockAt > before && r.item.unlockAt <= after)
+               .map(r => r.item);
   }
 
   function awardPoints(pts) {
@@ -531,7 +638,7 @@
 
   function renderPath() {
     const earned = rewardsEarned(pathPoints);
-    const next = nextLockedSkin(pathPoints);
+    const next = nextLockedReward(pathPoints);
 
     $('pathMini').textContent = `· ${pathPoints} pts`;
     $('pathTotal').textContent = `${pathPoints} points · ${earned} reward${earned === 1 ? '' : 's'}`;
@@ -540,25 +647,42 @@
     const into = pathPoints % POINTS_PER_REWARD;
     $('pathBarFill').style.width = (next ? (into / POINTS_PER_REWARD) * 100 : 100) + '%';
     $('pathNext').textContent = next
-      ? `${next.unlockAt - pathPoints} more points to unlock ${next.name}`
+      ? `${next.item.unlockAt - pathPoints} more points to unlock ${next.item.name}`
       : 'Every reward unlocked! 🎉';
 
+    const me = colorByKey(myColorKey);
     const grid = $('skinGrid');
     grid.innerHTML = '';
-    SKINS.forEach(s => {
-      const unlocked = isSkinUnlocked(s, pathPoints);
-      const equipped = s.key === mySkinKey;
+
+    // The two free options first, then the ten rewards in path order.
+    const entries = [{ kind: 'skin', item: SKINS[0] }, { kind: 'trail', item: TRAILS[0] }, ...PATH];
+
+    entries.forEach(({ kind, item }) => {
+      const unlocked = isSkinUnlocked(item, pathPoints);
+      const equipped = kind === 'skin' ? item.key === mySkinKey : item.key === myTrailKey;
       const tile = document.createElement('div');
       tile.className = 'skinTile' + (unlocked ? '' : ' locked') + (equipped ? ' equipped' : '');
-      const me = colorByKey(myColorKey);
-      const sw = s.dark ? `linear-gradient(90deg, ${s.light}, ${s.dark})`
-                        : `linear-gradient(90deg, ${me.light}, ${me.dark})`;
+
+      let sw;
+      if (kind === 'trail') sw = item.swatch || 'repeating-linear-gradient(90deg,#3d2255 0 6px,transparent 6px 12px)';
+      else sw = item.dark ? `linear-gradient(90deg, ${item.light}, ${item.dark})`
+                          : `linear-gradient(90deg, ${me.light}, ${me.dark})`;
+
       tile.innerHTML =
         `<div class="swatch" style="background:${sw}"></div>` +
-        `<div class="sname">${unlocked ? (s.emoji || '🐍') + ' ' : '🔒 '}${escapeHtml(s.name)}</div>` +
-        `<div class="sreq">${s.unlockAt === 0 ? 'Free' : s.unlockAt + ' pts'}</div>` +
+        `<div class="kindTag">${kind === 'trail' ? 'TRAIL' : 'SKIN'}</div>` +
+        `<div class="sname">${unlocked ? (item.emoji || '🐍') + ' ' : '🔒 '}${escapeHtml(item.name)}</div>` +
+        `<div class="sreq">${item.unlockAt === 0 ? 'Free' : item.unlockAt + ' pts'}</div>` +
         (equipped ? '<div class="equippedTag">EQUIPPED</div>' : '');
-      if (unlocked) tile.addEventListener('click', () => { mySkinKey = s.key; savePath(); renderPath(); });
+
+      if (unlocked) {
+        tile.addEventListener('click', () => {
+          // Skins and trails are separate slots — equipping one keeps the other.
+          if (kind === 'skin') mySkinKey = item.key; else myTrailKey = item.key;
+          savePath();
+          renderPath();
+        });
+      }
       grid.appendChild(tile);
     });
   }
@@ -570,7 +694,7 @@
   // ============================================================
   //  Building players
   // ============================================================
-  function makePlayer(idx, name, colorKey, skinKey) {
+  function makePlayer(idx, name, colorKey, skinKey, trailKey) {
     const s = SPAWNS[idx % SPAWNS.length];
     const hx = Math.max(MIN_LEN, Math.min(CELLS - 1 - MIN_LEN, Math.round(s.fx * CELLS)));
     const hy = Math.max(MIN_LEN, Math.min(CELLS - 1 - MIN_LEN, Math.round(s.fy * CELLS)));
@@ -578,6 +702,7 @@
     for (let i = 0; i < START_LEN; i++) cells.push({ x: hx - s.dir.x * i, y: hy - s.dir.y * i });
     return {
       idx, name, colorKey, skinKey: skinByKey(skinKey).key,
+      trailKey: trailByKey(trailKey).key, particles: [], lastParticleAt: 0,
       cells, dir: { ...s.dir }, nextDir: { ...s.dir },
       score: 0, alive: true, tailFrom: null,
       boostUntil: 0, slowUntil: 0,
@@ -601,7 +726,7 @@
   function startRound(roster) {
     const withColors = assignColors(roster);
     setBoardSize(cellsForPlayers(withColors.length));
-    players = withColors.map((p, i) => makePlayer(i, p.name, p.colorKey, p.skinKey));
+    players = withColors.map((p, i) => makePlayer(i, p.name, p.colorKey, p.skinKey, p.trailKey));
     const now = nowMs();
     players.forEach(p => { p.lastMoveAt = now - tickMs; p.moveMs = tickMs; });
     fruits = [];
@@ -804,6 +929,9 @@
     pts.push({ x: lerp(tailBase.x, tailTo.x, t), y: lerp(tailBase.y, tailTo.y, t) });
     const m = pts.length;
 
+    // Trail first, so the snake is drawn on top of its own sparks.
+    drawTrail(p, pts[m - 1], now);
+
     ctx.save();
     if (!p.alive) ctx.globalAlpha = 0.3;
 
@@ -922,6 +1050,35 @@
       }
     }
     ctx.restore();
+  }
+
+  // Sparks dropped behind the tail. Spawned on a timer rather than per move, so
+  // they look the same whether the snake is crawling on Easy or flying on Insane.
+  function drawTrail(p, tailPt, now) {
+    const tr = trailByKey(p.trailKey);
+    if (!p.particles) p.particles = [];
+
+    if (!tr.spawn) { p.particles.length = 0; return; }
+
+    if (p.alive && !paused && now - (p.lastParticleAt || 0) >= tr.every) {
+      p.lastParticleAt = now;
+      for (let i = 0; i < tr.count; i++) p.particles.push(tr.spawn(tailPt, now, cellSize));
+      // Hard cap: six snakes must not be able to flood the frame.
+      if (p.particles.length > TRAIL_CAP) {
+        p.particles.splice(0, p.particles.length - TRAIL_CAP);
+      }
+    }
+
+    ctx.save();
+    const alive = [];
+    for (const q of p.particles) {
+      const age = now - q.born;
+      if (age < 0 || age >= q.life) continue;   // expired, drop it
+      alive.push(q);
+      tr.draw(ctx, q, age / q.life, cellSize);
+    }
+    ctx.restore();
+    p.particles = alive;
   }
 
   // Little emblem on the head that gives each skin its character.
@@ -1099,10 +1256,12 @@
     matchConns = null;
     mode = n === 2 ? 'local2' : 'solo';
     myIndex = 0;
-    const roster = [{ name: myDisplayName(), colorKey: myColorKey, skinKey: mySkinKey }];
+    const roster = [{ name: myDisplayName(), colorKey: myColorKey,
+                      skinKey: mySkinKey, trailKey: myTrailKey }];
     if (n === 2) {
       const other = PALETTE.find(c => c.key !== myColorKey) || PALETTE[1];
-      roster.push({ name: 'Player 2', colorKey: other.key, skinKey: 'classic' });
+      roster.push({ name: 'Player 2', colorKey: other.key,
+                    skinKey: 'classic', trailKey: 'none' });
     }
     startRound(roster);
   }
@@ -1156,7 +1315,8 @@
   });
 
   function lobbyRoster() {
-    return lobby.map(l => ({ name: l.name, colorKey: l.colorKey, skinKey: l.skinKey || 'classic' }));
+    return lobby.map(l => ({ name: l.name, colorKey: l.colorKey,
+      skinKey: l.skinKey || 'classic', trailKey: l.trailKey || 'none' }));
   }
 
   // The single place a host starts or restarts an online match, so the
@@ -1226,7 +1386,8 @@
     showPanel('onlineStatus');
     $('roomCodeBox').classList.add('hidden');
     setStatus('Setting up room...');
-    lobby = [{ name: myDisplayName(), colorKey: myColorKey, skinKey: mySkinKey, conn: null }];
+    lobby = [{ name: myDisplayName(), colorKey: myColorKey, skinKey: mySkinKey,
+               trailKey: myTrailKey, conn: null }];
 
     peer = new Peer(generateRoomCode());
 
@@ -1247,7 +1408,7 @@
         // The guest sends its name/colour in 'hello'; placeholder until then.
         if (!lobby.some(l => l.conn === c)) {
           lobby.push({ name: 'Player ' + (lobby.length + 1), colorKey: freeColor(),
-                       skinKey: 'classic', conn: c });
+                       skinKey: 'classic', trailKey: 'none', conn: c });
         }
         c.send({ type: 'lobby', you: lobby.findIndex(l => l.conn === c), list: lobbyRoster() });
         renderLobby();
@@ -1306,7 +1467,8 @@
       conns = [c];
       c.on('open', () => {
         setStatus('Connected! Waiting for the host to start...');
-        c.send({ type: 'hello', name: myDisplayName(), colorKey: myColorKey, skinKey: mySkinKey });
+        c.send({ type: 'hello', name: myDisplayName(), colorKey: myColorKey,
+                 skinKey: mySkinKey, trailKey: myTrailKey });
       });
       c.on('data', handleGuestData);
       c.on('close', handleHostGone);
@@ -1335,6 +1497,7 @@
       // Skins aren't deduped - several people can wear Iron Man. The coloured
       // aura round each snake is what keeps them apart.
       entry.skinKey = skinByKey(msg.skinKey).key;
+      entry.trailKey = trailByKey(msg.trailKey).key;
       renderLobby();
       pushLobby();
     } else if (msg.type === 'input') {
@@ -1362,7 +1525,7 @@
       tickMs = msg.ms; difficultyName = msg.name; difficultyEmoji = msg.emoji;
       mode = 'online';
       setBoardSize(cellsForPlayers(msg.roster.length));
-      players = msg.roster.map((p, i) => makePlayer(i, p.name, p.colorKey, p.skinKey));
+      players = msg.roster.map((p, i) => makePlayer(i, p.name, p.colorKey, p.skinKey, p.trailKey));
       const now = nowMs();
       players.forEach(p => { p.lastMoveAt = now; p.moveMs = tickMs; });
       fruits = [];
@@ -1575,7 +1738,10 @@
     roundShouldEnd, aliveCount, assignColors, cellsForPlayers, fruitCountFor,
     applyDirTo, encodeCell: c => c.y * CELLS + c.x,
     decodeCell: i => ({ x: i % CELLS, y: Math.floor(i / CELLS) }),
-    SKINS, skinByKey, rewardsEarned, isSkinUnlocked, nextLockedSkin, newlyUnlocked,
+    SKINS, skinByKey, TRAILS, trailByKey, PATH, nextLockedReward,
+    rewardsEarned, isSkinUnlocked, nextLockedSkin, newlyUnlocked,
+    get myTrailKey() { return myTrailKey; },
+    set myTrailKey(v) { myTrailKey = v; },
     POINTS_PER_REWARD,
     get pathPoints() { return pathPoints; },
     set pathPoints(v) { pathPoints = v; },
