@@ -52,6 +52,34 @@
 - **Your name** on the scoreboard
 - Snakes glow while a power-up is active, so you can see who's affected
 
+**🏆 Path of Prey — reward track**
+
+Every **100 points you score, in any game, ever** earns one reward. Progress is
+saved on your device and never resets.
+
+| Points | Reward | Look |
+|---|---|---|
+| 100 | 🤖 Iron Man | Red and gold, glowing arc reactor on the head |
+| 200 | 🔨 Thor | Silver and blue, lightning bolt on the head |
+| 300 | 🕷️ Spider-Man | Red with dark blue webbing across the body |
+| 400 | 💚 Hulk | Green with purple bands, drawn 18% chunkier |
+| 500 | 🦸 Superman | Blue and red with a diamond emblem |
+| 600 | 🐜 Ant-Man | Dark red, drawn at 66% size — genuinely tiny |
+
+**Classic** is free and uses your chosen colour.
+
+Notes:
+
+- Skins are **cosmetic only** — tested to confirm they never change scoring or
+  collisions. Ant-Man looks smaller but occupies exactly the same squares.
+- Several players can wear the same skin online. Your chosen colour is drawn as
+  an **aura around your snake**, so you can always find yourself.
+- In same-device 2P, the **better** of the two scores counts toward the Path.
+  Online, only your own snake's score counts — not the winner's.
+- ⚠️ These names are trademarks of Marvel and DC. Fine for a personal project.
+  If this ever goes somewhere bigger, change the `name` fields in the `SKINS`
+  list near the top of the file — nothing else depends on them.
+
 ---
 
 ## ⚠️ What still needs doing

@@ -142,6 +142,38 @@
 
   #legend { margin-top: 6px; font-size: 0.7rem; opacity: 0.45; text-align: center; max-width: 92vw; }
 
+  /* ---- Path of Prey ---- */
+  #pathMini { font-size: 0.78rem; opacity: 0.8; font-weight: normal; }
+  #pathTotal { font-size: 1.5rem; font-weight: bold; color: #fde68a; margin: 2px 0 8px; }
+  #pathBarOuter {
+    height: 14px; background: #241533; border-radius: 20px;
+    overflow: hidden; border: 1px solid var(--panel);
+  }
+  #pathBarFill {
+    height: 100%; width: 0%; border-radius: 20px;
+    background: linear-gradient(90deg, #fbbf24, #f59e0b);
+    transition: width 0.5s ease;
+  }
+  #skinGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 14px 0; }
+  .skinTile {
+    border: 2px solid var(--panel); border-radius: 12px; padding: 9px 6px;
+    background: #1d1029; cursor: pointer; text-align: center; position: relative;
+  }
+  .skinTile.locked { opacity: 0.45; cursor: not-allowed; }
+  .skinTile.equipped { border-color: #fde68a; box-shadow: 0 0 14px rgba(253,230,138,0.45); }
+  .skinTile .swatch {
+    height: 16px; border-radius: 20px; margin: 0 auto 6px; width: 72%;
+  }
+  .skinTile .sname { font-size: 0.8rem; font-weight: bold; }
+  .skinTile .sreq { font-size: 0.68rem; opacity: 0.6; }
+  .skinTile .equippedTag { font-size: 0.62rem; color: #fde68a; }
+
+  #unlockBanner {
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    color: #2b1a0a; font-weight: bold; border-radius: 12px;
+    padding: 10px; margin: 10px 0; font-size: 0.95rem;
+  }
+
   /* Small phones: shrink so the board plus D-pad still fit. */
   @media (max-height: 720px) and (max-width: 899px) {
     #playArea canvas { width: min(86vw, 50vh, 640px); }
@@ -186,6 +218,8 @@
     <p class="fieldLabel">Your name:</p>
     <input id="nameInput" maxlength="12" placeholder="Player">
 
+    <button id="btnPath" class="secondary">🏆 Path of Prey <span id="pathMini"></span></button>
+
     <button id="btn1p">1 Player</button>
     <button id="btn2p">2 Player — Same Device</button>
     <button id="btnOnline">Online — up to 6 players</button>
@@ -200,6 +234,21 @@
     <input id="joinCodeInput" maxlength="4" placeholder="CODE">
     <button id="btnJoin">Join Room</button>
     <button id="btnOnlineBack" class="secondary">Back</button>
+  </div>
+
+  <!-- ---------- Path of Prey ---------- -->
+  <div id="pathPanel" class="hidden">
+    <p class="fieldLabel">🏆 Path of Prey</p>
+    <p class="note" style="margin-bottom:8px !important;">
+      Every <b>100 points</b> you score — in any game, ever — earns one reward.</p>
+
+    <div id="pathTotal"></div>
+    <div id="pathBarOuter"><div id="pathBarFill"></div></div>
+    <p id="pathNext" class="note"></p>
+
+    <div id="skinGrid"></div>
+
+    <button id="btnPathBack" class="secondary">Back</button>
   </div>
 
   <!-- ---------- Online: lobby ---------- -->
@@ -316,6 +365,35 @@
   };
 
   // ============================================================
+  //  Path of Prey — skins earned with total points ever scored
+  // ============================================================
+  const POINTS_PER_REWARD = 100;
+
+  // NOTE: these names are trademarks of Marvel / DC. Fine for a personal
+  // project; if this ever goes somewhere bigger, change the `name` fields —
+  // nothing else in the code depends on them.
+  const SKINS = [
+    { key: 'classic',  name: 'Classic',     unlockAt: 0,
+      dark: null, light: null, accent: null, badge: 'none', width: 1 },
+    { key: 'ironman',  name: 'Iron Man',    unlockAt: 100, emoji: '🤖',
+      dark: '#b91c1c', light: '#f59e0b', accent: '#fde68a', badge: 'reactor', width: 1 },
+    { key: 'thor',     name: 'Thor',        unlockAt: 200, emoji: '🔨',
+      dark: '#475569', light: '#e2e8f0', accent: '#60a5fa', badge: 'bolt',    width: 1 },
+    { key: 'spidey',   name: 'Spider-Man',  unlockAt: 300, emoji: '🕷️',
+      dark: '#b91c1c', light: '#ef4444', accent: '#1e3a8a', badge: 'web',     width: 1 },
+    { key: 'hulk',     name: 'Hulk',        unlockAt: 400, emoji: '💚',
+      dark: '#15803d', light: '#4ade80', accent: '#7e22ce', badge: 'none',    width: 1.18 },
+    { key: 'superman', name: 'Superman',    unlockAt: 500, emoji: '🦸',
+      dark: '#1d4ed8', light: '#3b82f6', accent: '#dc2626', badge: 'diamond', width: 1 },
+    { key: 'antman',   name: 'Ant-Man',     unlockAt: 600, emoji: '🐜',
+      dark: '#7f1d1d', light: '#dc2626', accent: '#111827', badge: 'none',    width: 0.66 }
+  ];
+  const skinByKey = k => SKINS.find(s => s.key === k) || SKINS[0];
+  const rewardsEarned = pts => Math.floor(pts / POINTS_PER_REWARD);
+  const isSkinUnlocked = (s, pts) => pts >= s.unlockAt;
+  const nextLockedSkin = pts => SKINS.find(s => !isSkinUnlocked(s, pts)) || null;
+
+  // ============================================================
   //  DOM
   // ============================================================
   const $ = id => document.getElementById(id);
@@ -341,6 +419,8 @@
   let tickMs = 230, difficultyName = 'Easy', difficultyEmoji = '🐌';
   let myColorKey = 'green';
   let myName = '';
+  let mySkinKey = 'classic';
+  let pathPoints = 0;     // every point you've ever scored, across all games
 
   // Networking
   let netRole = null;    // null | 'host' | 'guest'
@@ -412,16 +492,92 @@
   function myDisplayName() { return (nameInput.value.trim() || 'Player'); }
 
   // ============================================================
+  //  Path of Prey
+  // ============================================================
+  (function loadPath() {
+    let p = 0, s = null;
+    try {
+      p = parseInt(localStorage.getItem('scPathPoints') || '0', 10);
+      s = localStorage.getItem('scSkin');
+    } catch (e) {}
+    pathPoints = Number.isFinite(p) && p > 0 ? p : 0;
+    // Never leave someone wearing a skin they haven't earned (e.g. if progress
+    // was cleared but the skin choice survived).
+    const wanted = skinByKey(s);
+    mySkinKey = isSkinUnlocked(wanted, pathPoints) ? wanted.key : 'classic';
+  })();
+
+  function savePath() {
+    try {
+      localStorage.setItem('scPathPoints', String(pathPoints));
+      localStorage.setItem('scSkin', mySkinKey);
+    } catch (e) {}
+  }
+
+  // Returns the skins crossed by going from `before` to `after` points.
+  function newlyUnlocked(before, after) {
+    return SKINS.filter(s => s.unlockAt > 0 && s.unlockAt > before && s.unlockAt <= after);
+  }
+
+  function awardPoints(pts) {
+    if (!Number.isFinite(pts) || pts <= 0) return [];
+    const before = pathPoints;
+    pathPoints = before + pts;
+    const gained = newlyUnlocked(before, pathPoints);
+    savePath();
+    renderPath();
+    return gained;
+  }
+
+  function renderPath() {
+    const earned = rewardsEarned(pathPoints);
+    const next = nextLockedSkin(pathPoints);
+
+    $('pathMini').textContent = `· ${pathPoints} pts`;
+    $('pathTotal').textContent = `${pathPoints} points · ${earned} reward${earned === 1 ? '' : 's'}`;
+
+    // Bar shows progress through the CURRENT 100-point block.
+    const into = pathPoints % POINTS_PER_REWARD;
+    $('pathBarFill').style.width = (next ? (into / POINTS_PER_REWARD) * 100 : 100) + '%';
+    $('pathNext').textContent = next
+      ? `${next.unlockAt - pathPoints} more points to unlock ${next.name}`
+      : 'Every reward unlocked! 🎉';
+
+    const grid = $('skinGrid');
+    grid.innerHTML = '';
+    SKINS.forEach(s => {
+      const unlocked = isSkinUnlocked(s, pathPoints);
+      const equipped = s.key === mySkinKey;
+      const tile = document.createElement('div');
+      tile.className = 'skinTile' + (unlocked ? '' : ' locked') + (equipped ? ' equipped' : '');
+      const me = colorByKey(myColorKey);
+      const sw = s.dark ? `linear-gradient(90deg, ${s.light}, ${s.dark})`
+                        : `linear-gradient(90deg, ${me.light}, ${me.dark})`;
+      tile.innerHTML =
+        `<div class="swatch" style="background:${sw}"></div>` +
+        `<div class="sname">${unlocked ? (s.emoji || '🐍') + ' ' : '🔒 '}${escapeHtml(s.name)}</div>` +
+        `<div class="sreq">${s.unlockAt === 0 ? 'Free' : s.unlockAt + ' pts'}</div>` +
+        (equipped ? '<div class="equippedTag">EQUIPPED</div>' : '');
+      if (unlocked) tile.addEventListener('click', () => { mySkinKey = s.key; savePath(); renderPath(); });
+      grid.appendChild(tile);
+    });
+  }
+
+  renderPath();
+  $('btnPath').addEventListener('click', () => { renderPath(); showPanel('pathPanel'); });
+  $('btnPathBack').addEventListener('click', () => showPanel('modeChoice'));
+
+  // ============================================================
   //  Building players
   // ============================================================
-  function makePlayer(idx, name, colorKey) {
+  function makePlayer(idx, name, colorKey, skinKey) {
     const s = SPAWNS[idx % SPAWNS.length];
     const hx = Math.max(MIN_LEN, Math.min(CELLS - 1 - MIN_LEN, Math.round(s.fx * CELLS)));
     const hy = Math.max(MIN_LEN, Math.min(CELLS - 1 - MIN_LEN, Math.round(s.fy * CELLS)));
     const cells = [];
     for (let i = 0; i < START_LEN; i++) cells.push({ x: hx - s.dir.x * i, y: hy - s.dir.y * i });
     return {
-      idx, name, colorKey,
+      idx, name, colorKey, skinKey: skinByKey(skinKey).key,
       cells, dir: { ...s.dir }, nextDir: { ...s.dir },
       score: 0, alive: true, tailFrom: null,
       boostUntil: 0, slowUntil: 0,
@@ -445,7 +601,7 @@
   function startRound(roster) {
     const withColors = assignColors(roster);
     setBoardSize(cellsForPlayers(withColors.length));
-    players = withColors.map((p, i) => makePlayer(i, p.name, p.colorKey));
+    players = withColors.map((p, i) => makePlayer(i, p.name, p.colorKey, p.skinKey));
     const now = nowMs();
     players.forEach(p => { p.lastMoveAt = now - tickMs; p.moveMs = tickMs; });
     fruits = [];
@@ -658,17 +814,52 @@
       ctx.shadowBlur = cellSize * 0.9;
     }
 
-    const base = cellSize * 0.82;
+    // A skin overrides the body colours. The player's chosen colour then
+    // becomes an aura drawn underneath, so six people all wearing Iron Man
+    // can still tell which snake is theirs.
+    const skin = skinByKey(p.skinKey);
+    const bodyDark  = skin.dark  || col.dark;
+    const bodyLight = skin.light || col.light;
+    const showAura = !!skin.dark;
+
+    const base = cellSize * 0.82 * (skin.width || 1);
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.strokeStyle = col.dark;
+
     for (let i = m - 1; i >= 1; i--) {
       const fromTail = m - 1 - i;
-      ctx.lineWidth = base * Math.min(1, 0.38 + 0.62 * (fromTail / 3));
+      const w = base * Math.min(1, 0.38 + 0.62 * (fromTail / 3));
+      if (showAura) {
+        ctx.strokeStyle = col.light;
+        ctx.lineWidth = w + cellSize * 0.16;
+        ctx.beginPath();
+        ctx.moveTo(pts[i].x, pts[i].y);
+        ctx.lineTo(pts[i - 1].x, pts[i - 1].y);
+        ctx.stroke();
+      }
+      // Accent bands every third segment give each skin its stripe pattern.
+      ctx.strokeStyle = (skin.accent && i % 3 === 0) ? skin.accent : bodyDark;
+      ctx.lineWidth = w;
       ctx.beginPath();
       ctx.moveTo(pts[i].x, pts[i].y);
       ctx.lineTo(pts[i - 1].x, pts[i - 1].y);
       ctx.stroke();
+    }
+
+    // Spider-Man gets webbing drawn across the body.
+    if (skin.badge === 'web') {
+      ctx.strokeStyle = skin.accent;
+      ctx.lineWidth = Math.max(0.8, cellSize * 0.07);
+      for (let i = 1; i < m; i++) {
+        const a = pts[i], b2 = pts[i - 1];
+        const mx = (a.x + b2.x) / 2, my = (a.y + b2.y) / 2;
+        const ang = Math.atan2(b2.y - a.y, b2.x - a.x) + Math.PI / 2;
+        const r = base * 0.42;
+        ctx.beginPath();
+        ctx.moveTo(mx - Math.cos(ang) * r, my - Math.sin(ang) * r);
+        ctx.lineTo(mx + Math.cos(ang) * r, my + Math.sin(ang) * r);
+        ctx.stroke();
+      }
     }
     ctx.shadowBlur = 0;
 
@@ -683,10 +874,18 @@
     const px = -dy, py = dx;
     const head = pts[0];
 
-    ctx.fillStyle = col.light;
+    if (showAura) {
+      ctx.fillStyle = col.light;
+      ctx.beginPath();
+      ctx.arc(head.x, head.y, base * 0.56 + cellSize * 0.09, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = bodyLight;
     ctx.beginPath();
     ctx.arc(head.x, head.y, base * 0.56, 0, Math.PI * 2);
     ctx.fill();
+
+    drawBadge(skin, head, dx, dy, px, py, base, now);
 
     if (p.alive && (now % 1600) < 260) {
       ctx.strokeStyle = '#ff5da2';
@@ -721,6 +920,49 @@
         ctx.moveTo(ex + r, ey - r); ctx.lineTo(ex - r, ey + r);
         ctx.stroke();
       }
+    }
+    ctx.restore();
+  }
+
+  // Little emblem on the head that gives each skin its character.
+  function drawBadge(skin, head, dx, dy, px, py, base, now) {
+    if (!skin.badge || skin.badge === 'none' || skin.badge === 'web') return;
+    ctx.save();
+
+    if (skin.badge === 'reactor') {
+      const glow = 0.75 + Math.sin(now / 220) * 0.25;
+      ctx.shadowColor = '#bae6fd';
+      ctx.shadowBlur = base * 0.5 * glow;
+      ctx.fillStyle = '#e0f2fe';
+      ctx.beginPath(); ctx.arc(head.x, head.y, base * 0.2, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = skin.accent;
+      ctx.lineWidth = Math.max(1, base * 0.06);
+      ctx.beginPath(); ctx.arc(head.x, head.y, base * 0.3, 0, Math.PI * 2); ctx.stroke();
+
+    } else if (skin.badge === 'bolt') {
+      ctx.strokeStyle = '#fef08a';
+      ctx.lineWidth = Math.max(1.4, base * 0.1);
+      ctx.lineCap = 'round';
+      const s = base * 0.26;
+      // Zigzag drawn in the snake's own frame so it turns with the head.
+      const at = (f, r) => ({ x: head.x + dx * f * s + px * r * s,
+                              y: head.y + dy * f * s + py * r * s });
+      const a = at(0.9, -0.5), b2 = at(0, 0.15), c2 = at(0.15, -0.15), d2 = at(-0.9, 0.5);
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y); ctx.lineTo(b2.x, b2.y);
+      ctx.lineTo(c2.x, c2.y); ctx.lineTo(d2.x, d2.y);
+      ctx.stroke();
+
+    } else if (skin.badge === 'diamond') {
+      ctx.fillStyle = skin.accent;
+      const r = base * 0.3;
+      ctx.beginPath();
+      ctx.moveTo(head.x + dx * r, head.y + dy * r);
+      ctx.lineTo(head.x + px * r * 0.8, head.y + py * r * 0.8);
+      ctx.lineTo(head.x - dx * r, head.y - dy * r);
+      ctx.lineTo(head.x - px * r * 0.8, head.y - py * r * 0.8);
+      ctx.closePath(); ctx.fill();
     }
     ctx.restore();
   }
@@ -799,8 +1041,36 @@
         ? `${survivors[0].name} wins!`
         : `Everyone crashed — ${best.name} scored most!`;
     }
-    showEndScreen(msg, standingsText());
+    showEndScreen(msg, pathResultHtml() + standingsText());
     if (netRole === 'host') broadcast({ type: 'over', msg, standings: standingsText() });
+  }
+
+  // What this device earned toward the Path this round. In same-device 2P the
+  // better of the two counts, since it's one person's save file either way.
+  function myRoundScore() {
+    if (!players.length) return 0;
+    if (mode === 'local2') return Math.max(...players.map(p => p.score));
+    const me = players[myIndex];
+    return me ? me.score : 0;
+  }
+
+  // Awards the round's points and returns the HTML to sit above the standings.
+  function pathResultHtml() {
+    const earned = myRoundScore();
+    const gained = awardPoints(earned);
+    let html = '';
+    if (gained.length) {
+      html += `<div id="unlockBanner">🏆 REWARD UNLOCKED!<br>` +
+              gained.map(s => `${s.emoji || ''} ${escapeHtml(s.name)}`).join('<br>') +
+              `<br><span style="font-weight:normal;font-size:0.8rem;">` +
+              `Equip it from 🏆 Path of Prey</span></div>`;
+    }
+    const next = nextLockedSkin(pathPoints);
+    html += `<p class="note" style="margin:6px 0 !important;">+${earned} to your Path · ` +
+            `${pathPoints} total` +
+            (next ? ` · ${next.unlockAt - pathPoints} more for ${escapeHtml(next.name)}` : '') +
+            `</p>`;
+    return html;
   }
 
   function showEndScreen(msg, html) {
@@ -829,10 +1099,10 @@
     matchConns = null;
     mode = n === 2 ? 'local2' : 'solo';
     myIndex = 0;
-    const roster = [{ name: myDisplayName(), colorKey: myColorKey }];
+    const roster = [{ name: myDisplayName(), colorKey: myColorKey, skinKey: mySkinKey }];
     if (n === 2) {
       const other = PALETTE.find(c => c.key !== myColorKey) || PALETTE[1];
-      roster.push({ name: 'Player 2', colorKey: other.key });
+      roster.push({ name: 'Player 2', colorKey: other.key, skinKey: 'classic' });
     }
     startRound(roster);
   }
@@ -863,7 +1133,7 @@
   //  Online
   // ============================================================
   function showPanel(id) {
-    ['modeChoice', 'onlineChoice', 'onlineStatus'].forEach(p =>
+    ['modeChoice', 'onlineChoice', 'onlineStatus', 'pathPanel'].forEach(p =>
       $(p).classList.toggle('hidden', p !== id));
   }
   function setStatus(txt) { $('onlineStatusText').textContent = txt; }
@@ -885,7 +1155,9 @@
     hostBeginMatch();
   });
 
-  function lobbyRoster() { return lobby.map(l => ({ name: l.name, colorKey: l.colorKey })); }
+  function lobbyRoster() {
+    return lobby.map(l => ({ name: l.name, colorKey: l.colorKey, skinKey: l.skinKey || 'classic' }));
+  }
 
   // The single place a host starts or restarts an online match, so the
   // broadcast and the local start can never drift apart.
@@ -954,7 +1226,7 @@
     showPanel('onlineStatus');
     $('roomCodeBox').classList.add('hidden');
     setStatus('Setting up room...');
-    lobby = [{ name: myDisplayName(), colorKey: myColorKey, conn: null }];
+    lobby = [{ name: myDisplayName(), colorKey: myColorKey, skinKey: mySkinKey, conn: null }];
 
     peer = new Peer(generateRoomCode());
 
@@ -974,7 +1246,8 @@
       c.on('open', () => {
         // The guest sends its name/colour in 'hello'; placeholder until then.
         if (!lobby.some(l => l.conn === c)) {
-          lobby.push({ name: 'Player ' + (lobby.length + 1), colorKey: freeColor(), conn: c });
+          lobby.push({ name: 'Player ' + (lobby.length + 1), colorKey: freeColor(),
+                       skinKey: 'classic', conn: c });
         }
         c.send({ type: 'lobby', you: lobby.findIndex(l => l.conn === c), list: lobbyRoster() });
         renderLobby();
@@ -1033,7 +1306,7 @@
       conns = [c];
       c.on('open', () => {
         setStatus('Connected! Waiting for the host to start...');
-        c.send({ type: 'hello', name: myDisplayName(), colorKey: myColorKey });
+        c.send({ type: 'hello', name: myDisplayName(), colorKey: myColorKey, skinKey: mySkinKey });
       });
       c.on('data', handleGuestData);
       c.on('close', handleHostGone);
@@ -1059,6 +1332,9 @@
       entry.name = String(msg.name || 'Player').slice(0, 12);
       const used = lobby.filter(l => l !== entry).map(l => l.colorKey);
       entry.colorKey = used.includes(msg.colorKey) ? freeColor() : (msg.colorKey || freeColor());
+      // Skins aren't deduped - several people can wear Iron Man. The coloured
+      // aura round each snake is what keeps them apart.
+      entry.skinKey = skinByKey(msg.skinKey).key;
       renderLobby();
       pushLobby();
     } else if (msg.type === 'input') {
@@ -1086,7 +1362,7 @@
       tickMs = msg.ms; difficultyName = msg.name; difficultyEmoji = msg.emoji;
       mode = 'online';
       setBoardSize(cellsForPlayers(msg.roster.length));
-      players = msg.roster.map((p, i) => makePlayer(i, p.name, p.colorKey));
+      players = msg.roster.map((p, i) => makePlayer(i, p.name, p.colorKey, p.skinKey));
       const now = nowMs();
       players.forEach(p => { p.lastMoveAt = now; p.moveMs = tickMs; });
       fruits = [];
@@ -1099,7 +1375,7 @@
       running = false;
       roundOver = true;      // so a later disconnect doesn't overwrite the result
       stopRenderLoop();
-      showEndScreen(msg.msg, msg.standings || '');
+      showEndScreen(msg.msg, pathResultHtml() + (msg.standings || ''));
     }
   }
 
@@ -1299,6 +1575,13 @@
     roundShouldEnd, aliveCount, assignColors, cellsForPlayers, fruitCountFor,
     applyDirTo, encodeCell: c => c.y * CELLS + c.x,
     decodeCell: i => ({ x: i % CELLS, y: Math.floor(i / CELLS) }),
+    SKINS, skinByKey, rewardsEarned, isSkinUnlocked, nextLockedSkin, newlyUnlocked,
+    POINTS_PER_REWARD,
+    get pathPoints() { return pathPoints; },
+    set pathPoints(v) { pathPoints = v; },
+    awardPoints, myRoundScore,
+    setMode(m) { mode = m; },
+    setMyIndex(i) { myIndex = i; },
     setTick(ms) { tickMs = ms; },
     startRoundWith(roster) { startRound(roster); }
   };
