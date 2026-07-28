@@ -75,15 +75,15 @@ rainbow trail, or the Hacker skin with the Hacker trail once you've earned both.
 | 900 | 🦸 Superman | Skin | Blue and red with a diamond emblem |
 | 1000 | 🐜 Ant-Man | Skin | Dark red, drawn at 66% size — genuinely tiny |
 | **2750** | 💻 **Hacker Trail** | Trail | 🟢 **LEGENDARY** — streams of code shed off the tail, every glyph re-rolling as it fades |
-| **3000** | 💻 **Hacker** | Skin | 🟢 **LEGENDARY** — near-black body, neon green, a terminal screen on the head with a blinking cursor. **The only skin with a real power.** |
+| **3000** | 💻 **Hacker** | Skin | 🟢 **LEGENDARY** — near-black body, neon green, a terminal screen on the head with a blinking cursor |
 
 **Classic** skin and **No Trail** are free from the start.
 
 Notes:
 
-- Everything here is **cosmetic only, with one exception** — tested to confirm
-  no skin or trail changes scoring or collisions. Ant-Man looks tiny but fills
-  the same squares. The exception is the Hacker skin's HACK button (below).
+- **Trails are cosmetic. Skins are not any more** — six of them carry an
+  ability (see below). Ant-Man's *passive* look is still cosmetic; he only
+  actually phases while SHRINK is active.
 - Trails are drawn from each device's own copy of the game, so they cost
   **nothing** in network traffic even with six players.
 - Particles are capped at 80 per snake and expire on a timer, so they can't pile
@@ -113,29 +113,66 @@ Notes:
   project. To change them, edit the `name` fields in the `SKINS` list near the
   top of the file — nothing else depends on them.
 
-### 💻 The HACK button
+### ⚡ Skin abilities
 
-Wearing the Hacker skin puts a green **HACK** button under the board (or press
-**H**). Pressing it steals a random **10–30 points**, then goes on a **15 second
-cooldown**. It works in every mode, including online.
+Six skins now have a power. One button under the board (or press **H**), and
+**every ability shares a 15 second cooldown**.
 
-- Roughly **80 points a minute** if you press it the moment it's ready — about
-  eight candies' worth. A real edge, not an instant win.
-- Everyone sees a green **"+17"** pop off your snake's head when it lands, so it
-  never feels like invisible cheating.
-- **The host decides, not you.** A guest pressing HACK only *asks* the host,
-  which checks the skin and the cooldown before allowing it. Tested: 5000 forged
-  hack messages in five seconds land exactly one hack, and a guest lying about
-  owning the skin gets nothing.
-- Hacking can't move you, resize you, kill you or disturb the fruit — it only
-  touches your score.
+| Skin | Ability | What it does |
+|---|---|---|
+| 🔨 Thor | **HAMMER** | A hammer orbits your head for 3.5s at 2.6 squares out. Any snake whose head enters its 3×3 zone dies. Never hurts you. |
+| 🔆 Iron Man | **LASER** | Instant beam straight ahead, up to 12 squares. Kills the **first** snake it touches, then stops — no wiping a whole row. |
+| 🕸️ Spider-Man | **WEB** | For 6s, hitting a wall doesn't kill you — you web it and slingshot 90°. Other snakes still kill you. |
+| 👊 Hulk | **SMASH** | Instantly eats **every fruit within 4 squares**, points, growth, power-ups and all. |
+| 🐜 Ant-Man | **SHRINK** | For 5s you shrink and phase through other snakes, both ways. Walls and your own body still kill you. |
+| 💻 Hacker | **HACK** | Steals a random 10–30 points. |
 
-⚠️ **This is a genuine advantage online.** You chose that deliberately, and it's
-earned — 3000 points is a long climb. But if friends without it stop enjoying
-the game, the fix is easy: raise `HACK_COOLDOWN_MS`, lower `HACK_MAX`, or gate
-it to 1-player only. All near the top of the file.
+🦸 **Superman has no ability yet** — still purely cosmetic. Classic doesn't either.
+
+**Everything is host-authoritative.** A guest pressing the button only *asks*;
+the host checks the skin, the cooldown and whether you're alive before allowing
+it. Tested: 3000 spammed requests in three seconds land exactly one use, for
+every ability.
+
+### 📊 How balanced is it? (simulated, 300 rounds, 6 players)
+
+The answer changes completely with skill level, which was the surprise:
+
+| Skin | Win % vs **weak** players | Win % vs **skilled** players |
+|---|---|---|
+| 🕸️ Spider-Man | **53%** 🚨 | 11% |
+| 🔨 Thor | 13% | **33%** 🚨 |
+| 🐜 Ant-Man | 11% | 20% |
+| 🔆 Iron Man | 7% | 15% |
+| Classic | 10% | 12% |
+| 👊 Hulk | 6% | 9% |
+
+*(a fair share would be ~17% each)*
+
+- **Spider-Man is a beginner's crutch.** 93% of deaths among weak players are
+  wall crashes, and WEB removes those for 6 seconds out of every 15. Against
+  players who don't hit walls anyway, it's the *weakest* ability.
+- **Thor is the opposite** — useless against players who are already crashing,
+  dominant once everyone survives long enough to cluster together.
+- Kill abilities cause **7% of deaths among weak players, 29% among skilled
+  ones**. So it doesn't become a pure fighting game, but it's a real factor.
+- Hulk's SMASH is the weakest overall — it only scores points, and points only
+  break ties.
+
+**If you want to even it out**, the knobs are all near the top of the file:
+
+- Thor too strong → shorten `duration` (3500), shrink `HAMMER_RADIUS`, or make
+  the hammer kill only on an exact square instead of 3×3.
+- Spider-Man too strong for beginners → cut WEB `duration` from 6000 to ~3000.
+- Hulk too weak → raise `SMASH_RADIUS` from 4, or give him a second effect.
+- Everything too chaotic → raise `ABILITY_COOLDOWN_MS` from 15000.
+
+⚠️ These numbers come from **simulated** players, not real ones. Treat them as a
+rough guide — the honest test is six actual humans.
 
 ---
+
+## ⚠️ What still needs doing---
 
 ## ⚠️ What still needs doing
 
@@ -149,8 +186,9 @@ watching for:
 - Is ⚡ too strong? Is ❄️ annoying to be on the receiving end of?
 - Does online play stay smooth with 5 friends, or does it lag?
 - Are the fruits easy to tell apart at small sizes on a phone?
-- Does the HACK button feel powerful but fair, or does it ruin games for
-  everyone else?
+- Do the abilities feel fun or frustrating? Especially Thor's hammer, which the
+  simulation says is the strongest against good players.
+- Does the ability button get in the way on a phone?
 
 Any of those are easy to tune — they're just numbers in the file.
 

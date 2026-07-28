@@ -134,7 +134,7 @@
   .dpad-btn.down { grid-column: 2; grid-row: 3; }
   #playArea.dpads-off #dpad1Wrap, #playArea.dpads-off #dpad2Wrap { display: none !important; }
 
-  #btnHack {
+  #btnAbility {
     margin-top: 10px; padding: 10px 26px; font-size: 0.95rem; font-weight: bold;
     font-family: 'Courier New', monospace; letter-spacing: 2px;
     border: 2px solid #39ff14; border-radius: 10px;
@@ -142,10 +142,10 @@
     box-shadow: 0 0 16px rgba(57,255,20,0.35);
     touch-action: manipulation;
   }
-  #btnHack:active { background: #39ff14; color: #04240f; }
-  #btnHack.cooling {
-    border-color: #1f513a; color: #4d7c5f;
-    background: #0a1410; box-shadow: none; cursor: not-allowed;
+  #btnAbility:active { filter: brightness(2); }
+  #btnAbility.cooling {
+    border-color: #33324a !important; color: #6b7280 !important;
+    background: #14101c !important; box-shadow: none !important; cursor: not-allowed;
   }
 
   #btnToggleDpad {
@@ -202,7 +202,7 @@
     #playArea canvas { width: min(86vw, 50vh, 640px); }
     .dpad { grid-template-columns: 44px 44px 44px; grid-template-rows: 44px 44px 44px; }
     #hint, #legend { margin-top: 5px; font-size: 0.68rem; }
-    #btnHack {
+    #btnAbility {
     margin-top: 10px; padding: 10px 26px; font-size: 0.95rem; font-weight: bold;
     font-family: 'Courier New', monospace; letter-spacing: 2px;
     border: 2px solid #39ff14; border-radius: 10px;
@@ -210,10 +210,10 @@
     box-shadow: 0 0 16px rgba(57,255,20,0.35);
     touch-action: manipulation;
   }
-  #btnHack:active { background: #39ff14; color: #04240f; }
-  #btnHack.cooling {
-    border-color: #1f513a; color: #4d7c5f;
-    background: #0a1410; box-shadow: none; cursor: not-allowed;
+  #btnAbility:active { filter: brightness(2); }
+  #btnAbility.cooling {
+    border-color: #33324a !important; color: #6b7280 !important;
+    background: #14101c !important; box-shadow: none !important; cursor: not-allowed;
   }
 
   #btnToggleDpad { margin-top: 5px; }
@@ -227,7 +227,7 @@
     .dpad { grid-template-columns: 40px 40px 40px; grid-template-rows: 40px 40px 40px; }
     body.playing h1 { display: none; }
     body.playing #hint, body.playing #legend { display: none; }
-    #btnHack {
+    #btnAbility {
     margin-top: 10px; padding: 10px 26px; font-size: 0.95rem; font-weight: bold;
     font-family: 'Courier New', monospace; letter-spacing: 2px;
     border: 2px solid #39ff14; border-radius: 10px;
@@ -235,10 +235,10 @@
     box-shadow: 0 0 16px rgba(57,255,20,0.35);
     touch-action: manipulation;
   }
-  #btnHack:active { background: #39ff14; color: #04240f; }
-  #btnHack.cooling {
-    border-color: #1f513a; color: #4d7c5f;
-    background: #0a1410; box-shadow: none; cursor: not-allowed;
+  #btnAbility:active { filter: brightness(2); }
+  #btnAbility.cooling {
+    border-color: #33324a !important; color: #6b7280 !important;
+    background: #14101c !important; box-shadow: none !important; cursor: not-allowed;
   }
 
   #btnToggleDpad { margin-top: 3px; }
@@ -345,8 +345,8 @@
     </div>
   </div>
 
-  <button id="btnHack" class="hidden">💻 HACK</button>
-  <div id="hint">Swipe anywhere to steer. <b>Space</b> pauses, <b>R</b> restarts.</div>
+  <button id="btnAbility" class="hidden">💻 HACK</button>
+  <div id="hint">Swipe anywhere to steer. <b>Space</b> pauses, <b>R</b> restarts, <b>H</b> = ability.</div>
   <div id="legend">🍬 +10 &nbsp; 🍒 +25 &nbsp; 🍌 shrink &nbsp; ⚡ speed burst &nbsp; ❄️ slows everyone else</div>
   <button id="btnToggleDpad">Hide buttons</button>
 </div>
@@ -373,8 +373,28 @@
   const SLOW_MULT = 0.55;
   const BROADCAST_MS = 45;
 
-  // The Hacker skin's one gameplay power: steal a random pile of points.
-  const HACK_MIN = 10, HACK_MAX = 30, HACK_COOLDOWN_MS = 15000;
+  // Skin abilities. Every one shares the same 15 second cooldown.
+  const ABILITY_COOLDOWN_MS = 15000;
+  const HACK_MIN = 10, HACK_MAX = 30, HACK_COOLDOWN_MS = ABILITY_COOLDOWN_MS;
+  const LASER_RANGE = 12;      // squares
+  const SMASH_RADIUS = 4;      // squares
+  const HAMMER_RADIUS = 2.6;   // squares from the head
+  const HAMMER_SPIN_MS = 420;  // one full orbit
+
+  // duration 0 == instant. Anything else stays active for that long.
+  const ABILITIES = {
+    thor:     { key: 'hammer', label: 'HAMMER', emoji: '🔨', duration: 3500, colour: '#93c5fd' },
+    spidey:   { key: 'web',    label: 'WEB',    emoji: '🕸️', duration: 6000, colour: '#f87171' },
+    ironman:  { key: 'laser',  label: 'LASER',  emoji: '🔆', duration: 0,    colour: '#fbbf24' },
+    hulk:     { key: 'smash',  label: 'SMASH',  emoji: '👊', duration: 0,    colour: '#4ade80' },
+    antman:   { key: 'tiny',   label: 'SHRINK', emoji: '🐜', duration: 5000, colour: '#fca5a5' },
+    hacker:   { key: 'hack',   label: 'HACK',   emoji: '💻', duration: 0,    colour: '#39ff14' }
+    // Superman is still purely cosmetic.
+  };
+  const abilityFor = p => (p ? ABILITIES[p.skinKey] || null : null);
+  const isTiny = (q, now) => q.abKind === 'tiny' && now < (q.abUntil || 0);
+  const webActive = (q, now) => q.abKind === 'web' && now < (q.abUntil || 0);
+  const hammerActive = (q, now) => q.abKind === 'hammer' && now < (q.abUntil || 0);
 
   const PALETTE = [
     { key: 'green',  dark: '#22c55e', light: '#4ade80', name: 'Green'  },
@@ -867,7 +887,8 @@
       cells, dir: { ...s.dir }, nextDir: { ...s.dir },
       score: 0, alive: true, tailFrom: null,
       boostUntil: 0, slowUntil: 0,
-      hackReadyAt: 0, hackCount: 0, hackGain: 0, hackFlash: null,
+      abReadyAt: 0, abCount: 0, abKind: null, abUntil: 0, abData: null, abFlash: null,
+      hackFlash: null, webSaves: 0,
       moveMs: tickMs, lastMoveAt: 0, prevHeadKey: -1
     };
   }
@@ -970,15 +991,30 @@
 
   // Checked every frame for every snake, not just the ones that moved — that
   // way a snake growing into a stationary one still counts as a crash.
-  function resolveCollisions() {
+  function resolveCollisions(now) {
+    if (now === undefined) now = nowMs();
     const doomed = [];
     for (const p of players) {
       if (!p.alive) continue;
-      const h = p.cells[0];
-      if (h.x < 0 || h.x >= CELLS || h.y < 0 || h.y >= CELLS) { doomed.push(p); continue; }
+      let h = p.cells[0];
+
+      if (h.x < 0 || h.x >= CELLS || h.y < 0 || h.y >= CELLS) {
+        // Spider-Man's web saves him off the wall; everyone else crashes.
+        if (webActive(p, now) && deflectOffWall(p)) {
+          h = p.cells[0];
+        } else {
+          doomed.push(p);
+          continue;
+        }
+      }
+
       let hit = false;
+      const pTiny = isTiny(p, now);
       for (const q of players) {
         if (!q.alive) continue;
+        // While Ant-Man is shrunk he passes through others, and others pass
+        // through him — intangibility has to work both ways or it's unfair.
+        if (q !== p && (pTiny || isTiny(q, now))) continue;
         // Skip our own head (index 0); everything else, including another
         // snake's head, is lethal. Two heads meeting kills both.
         for (let i = (q === p ? 1 : 0); i < q.cells.length; i++) {
@@ -994,19 +1030,133 @@
 
   // Authoritative: only ever called on the host or in a local game, so a guest
   // spamming the button can't do anything the host doesn't allow.
-  function tryHack(p, now) {
-    if (!p || !p.alive || !running || paused || roundOver) return false;
-    if (p.skinKey !== 'hacker') return false;
-    if (now < (p.hackReadyAt || 0)) return false;
-    const gain = HACK_MIN + Math.floor(Math.random() * (HACK_MAX - HACK_MIN + 1));
-    p.score += gain;
-    p.hackReadyAt = now + HACK_COOLDOWN_MS;
-    p.hackCount = (p.hackCount || 0) + 1;
-    p.hackGain = gain;
-    p.hackFlash = { at: now, gain };
+  function useAbility(p, now) {
+    const ab = abilityFor(p);
+    if (!ab) return false;
+    if (!p.alive || !running || paused || roundOver) return false;
+    if (now < (p.abReadyAt || 0)) return false;
+
+    p.abReadyAt = now + ABILITY_COOLDOWN_MS;
+    p.abCount = (p.abCount || 0) + 1;
+    p.abKind = ab.key;
+    p.abUntil = ab.duration > 0 ? now + ab.duration : 0;
+    p.abData = null;
+
+    if (ab.key === 'hack') {
+      const gain = HACK_MIN + Math.floor(Math.random() * (HACK_MAX - HACK_MIN + 1));
+      p.score += gain;
+      p.hackFlash = { at: now, gain };
+      p.abData = { gain };
+    } else if (ab.key === 'laser') {
+      fireLaser(p, now);
+    } else if (ab.key === 'smash') {
+      hulkSmash(p, now);
+    }
+    // hammer / web / tiny are ongoing — handled in update() and collisions.
+    p.abFlash = { at: now, kind: ab.key, data: p.abData };
     return true;
   }
 
+  // Kept so older callers and tests still read clearly.
+  function tryHack(p, now) {
+    if (!p || p.skinKey !== 'hacker') return false;
+    return useAbility(p, now);
+  }
+
+  // Iron Man: a straight beam that stops at the FIRST thing it hits, so it
+  // can't sweep a whole row of players in one shot.
+  function fireLaser(p, now) {
+    const d = p.dir, h = p.cells[0];
+    let x = h.x, y = h.y, end = { x: h.x, y: h.y }, hit = null;
+    for (let i = 1; i <= LASER_RANGE; i++) {
+      x += d.x; y += d.y;
+      if (x < 0 || x >= CELLS || y < 0 || y >= CELLS) break;
+      end = { x, y };
+      for (const q of players) {
+        if (q === p || !q.alive || isTiny(q, now)) continue;
+        if (q.cells.some(c => c.x === x && c.y === y)) { hit = q; break; }
+      }
+      if (hit) break;
+    }
+    if (hit) hit.alive = false;
+    p.abData = { x1: h.x, y1: h.y, x2: end.x, y2: end.y, killed: hit ? 1 : 0 };
+  }
+
+  // Hulk: leaps on every fruit within SMASH_RADIUS at once.
+  function hulkSmash(p, now) {
+    const h = p.cells[0];
+    let got = 0;
+    for (let i = fruits.length - 1; i >= 0; i--) {
+      const f = fruits[i];
+      if (Math.abs(f.x - h.x) > SMASH_RADIUS || Math.abs(f.y - h.y) > SMASH_RADIUS) continue;
+      const def = FRUITS[f.type] || FRUITS.candy;
+      p.score += def.points;
+      if (def.effect === 'fast') p.boostUntil = now + EFFECT_MS;
+      if (def.effect === 'slowOthers') {
+        players.forEach(o => { if (o !== p && o.alive) o.slowUntil = now + EFFECT_MS; });
+      }
+      if (def.grow > 0) {
+        const tail = p.cells[p.cells.length - 1];
+        for (let k = 0; k < def.grow; k++) p.cells.push({ x: tail.x, y: tail.y });
+      } else if (def.grow < 0) {
+        let rm = -def.grow;
+        while (rm-- > 0 && p.cells.length > MIN_LEN) p.cells.pop();
+      }
+      fruits.splice(i, 1);
+      got++;
+    }
+    p.abData = { x: h.x, y: h.y, r: SMASH_RADIUS, got };
+    refillFruits();
+  }
+
+  // Thor's hammer orbits the head; this is the square it currently occupies.
+  // Derived from abUntil so the host and every guest agree without extra data.
+  function hammerCell(p, now) {
+    const startedAt = (p.abUntil || 0) - ABILITIES.thor.duration;
+    const ang = ((now - startedAt) / HAMMER_SPIN_MS) * Math.PI * 2;
+    const h = p.cells[0];
+    return { x: Math.round(h.x + Math.cos(ang) * HAMMER_RADIUS),
+             y: Math.round(h.y + Math.sin(ang) * HAMMER_RADIUS),
+             fx: h.x + Math.cos(ang) * HAMMER_RADIUS,
+             fy: h.y + Math.sin(ang) * HAMMER_RADIUS };
+  }
+
+  function applyHammers(now) {
+    for (const p of players) {
+      if (!p.alive || !hammerActive(p, now)) continue;
+      const c = hammerCell(p, now);
+      for (const q of players) {
+        if (q === p || !q.alive || isTiny(q, now)) continue;
+        const h = q.cells[0];
+        // 3x3 kill zone around the hammer — landable, but you have to aim.
+        if (Math.abs(h.x - c.x) <= 1 && Math.abs(h.y - c.y) <= 1) q.alive = false;
+      }
+    }
+  }
+
+  // Spider-Man: webs the wall and slings along it instead of dying. Turns 90
+  // degrees, because reversing would drive the head straight into its own neck.
+  function deflectOffWall(p) {
+    p.cells.shift();                       // undo the out-of-bounds head
+    const head = p.cells[0];
+    const opts = (p.dir.x !== 0)
+      ? [{ x: 0, y: 1 }, { x: 0, y: -1 }]
+      : [{ x: 1, y: 0 }, { x: -1, y: 0 }];
+    if (Math.random() < 0.5) opts.reverse();
+    for (const d of opts) {
+      const nh = { x: head.x + d.x, y: head.y + d.y };
+      if (nh.x < 0 || nh.x >= CELLS || nh.y < 0 || nh.y >= CELLS) continue;
+      if (p.cells.some(c => c.x === nh.x && c.y === nh.y)) continue;
+      p.dir = d; p.nextDir = d;
+      p.cells.unshift(nh);
+      p.webSaves = (p.webSaves || 0) + 1;
+      return true;
+    }
+    p.cells.unshift(head);                 // cornered - put it back and die
+    return false;
+  }
+
+  // The snake this device is actually steering.
   // The snake this device is actually steering.
   function myPlayer() {
     if (!players.length) return null;
@@ -1035,7 +1185,8 @@
       }
     }
 
-    resolveCollisions();
+    applyHammers(now);          // before collisions, so a hammer kill lands first
+    resolveCollisions(now);
     refillFruits();
 
     if (roundShouldEnd()) endRound();
@@ -1144,7 +1295,10 @@
     const bodyLight = skin.light || col.light;
     const showAura = !!skin.dark;
 
-    const base = cellSize * 0.82 * (skin.width || 1);
+    // Ant-Man shrinks further while intangible, so you can SEE he's phasing.
+    const tinyNow = isTiny(p, now);
+    const base = cellSize * 0.82 * (skin.width || 1) * (tinyNow ? 0.55 : 1);
+    if (tinyNow) ctx.globalAlpha *= 0.6;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
@@ -1243,6 +1397,8 @@
         ctx.stroke();
       }
     }
+    drawAbility(p, head, now, base);
+
     // "+N" popping off the head when a hack lands. Everyone sees it, so the
     // power never feels like invisible cheating.
     if (p.hackFlash && now - p.hackFlash.at < 1100) {
@@ -1260,6 +1416,99 @@
     }
 
     ctx.restore();
+  }
+
+  // Everything the abilities look like. Guests run this too, driven by the
+  // ability state the host sends, so all six screens show the same thing.
+  function drawAbility(p, head, now, base) {
+    const cs = cellSize;
+
+    // --- Thor: orbiting hammer ---
+    if (hammerActive(p, now)) {
+      const c = hammerCell(p, now);
+      const hx = c.fx * cs + cs / 2, hy = c.fy * cs + cs / 2;
+      ctx.save();
+      ctx.globalAlpha = 0.22;
+      ctx.strokeStyle = '#93c5fd';
+      ctx.lineWidth = cs * 0.25;
+      ctx.beginPath();
+      ctx.arc(head.x, head.y, HAMMER_RADIUS * cs, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.shadowColor = '#bfdbfe';
+      ctx.shadowBlur = cs * 0.8;
+      ctx.translate(hx, hy);
+      ctx.rotate((now / 90) % (Math.PI * 2));
+      ctx.fillStyle = '#cbd5e1';
+      ctx.fillRect(-cs * 0.55, -cs * 0.38, cs * 1.1, cs * 0.76);   // head of the hammer
+      ctx.fillStyle = '#78350f';
+      ctx.fillRect(-cs * 0.12, cs * 0.3, cs * 0.24, cs * 1.0);     // handle
+      ctx.restore();
+    }
+
+    // --- Spider-Man: web bubble ---
+    if (webActive(p, now)) {
+      ctx.save();
+      const r = base * 1.5;
+      ctx.globalAlpha = 0.75;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = Math.max(1, cs * 0.06);
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.moveTo(head.x, head.y);
+        ctx.lineTo(head.x + Math.cos(a) * r, head.y + Math.sin(a) * r);
+        ctx.stroke();
+      }
+      for (const f of [0.45, 0.75, 1]) {
+        ctx.beginPath();
+        for (let i = 0; i <= 6; i++) {
+          const a = (i / 6) * Math.PI * 2;
+          const x = head.x + Math.cos(a) * r * f, y = head.y + Math.sin(a) * r * f;
+          i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+        }
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // --- one-shot flashes: laser and smash ---
+    const fl = p.abFlash;
+    if (!fl) return;
+    const age = now - fl.at;
+
+    if (fl.kind === 'laser' && age < 380 && fl.data) {
+      const t = age / 380;
+      ctx.save();
+      ctx.lineCap = 'round';
+      const x1 = fl.data.x1 * cs + cs / 2, y1 = fl.data.y1 * cs + cs / 2;
+      const x2 = fl.data.x2 * cs + cs / 2, y2 = fl.data.y2 * cs + cs / 2;
+      ctx.globalAlpha = (1 - t) * 0.5;
+      ctx.strokeStyle = '#fbbf24'; ctx.lineWidth = cs * 0.9;
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      ctx.globalAlpha = 1 - t;
+      ctx.strokeStyle = '#fffbeb'; ctx.lineWidth = cs * 0.3;
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      if (fl.data.killed) {
+        ctx.fillStyle = '#fff';
+        ctx.globalAlpha = 1 - t;
+        ctx.beginPath(); ctx.arc(x2, y2, cs * (0.5 + t * 1.2), 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    if (fl.kind === 'smash' && age < 520 && fl.data) {
+      const t = age / 520;
+      ctx.save();
+      ctx.globalAlpha = 1 - t;
+      ctx.strokeStyle = '#4ade80';
+      ctx.lineWidth = cs * 0.4 * (1 - t);
+      ctx.beginPath();
+      ctx.arc(fl.data.x * cs + cs / 2, fl.data.y * cs + cs / 2,
+              fl.data.r * cs * (0.3 + t), 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
   }
 
   // Sparks dropped behind the tail. Spawned on a timer rather than per move, so
@@ -1381,7 +1630,7 @@
                     `<span style="color:${col.light}">${escapeHtml(p.name)}</span> ${p.score}${fx}`;
       hudEl.appendChild(d);
     });
-    updateHackButton(now);
+    updateAbilityButton(now);
 
     const badge = document.createElement('div');
     badge.id = 'speedBadge';
@@ -1389,34 +1638,42 @@
     hudEl.appendChild(badge);
   }
 
-  const hackBtn = $('btnHack');
-  function updateHackButton(now) {
+  const abilityBtn = $('btnAbility');
+  function updateAbilityButton(now) {
     const me = myPlayer();
-    const has = !!me && me.skinKey === 'hacker' && running && !roundOver;
-    hackBtn.classList.toggle('hidden', !has);
-    if (!has) return;
-    const left = Math.max(0, (me.hackReadyAt || 0) - now);
-    if (left > 0) {
-      hackBtn.classList.add('cooling');
-      hackBtn.textContent = `🔒 ${Math.ceil(left / 1000)}s`;
+    const ab = abilityFor(me);
+    const show = !!ab && me.alive && running && !roundOver;
+    abilityBtn.classList.toggle('hidden', !show);
+    if (!show) return;
+
+    const left = Math.max(0, (me.abReadyAt || 0) - now);
+    const activeLeft = Math.max(0, (me.abUntil || 0) - now);
+    abilityBtn.style.borderColor = ab.colour;
+    abilityBtn.style.color = ab.colour;
+    if (activeLeft > 0) {
+      abilityBtn.classList.add('cooling');
+      abilityBtn.textContent = `${ab.emoji} ${Math.ceil(activeLeft / 1000)}s ACTIVE`;
+    } else if (left > 0) {
+      abilityBtn.classList.add('cooling');
+      abilityBtn.textContent = `🔒 ${Math.ceil(left / 1000)}s`;
     } else {
-      hackBtn.classList.remove('cooling');
-      hackBtn.textContent = '💻 HACK';
+      abilityBtn.classList.remove('cooling');
+      abilityBtn.textContent = `${ab.emoji} ${ab.label}`;
     }
   }
 
   // One entry point for the button and the H key.
-  function requestHack() {
+  function requestAbility() {
     const me = myPlayer();
-    if (!me || me.skinKey !== 'hacker') return;
+    if (!abilityFor(me)) return;
     if (netRole === 'guest') {
-      // Ask the host; it decides. Cooldown is enforced there, not here.
+      // Ask the host; it decides. The cooldown is enforced there, not here.
       const c = conns[0];
-      if (c && c.open) { try { c.send({ type: 'hack' }); } catch (e) {} }
+      if (c && c.open) { try { c.send({ type: 'ability' }); } catch (e) {} }
       return;
     }
-    tryHack(me, nowMs());
-    updateHackButton(nowMs());
+    useAbility(me, nowMs());
+    updateAbilityButton(nowMs());
   }
 
   function escapeHtml(s) {
@@ -1782,9 +2039,9 @@
       const p = idx >= 0 ? players[idx] : null;
       if (p && p.alive && msg.dir) applyDirTo(p, msg.dir);
 
-    } else if (msg.type === 'hack') {
+    } else if (msg.type === 'hack' || msg.type === 'ability') {
       const idx = matchConns ? matchConns.indexOf(c) : lobby.indexOf(entry);
-      if (idx >= 0) tryHack(players[idx], nowMs());
+      if (idx >= 0) useAbility(players[idx], nowMs());
     }
   }
 
@@ -1841,9 +2098,11 @@
         m: p.moveMs,
         b: p.boostUntil > now ? 1 : 0,
         w: p.slowUntil > now ? 1 : 0,
-        k: p.hackCount || 0,                              // rises once per hack
-        kg: p.hackGain || 0,
-        kr: Math.max(0, (p.hackReadyAt || 0) - now)       // cooldown remaining
+        k: p.abCount || 0,                                // rises once per use
+        kk: p.abKind || '',
+        kd: p.abData || null,
+        ku: Math.max(0, (p.abUntil || 0) - now),          // ongoing effect left
+        kr: Math.max(0, (p.abReadyAt || 0) - now)         // cooldown remaining
       }))
     };
   }
@@ -1868,14 +2127,17 @@
       p.moveMs = sp.m || tickMs;
       p.boostUntil = sp.b ? now + 200 : 0;   // just for the glow/HUD icon
       p.slowUntil = sp.w ? now + 200 : 0;
-      // Trigger the "+N" popup only when the counter actually moves, otherwise
-      // 22 updates a second would re-fire it constantly.
-      if ((sp.k || 0) !== (p.hackCount || 0)) {
-        p.hackCount = sp.k || 0;
-        p.hackGain = sp.kg || 0;
-        p.hackFlash = { at: now, gain: sp.kg || 0 };
+      // Fire the one-shot visuals only when the counter actually moves —
+      // otherwise 22 updates a second would re-trigger them constantly.
+      p.abKind = sp.kk || null;
+      p.abData = sp.kd || null;
+      if ((sp.k || 0) !== (p.abCount || 0)) {
+        p.abCount = sp.k || 0;
+        p.abFlash = { at: now, kind: sp.kk || '', data: sp.kd || null };
+        if (sp.kk === 'hack' && sp.kd) p.hackFlash = { at: now, gain: sp.kd.gain || 0 };
       }
-      p.hackReadyAt = now + (sp.kr || 0);
+      p.abUntil = now + (sp.ku || 0);
+      p.abReadyAt = now + (sp.kr || 0);
     });
   }
 
@@ -1939,7 +2201,7 @@
   wrapEl.addEventListener('touchstart', e => {
     if (!running) return;
     if (e.target.closest('.dpad-btn') || e.target.closest('#btnToggleDpad') ||
-        e.target.closest('#btnHack')) return;
+        e.target.closest('#btnAbility')) return;
     const t = e.changedTouches[0];
     touchState = { id: t.identifier, x: t.clientX, y: t.clientY,
                    slot: swipeSlotFor(t.clientX), fired: false };
@@ -1974,7 +2236,7 @@
     });
   });
 
-  hackBtn.addEventListener('click', e => { e.preventDefault(); requestHack(); });
+  abilityBtn.addEventListener('click', e => { e.preventDefault(); requestAbility(); });
 
   const toggleBtn = $('btnToggleDpad');
   toggleBtn.addEventListener('click', () => {
@@ -2005,7 +2267,7 @@
       else startLocal(mode === 'local2' ? 2 : 1);
       return;
     }
-    if (key.toLowerCase() === 'h' && running) { requestHack(); return; }
+    if (key.toLowerCase() === 'h' && running) { requestAbility(); return; }
 
     const isWASD = ['w', 'a', 's', 'd'].includes(key.toLowerCase());
     const isArrow = key.startsWith('Arrow');
@@ -2030,6 +2292,9 @@
     get CELLS() { return CELLS; },
     FRUITS, PALETTE, MIN_LEN, MAX_PLAYERS,
     setBoardSize, makePlayer, movePlayer, resolveCollisions, refillFruits,
+    useAbility, abilityFor, ABILITIES, isTiny, webActive, hammerActive,
+    hammerCell, fireLaser, hulkSmash, applyHammers, deflectOffWall,
+    ABILITY_COOLDOWN_MS, LASER_RANGE, SMASH_RADIUS, HAMMER_RADIUS,
     roundShouldEnd, aliveCount, assignColors, cellsForPlayers, fruitCountFor,
     applyDirTo, tryHack, myPlayer, HACK_MIN, HACK_MAX, HACK_COOLDOWN_MS,
     setRunning(v) { running = v; }, setRoundOver(v) { roundOver = v; },
