@@ -17,6 +17,7 @@
     --text: #f5f0ff;
   }
   * { box-sizing: border-box; }
+  html, body { overscroll-behavior: none; }
   body {
     margin: 0;
     min-height: 100vh;
@@ -67,6 +68,42 @@
   #menu button:hover, #gameOver button:hover { transform: scale(1.04); }
   #menu p, #gameOver p { opacity: 0.8; font-size: 0.85rem; line-height: 1.5; }
 
+  /* ---- Difficulty picker ---- */
+  #speedLabel {
+    margin: 0 0 6px;
+    font-weight: bold;
+    opacity: 1 !important;
+    font-size: 0.9rem !important;
+  }
+  #difficultyRow {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    margin: 0 0 6px;
+  }
+  /* Two IDs beat the generic "#menu button" rule above, so no !important needed. */
+  #menu #difficultyRow button {
+    display: block;
+    flex: 1;
+    width: auto;
+    margin: 0;
+    padding: 9px 2px;
+    font-size: 0.78rem;
+    line-height: 1.25;
+    border-radius: 9px;
+    background: #2c1a3d;
+    border: 2px solid transparent;
+    opacity: 0.75;
+  }
+  #menu #difficultyRow button .emoji { display: block; font-size: 1.05rem; }
+  #menu #difficultyRow button.active {
+    background: linear-gradient(135deg, var(--candy), #b23b6f);
+    border-color: #ffb3d4;
+    opacity: 1;
+    box-shadow: 0 0 14px rgba(255,93,162,0.55);
+  }
+  #speedNote { margin: 0 0 16px; font-size: 0.75rem !important; opacity: 0.55 !important; }
+
   #joinCodeInput {
     display: block;
     width: 220px;
@@ -94,13 +131,22 @@
 
   #hud {
     display: flex;
-    gap: 28px;
+    gap: 20px;
+    align-items: center;
     margin-bottom: 8px;
     font-size: 1.1rem;
     font-weight: bold;
   }
   #hud .p1 { color: var(--p1); }
   #hud .p2 { color: var(--p2); }
+  #speedBadge {
+    font-size: 0.75rem;
+    font-weight: normal;
+    opacity: 0.6;
+    border: 1px solid #3d2255;
+    border-radius: 20px;
+    padding: 3px 10px;
+  }
 
   canvas {
     background: var(--grid);
@@ -112,8 +158,15 @@
     touch-action: none;
   }
 
-  #wrap { display: none; flex-direction: column; align-items: center; }
-  #hint { margin-top: 10px; font-size: 0.8rem; opacity: 0.6; text-align: center; }
+  /* touch-action:none here means swipes steer the snake instead of
+     scrolling the page or triggering pull-to-refresh. */
+  #wrap {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    touch-action: none;
+  }
+  #hint { margin-top: 10px; font-size: 0.8rem; opacity: 0.6; text-align: center; max-width: 92vw; }
   .hidden { display: none !important; }
 
   #touchControls {
@@ -122,7 +175,7 @@
     gap: 40px;
     width: 92vw;
     max-width: 480px;
-    margin-top: 16px;
+    margin-top: 14px;
   }
   .dpad {
     display: grid;
@@ -151,6 +204,18 @@
   .dpad-btn.left { grid-column: 1; grid-row: 2; }
   .dpad-btn.right { grid-column: 3; grid-row: 2; }
   .dpad-btn.down { grid-column: 2; grid-row: 3; }
+
+  #btnToggleDpad {
+    margin-top: 12px;
+    padding: 7px 16px;
+    font-size: 0.75rem;
+    border: 1px solid #3d2255;
+    border-radius: 20px;
+    background: transparent;
+    color: var(--text);
+    opacity: 0.55;
+    cursor: pointer;
+  }
 </style>
 </head>
 <body>
@@ -160,11 +225,20 @@
 
 <div id="menu">
   <div id="modeChoice">
+    <p id="speedLabel">Choose your speed:</p>
+    <div id="difficultyRow">
+      <button class="diff-btn" data-ms="230" data-name="Easy"><span class="emoji">🐌</span>Easy</button>
+      <button class="diff-btn" data-ms="160" data-name="Medium"><span class="emoji">🙂</span>Medium</button>
+      <button class="diff-btn" data-ms="110" data-name="Hard"><span class="emoji">🔥</span>Hard</button>
+      <button class="diff-btn" data-ms="75" data-name="Insane"><span class="emoji">💀</span>Insane</button>
+    </div>
+    <p id="speedNote">You can change this any time from the menu.</p>
+
     <p>Pick a mode to start:</p>
     <button id="btn1p">1 Player</button>
     <button id="btn2p">2 Player — Same Device</button>
     <button id="btnOnline">2 Player — Online</button>
-    <p>1P: Arrow keys or WASD.<br>Same device: P1 = WASD, P2 = Arrows.<br>Online: each player uses Arrows or WASD on their own device.</p>
+    <p><b>Swipe</b> up / down / left / right to steer.<br>Arrow keys or WASD work on a laptop.<br>Same device: P1 swipes the left half (or WASD), P2 the right half (or Arrows).</p>
   </div>
 
   <div id="onlineChoice" class="hidden">
@@ -191,9 +265,10 @@
   <div id="hud">
     <div class="p1" id="score1">Score: 0</div>
     <div class="p2 hidden" id="score2">Score: 0</div>
+    <div id="speedBadge">🐌 Easy</div>
   </div>
   <canvas id="board" width="480" height="480"></canvas>
-  <div id="hint">Press <b>Space</b> to pause. Press <b>R</b> to restart. On mobile, use the buttons below.</div>
+  <div id="hint">Swipe anywhere to steer. <b>Space</b> pauses, <b>R</b> restarts.</div>
 
   <div id="touchControls">
     <div>
@@ -215,6 +290,8 @@
       </div>
     </div>
   </div>
+
+  <button id="btnToggleDpad">Hide buttons</button>
 </div>
 
 <div id="gameOver" class="hidden">
@@ -236,17 +313,55 @@
   const goText = document.getElementById('goText');
   const score1El = document.getElementById('score1');
   const score2El = document.getElementById('score2');
+  const speedBadgeEl = document.getElementById('speedBadge');
 
   let mode = 1; // 1 or 2
   let running = false;
   let paused = false;
-  let tickMs = 130;
   let timer = null;
 
-  // Online multiplayer state
+  // Online multiplayer state. Declared up here because selectDifficulty()
+  // below reads netRole, and it runs during setup.
   let netRole = null; // null | 'host' | 'guest'
   let peer = null;
   let conn = null;
+
+  // ---------- Difficulty ----------
+  // tickMs is the delay between moves: bigger number = slower snake.
+  let tickMs = 230;             // default to Easy, the most forgiving
+  let difficultyName = 'Easy';
+  let difficultyEmoji = '🐌';
+
+  const diffButtons = Array.from(document.querySelectorAll('.diff-btn'));
+
+  function selectDifficulty(btn, persist) {
+    tickMs = Number(btn.dataset.ms);
+    difficultyName = btn.dataset.name;
+    difficultyEmoji = btn.querySelector('.emoji').textContent;
+    diffButtons.forEach(b => b.classList.toggle('active', b === btn));
+    speedBadgeEl.textContent = `${difficultyEmoji} ${difficultyName}`;
+
+    // If the speed changes mid-game, restart the clock at the new pace.
+    if (running && timer !== null && netRole !== 'guest') {
+      clearInterval(timer);
+      timer = setInterval(step, tickMs);
+    }
+    if (persist) {
+      try { localStorage.setItem('snakeCandyDifficulty', difficultyName); } catch (e) {}
+    }
+  }
+
+  diffButtons.forEach(btn => {
+    btn.addEventListener('click', () => selectDifficulty(btn, true));
+  });
+
+  // Restore the player's last choice, falling back to Easy.
+  (function initDifficulty() {
+    let saved = null;
+    try { saved = localStorage.getItem('snakeCandyDifficulty'); } catch (e) {}
+    const match = diffButtons.find(b => b.dataset.name === saved);
+    selectDifficulty(match || diffButtons[0], false);
+  })();
 
   let snake1, snake2, candy, dir1, dir2, nextDir1, nextDir2, score1, score2, alive1, alive2;
 
@@ -418,7 +533,7 @@
     clearInterval(timer);
     let msg;
     if (mode === 1) {
-      msg = `Game over! Final score: ${score1}`;
+      msg = `Game over! Final score: ${score1} (${difficultyName})`;
     } else {
       if (!alive1 && !alive2 && score1 === score2) {
         msg = `Draw! Both scored ${score1}`;
@@ -602,6 +717,11 @@
       draw();
       clearInterval(timer);
       timer = setInterval(step, tickMs);
+      // The host's device runs the simulation, so the host's speed setting
+      // governs the match. Tell the guest what it is so their badge matches.
+      if (conn && conn.open) {
+        conn.send({ type: 'difficulty', name: difficultyName, emoji: difficultyEmoji });
+      }
     } else {
       // guest: no local simulation, just wait for state pushes
       running = true;
@@ -629,6 +749,8 @@
       alive2 = msg.alive2;
       updateHud();
       draw();
+    } else if (msg.type === 'difficulty') {
+      speedBadgeEl.textContent = `${msg.emoji} ${msg.name}`;
     } else if (msg.type === 'gameover') {
       running = false;
       goText.textContent = msg.msg;
@@ -643,8 +765,15 @@
 
   // ---------- Input ----------
 
+  const DIRS = {
+    up:    { x: 0,  y: -1 },
+    down:  { x: 0,  y: 1  },
+    left:  { x: -1, y: 0  },
+    right: { x: 1,  y: 0  }
+  };
+
   // Single entry point for "move this player in this direction," used by
-  // both keyboard and the on-screen touch D-pads. `player` (1 or 2) only
+  // keyboard, the on-screen D-pads, and swipes. `player` (1 or 2) only
   // matters in local same-device 2P mode, where two snakes share one screen.
   function applyDirection(newDir, player) {
     if (!newDir) return;
@@ -673,18 +802,95 @@
     const twoLocalPlayers = (mode === 2 && !netRole);
     document.getElementById('dpad2Wrap').classList.toggle('hidden', !twoLocalPlayers);
     document.getElementById('dpad1Label').textContent = twoLocalPlayers ? 'Player 1' : 'Move';
+    document.getElementById('hint').innerHTML = twoLocalPlayers
+      ? 'P1 swipes the <b>left</b> half, P2 the <b>right</b> half. <b>Space</b> pauses, <b>R</b> restarts.'
+      : 'Swipe anywhere to steer. <b>Space</b> pauses, <b>R</b> restarts.';
   }
 
+  // ---------- Swipe steering ----------
+  // Fires the moment the finger passes the threshold rather than waiting for
+  // touchend, so steering feels immediate. One direction change per touch —
+  // `fired` prevents a single wandering finger from spamming turns.
+  const SWIPE_THRESHOLD = 22; // px of travel before we call it a swipe
+  let touchState = null;
+
+  function swipePlayerFor(clientX) {
+    // Only same-device 2P needs the screen split; everywhere else one snake
+    // is being driven, so a swipe anywhere belongs to it.
+    if (mode === 2 && !netRole) {
+      return clientX < window.innerWidth / 2 ? 1 : 2;
+    }
+    return 1;
+  }
+
+  wrapEl.addEventListener('touchstart', (e) => {
+    if (!running) return;
+    // Let the D-pad buttons handle their own taps.
+    if (e.target.closest('.dpad-btn') || e.target.closest('#btnToggleDpad')) return;
+    const t = e.changedTouches[0];
+    touchState = {
+      id: t.identifier,
+      x: t.clientX,
+      y: t.clientY,
+      player: swipePlayerFor(t.clientX),
+      fired: false
+    };
+  }, { passive: true });
+
+  wrapEl.addEventListener('touchmove', (e) => {
+    if (!touchState || touchState.fired || !running) return;
+
+    let t = null;
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      if (e.changedTouches[i].identifier === touchState.id) { t = e.changedTouches[i]; break; }
+    }
+    if (!t) return;
+
+    const dx = t.clientX - touchState.x;
+    const dy = t.clientY - touchState.y;
+    if (Math.abs(dx) < SWIPE_THRESHOLD && Math.abs(dy) < SWIPE_THRESHOLD) return;
+
+    // Whichever axis moved further wins, so a slightly diagonal swipe
+    // still resolves to a clean up/down/left/right.
+    const dir = Math.abs(dx) > Math.abs(dy)
+      ? (dx > 0 ? DIRS.right : DIRS.left)
+      : (dy > 0 ? DIRS.down : DIRS.up);
+
+    applyDirection(dir, touchState.player);
+    touchState.fired = true;
+  }, { passive: true });
+
+  function endTouch() { touchState = null; }
+  wrapEl.addEventListener('touchend', endTouch, { passive: true });
+  wrapEl.addEventListener('touchcancel', endTouch, { passive: true });
+
+  // ---------- D-pad buttons ----------
   document.querySelectorAll('.dpad-btn').forEach(btn => {
-    const dirMap = { up: { x: 0, y: -1 }, down: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
     btn.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       if (!running) return;
       const player = Number(btn.closest('.dpad').dataset.player);
-      applyDirection(dirMap[btn.dataset.dir], player);
+      applyDirection(DIRS[btn.dataset.dir], player);
     });
   });
 
+  const touchControlsEl = document.getElementById('touchControls');
+  const toggleBtn = document.getElementById('btnToggleDpad');
+  toggleBtn.addEventListener('click', () => {
+    const nowHidden = touchControlsEl.classList.toggle('hidden');
+    toggleBtn.textContent = nowHidden ? 'Show buttons' : 'Hide buttons';
+    try { localStorage.setItem('snakeCandyHideDpad', nowHidden ? '1' : '0'); } catch (e) {}
+  });
+  (function initDpadVisibility() {
+    let hidden = null;
+    try { hidden = localStorage.getItem('snakeCandyHideDpad'); } catch (e) {}
+    if (hidden === '1') {
+      touchControlsEl.classList.add('hidden');
+      toggleBtn.textContent = 'Show buttons';
+    }
+  })();
+
+  // ---------- Keyboard ----------
   window.addEventListener('keydown', (e) => {
     const key = e.key;
 
@@ -709,10 +915,10 @@
     if (!isWASD && !isArrow) return;
 
     let newDir = null;
-    if (key === 'ArrowUp' || key.toLowerCase() === 'w') newDir = { x: 0, y: -1 };
-    else if (key === 'ArrowDown' || key.toLowerCase() === 's') newDir = { x: 0, y: 1 };
-    else if (key === 'ArrowLeft' || key.toLowerCase() === 'a') newDir = { x: -1, y: 0 };
-    else if (key === 'ArrowRight' || key.toLowerCase() === 'd') newDir = { x: 1, y: 0 };
+    if (key === 'ArrowUp' || key.toLowerCase() === 'w') newDir = DIRS.up;
+    else if (key === 'ArrowDown' || key.toLowerCase() === 's') newDir = DIRS.down;
+    else if (key === 'ArrowLeft' || key.toLowerCase() === 'a') newDir = DIRS.left;
+    else if (key === 'ArrowRight' || key.toLowerCase() === 'd') newDir = DIRS.right;
 
     if (newDir) {
       // In local same-device 2P, WASD always drives player 1 and Arrows
