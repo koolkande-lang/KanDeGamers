@@ -7,279 +7,224 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
 <style>
   :root {
-    --bg: #1b1025;
-    --grid: #241533;
     --candy: #ff5da2;
-    --p1: #4ade80;
-    --p1-dark: #22c55e;
-    --p2: #60a5fa;
-    --p2-dark: #3b82f6;
     --text: #f5f0ff;
+    --panel: #3d2255;
   }
   * { box-sizing: border-box; }
   html, body { overscroll-behavior: none; }
   body {
-    margin: 0;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
+    margin: 0; min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
     background: radial-gradient(circle at top, #2b1a3f, #120a1c 70%);
     font-family: 'Trebuchet MS', system-ui, sans-serif;
-    color: var(--text);
-    padding: 6px 0 20px;
+    color: var(--text); padding: 6px 0 20px;
   }
-  h1 {
-    margin: 6px 0 2px;
-    font-size: 1.8rem;
-    letter-spacing: 1px;
-    text-shadow: 0 0 12px rgba(255,93,162,0.6);
-  }
+  h1 { margin: 6px 0 2px; font-size: 1.8rem; letter-spacing: 1px; text-shadow: 0 0 12px rgba(255,93,162,0.6); }
   #subtitle { margin: 0 0 10px; opacity: 0.75; font-size: 0.85rem; }
-  /* Once the game is on screen the header is wasted vertical space,
-     which is exactly what forces scrolling on an iPad. */
   body.playing h1 { font-size: 1.15rem; margin: 2px 0 0; }
   body.playing #subtitle { display: none; }
 
   #menu, #gameOver {
-    background: rgba(20, 10, 30, 0.85);
-    border: 2px solid #3d2255;
-    border-radius: 16px;
-    padding: 24px 32px;
-    text-align: center;
-    box-shadow: 0 0 30px rgba(0,0,0,0.5);
-    max-width: 360px;
+    background: rgba(20,10,30,0.88); border: 2px solid var(--panel);
+    border-radius: 16px; padding: 22px 26px; text-align: center;
+    box-shadow: 0 0 30px rgba(0,0,0,0.5); max-width: 380px;
+    max-height: 92vh; overflow-y: auto;
   }
   #menu button, #gameOver button {
-    display: block;
-    width: 220px;
-    margin: 10px auto;
-    padding: 12px;
-    font-size: 1.05rem;
-    border: none;
-    border-radius: 10px;
+    display: block; width: 230px; margin: 9px auto; padding: 12px;
+    font-size: 1.05rem; border: none; border-radius: 10px;
     background: linear-gradient(135deg, var(--candy), #b23b6f);
-    color: white;
-    cursor: pointer;
-    font-weight: bold;
-    transition: transform 0.1s ease;
+    color: white; cursor: pointer; font-weight: bold; transition: transform 0.1s ease;
   }
-  #menu button.secondary { background: #3d2255; }
+  #menu button.secondary, #gameOver button.secondary { background: var(--panel); }
   #menu button:hover, #gameOver button:hover { transform: scale(1.04); }
+  #menu button:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
   #menu p, #gameOver p { opacity: 0.8; font-size: 0.85rem; line-height: 1.5; }
+  .fieldLabel { margin: 0 0 6px !important; font-weight: bold; opacity: 1 !important; font-size: 0.88rem !important; }
+  .note { font-size: 0.74rem !important; opacity: 0.5 !important; margin: 4px 0 14px !important; }
 
-  /* ---- Difficulty picker ---- */
-  #speedLabel { margin: 0 0 6px; font-weight: bold; opacity: 1 !important; font-size: 0.9rem !important; }
-  #difficultyRow { display: flex; gap: 6px; justify-content: center; margin: 0 0 6px; }
-  /* Two IDs beat the generic "#menu button" rule above, so no !important needed. */
+  #difficultyRow { display: flex; gap: 5px; justify-content: center; margin: 0 0 4px; }
   #menu #difficultyRow button {
-    display: block; flex: 1; width: auto; margin: 0;
-    padding: 9px 2px; font-size: 0.78rem; line-height: 1.25;
-    border-radius: 9px; background: #2c1a3d;
-    border: 2px solid transparent; opacity: 0.75;
+    display: block; flex: 1; width: auto; margin: 0; padding: 8px 2px;
+    font-size: 0.75rem; line-height: 1.2; border-radius: 9px;
+    background: #2c1a3d; border: 2px solid transparent; opacity: 0.75;
   }
-  #menu #difficultyRow button .emoji { display: block; font-size: 1.05rem; }
+  #menu #difficultyRow button .emoji { display: block; font-size: 1rem; }
   #menu #difficultyRow button.active {
     background: linear-gradient(135deg, var(--candy), #b23b6f);
-    border-color: #ffb3d4; opacity: 1;
-    box-shadow: 0 0 14px rgba(255,93,162,0.55);
+    border-color: #ffb3d4; opacity: 1; box-shadow: 0 0 14px rgba(255,93,162,0.55);
   }
-  #speedNote { margin: 0 0 16px; font-size: 0.75rem !important; opacity: 0.55 !important; }
 
-  #joinCodeInput {
-    display: block; width: 220px; margin: 10px auto; padding: 10px;
-    font-size: 1rem; border-radius: 8px; border: 1px solid #3d2255;
-    background: #120a1c; color: var(--text); text-align: center; letter-spacing: 1px;
+  #colorRow { display: flex; gap: 8px; justify-content: center; margin: 0 0 4px; flex-wrap: wrap; }
+  #menu #colorRow button {
+    display: block; width: 40px; height: 40px; margin: 0; padding: 0;
+    border-radius: 50%; border: 3px solid transparent; opacity: 0.55;
   }
+  #menu #colorRow button.active { opacity: 1; border-color: #fff; transform: scale(1.1); }
+  #menu #colorRow button.taken { opacity: 0.18; cursor: not-allowed; }
+
+  #nameInput, #joinCodeInput {
+    display: block; width: 230px; margin: 6px auto; padding: 10px;
+    font-size: 1rem; border-radius: 8px; border: 1px solid var(--panel);
+    background: #120a1c; color: var(--text); text-align: center;
+  }
+  #joinCodeInput { letter-spacing: 3px; text-transform: uppercase; font-weight: bold; }
+
   #roomCode {
-    font-size: 1.7rem; font-weight: bold; letter-spacing: 2px;
-    margin: 8px 0; padding: 8px; background: #120a1c;
-    border-radius: 8px; word-break: break-all;
+    font-size: 2rem; font-weight: bold; letter-spacing: 4px; margin: 8px 0;
+    padding: 10px; background: #120a1c; border-radius: 8px;
   }
+  #lobbyList { list-style: none; padding: 0; margin: 10px 0; }
+  #lobbyList li {
+    display: flex; align-items: center; gap: 9px; justify-content: center;
+    padding: 6px; font-size: 0.92rem;
+  }
+  .dot { width: 15px; height: 15px; border-radius: 50%; flex: none; }
 
   #hud {
-    display: flex; gap: 18px; align-items: center;
-    margin-bottom: 6px; font-size: 1.05rem; font-weight: bold;
+    display: flex; gap: 8px; align-items: center; justify-content: center;
+    flex-wrap: wrap; margin-bottom: 6px; font-size: 0.88rem;
+    font-weight: bold; max-width: 96vw;
   }
-  #hud .p1 { color: var(--p1); }
-  #hud .p2 { color: var(--p2); }
-  #speedBadge {
-    font-size: 0.72rem; font-weight: normal; opacity: 0.6;
-    border: 1px solid #3d2255; border-radius: 20px; padding: 3px 10px;
+  .hudPlayer {
+    display: flex; align-items: center; gap: 5px;
+    background: rgba(20,10,30,0.6); border-radius: 20px; padding: 3px 10px;
   }
+  .hudPlayer.dead { opacity: 0.35; text-decoration: line-through; }
+  #speedBadge { font-size: 0.7rem; font-weight: normal; opacity: 0.55; border: 1px solid var(--panel); border-radius: 20px; padding: 3px 9px; }
 
   canvas {
-    background: var(--grid);
-    border: 3px solid #3d2255;
-    border-radius: 10px;
+    background: #241533; border: 3px solid var(--panel); border-radius: 10px;
     box-shadow: 0 0 24px rgba(0,0,0,0.6) inset;
-    /* Capped by viewport HEIGHT as well as width, so the board plus its
-       controls always fit on one screen without scrolling. */
-    width: min(92vw, 58vh, 620px);
-    height: auto;
-    touch-action: none;
-    display: block;
+    width: min(92vw, 58vh, 640px); height: auto; touch-action: none; display: block;
   }
 
-  /* touch-action:none means swipes steer the snake instead of scrolling
-     the page or triggering pull-to-refresh. */
   #wrap { display: none; flex-direction: column; align-items: center; touch-action: none; }
   #hint { margin-top: 8px; font-size: 0.75rem; opacity: 0.55; text-align: center; max-width: 92vw; }
   .hidden { display: none !important; }
 
-  /* ---- Play area layout ----
-     Phone (default): board on top, D-pads underneath.
-     Tablet/desktop:  D-pads beside the board so nothing needs scrolling. */
   #playArea {
-    display: grid;
-    justify-items: center;
-    align-items: center;
-    gap: 12px;
+    display: grid; justify-items: center; align-items: center; gap: 12px;
     grid-template-columns: 1fr 1fr;
-    grid-template-areas:
-      "board board"
-      "d1    d2";
+    grid-template-areas: "board board" "d1 d2";
   }
-  #playArea:not(.local2p) {
-    grid-template-columns: 1fr;
-    grid-template-areas: "board" "d1";
-  }
+  #playArea:not(.local2p) { grid-template-columns: 1fr; grid-template-areas: "board" "d1"; }
   #boardWrap { grid-area: board; }
   #dpad1Wrap { grid-area: d1; }
   #dpad2Wrap { grid-area: d2; }
 
   @media (min-width: 900px) {
-    #playArea {
-      grid-template-columns: auto auto auto;
-      grid-template-areas: "d1 board d2";
-      gap: 30px;
-    }
-    #playArea:not(.local2p) {
-      grid-template-columns: auto auto;
-      grid-template-areas: "board d1";
-    }
-    /* Side by side, the D-pads eat horizontal room, so the board has to
-       leave space for them or the row overflows the screen. */
-    #playArea canvas { width: min(58vh, 620px, calc(96vw - 230px)); }
-    #playArea.local2p canvas { width: min(58vh, 620px, calc(96vw - 440px)); }
+    #playArea { grid-template-columns: auto auto auto; grid-template-areas: "d1 board d2"; gap: 30px; }
+    #playArea:not(.local2p) { grid-template-columns: auto auto; grid-template-areas: "board d1"; }
+    #playArea canvas { width: min(58vh, 640px, calc(96vw - 230px)); }
+    #playArea.local2p canvas { width: min(58vh, 640px, calc(96vw - 440px)); }
   }
 
-  .dpad {
-    display: grid;
-    grid-template-columns: 52px 52px 52px;
-    grid-template-rows: 52px 52px 52px;
-    gap: 5px;
-  }
-
-  /* Small phones (iPhone SE and similar) are short enough that the board plus
-     the D-pad below it would spill off the bottom. Shrink both a little. */
-  @media (max-height: 720px) and (max-width: 899px) {
-    #playArea canvas { width: min(86vw, 50vh, 620px); }
-    .dpad { grid-template-columns: 44px 44px 44px; grid-template-rows: 44px 44px 44px; }
-    #hint { margin-top: 5px; font-size: 0.7rem; }
-    #btnToggleDpad { margin-top: 5px; }
-    body.playing h1 { font-size: 1rem; }
-  }
-
-  /* Phone turned sideways: barely any height, but plenty of width — so put
-     the D-pads beside the board and drop the decoration. */
-  @media (max-height: 480px) and (orientation: landscape) {
-    #playArea {
-      grid-template-columns: auto auto auto;
-      grid-template-areas: "d1 board d2";
-      gap: 16px;
-    }
-    #playArea:not(.local2p) {
-      grid-template-columns: auto auto;
-      grid-template-areas: "board d1";
-    }
-    #playArea canvas { width: min(72vh, 620px, calc(96vw - 200px)); }
-    .dpad { grid-template-columns: 40px 40px 40px; grid-template-rows: 40px 40px 40px; }
-    body.playing h1 { display: none; }
-    body.playing #hint { display: none; }
-    #btnToggleDpad { margin-top: 3px; }
-  }
+  .dpad { display: grid; grid-template-columns: 52px 52px 52px; grid-template-rows: 52px 52px 52px; gap: 5px; }
   .dpad-label { text-align: center; font-size: 0.72rem; opacity: 0.7; margin-bottom: 4px; }
   .dpad-btn {
-    border: none; border-radius: 10px; background: #3d2255;
-    color: var(--text); font-size: 1.2rem;
-    touch-action: none; user-select: none; -webkit-user-select: none;
+    border: none; border-radius: 10px; background: var(--panel); color: var(--text);
+    font-size: 1.2rem; touch-action: none; user-select: none; -webkit-user-select: none;
   }
   .dpad-btn:active { background: var(--candy); }
   .dpad-btn.up { grid-column: 2; grid-row: 1; }
   .dpad-btn.left { grid-column: 1; grid-row: 2; }
   .dpad-btn.right { grid-column: 3; grid-row: 2; }
   .dpad-btn.down { grid-column: 2; grid-row: 3; }
-
-  #playArea.dpads-off #dpad1Wrap,
-  #playArea.dpads-off #dpad2Wrap { display: none !important; }
+  #playArea.dpads-off #dpad1Wrap, #playArea.dpads-off #dpad2Wrap { display: none !important; }
 
   #btnToggleDpad {
     margin-top: 8px; padding: 6px 16px; font-size: 0.72rem;
-    border: 1px solid #3d2255; border-radius: 20px;
+    border: 1px solid var(--panel); border-radius: 20px;
     background: transparent; color: var(--text); opacity: 0.5; cursor: pointer;
+  }
+
+  #legend { margin-top: 6px; font-size: 0.7rem; opacity: 0.45; text-align: center; max-width: 92vw; }
+
+  /* Small phones: shrink so the board plus D-pad still fit. */
+  @media (max-height: 720px) and (max-width: 899px) {
+    #playArea canvas { width: min(86vw, 50vh, 640px); }
+    .dpad { grid-template-columns: 44px 44px 44px; grid-template-rows: 44px 44px 44px; }
+    #hint, #legend { margin-top: 5px; font-size: 0.68rem; }
+    #btnToggleDpad { margin-top: 5px; }
+    body.playing h1 { font-size: 1rem; }
+  }
+  /* Phone turned sideways: little height, lots of width. */
+  @media (max-height: 480px) and (orientation: landscape) {
+    #playArea { grid-template-columns: auto auto auto; grid-template-areas: "d1 board d2"; gap: 16px; }
+    #playArea:not(.local2p) { grid-template-columns: auto auto; grid-template-areas: "board d1"; }
+    #playArea canvas { width: min(72vh, 640px, calc(96vw - 200px)); }
+    .dpad { grid-template-columns: 40px 40px 40px; grid-template-rows: 40px 40px 40px; }
+    body.playing h1 { display: none; }
+    body.playing #hint, body.playing #legend { display: none; }
+    #btnToggleDpad { margin-top: 3px; }
   }
 </style>
 </head>
 <body>
 
 <h1>🐍 Snake &amp; Candy</h1>
-<p id="subtitle">Slither around, gobble candy, don't bite yourself.</p>
+<p id="subtitle">Slither around, gobble fruit, don't bite anyone.</p>
 
 <div id="menu">
+  <!-- ---------- Main menu ---------- -->
   <div id="modeChoice">
-    <p id="speedLabel">Choose your speed:</p>
+    <p class="fieldLabel">Choose your speed:</p>
     <div id="difficultyRow">
       <button class="diff-btn" data-ms="230" data-name="Easy"><span class="emoji">🐌</span>Easy</button>
       <button class="diff-btn" data-ms="160" data-name="Medium"><span class="emoji">🙂</span>Medium</button>
       <button class="diff-btn" data-ms="110" data-name="Hard"><span class="emoji">🔥</span>Hard</button>
       <button class="diff-btn" data-ms="75" data-name="Insane"><span class="emoji">💀</span>Insane</button>
     </div>
-    <p id="speedNote">You can change this any time from the menu.</p>
+    <p class="note">Changeable any time from the menu.</p>
 
-    <p>Pick a mode to start:</p>
+    <p class="fieldLabel">Your snake colour:</p>
+    <div id="colorRow"></div>
+    <p class="note">Used online and in 1 player.</p>
+
+    <p class="fieldLabel">Your name:</p>
+    <input id="nameInput" maxlength="12" placeholder="Player">
+
     <button id="btn1p">1 Player</button>
     <button id="btn2p">2 Player — Same Device</button>
-    <button id="btnOnline">2 Player — Online</button>
-    <p><b>Swipe</b> up / down / left / right to steer.<br>Arrow keys or WASD work on a laptop.<br>Same device: P1 swipes the left half (or WASD), P2 the right half (or Arrows).</p>
+    <button id="btnOnline">Online — up to 6 players</button>
+    <p><b>Swipe</b> to steer, or arrow keys / WASD.<br>Same device: P1 = left half or WASD, P2 = right half or Arrows.</p>
   </div>
 
+  <!-- ---------- Online: host or join ---------- -->
   <div id="onlineChoice" class="hidden">
-    <p>Play with a friend on another device:</p>
+    <p>Play with friends on other devices:</p>
     <button id="btnHost">Create Room</button>
     <p style="margin:6px 0;">— or —</p>
-    <input id="joinCodeInput" placeholder="Enter room code">
+    <input id="joinCodeInput" maxlength="4" placeholder="CODE">
     <button id="btnJoin">Join Room</button>
     <button id="btnOnlineBack" class="secondary">Back</button>
   </div>
 
+  <!-- ---------- Online: lobby ---------- -->
   <div id="onlineStatus" class="hidden">
     <p id="onlineStatusText">Connecting...</p>
     <div id="roomCodeBox" class="hidden">
-      <p>Send this code to your friend:</p>
+      <p style="margin-bottom:0;">Room code:</p>
       <div id="roomCode"></div>
-      <button id="btnCopyCode">Copy Code</button>
+      <button id="btnCopyCode" class="secondary">Copy Code</button>
     </div>
-    <button id="btnOnlineCancel" class="secondary">Cancel</button>
+    <ul id="lobbyList"></ul>
+    <button id="btnStartMatch" class="hidden">Start Game</button>
+    <button id="btnOnlineCancel" class="secondary">Leave</button>
   </div>
 </div>
 
 <div id="wrap">
-  <div id="hud">
-    <div class="p1" id="score1">Score: 0</div>
-    <div class="p2 hidden" id="score2">Score: 0</div>
-    <div id="speedBadge">🐌 Easy</div>
-  </div>
+  <div id="hud"></div>
 
   <div id="playArea">
-    <div id="boardWrap">
-      <canvas id="board" width="600" height="600"></canvas>
-    </div>
+    <div id="boardWrap"><canvas id="board" width="720" height="720"></canvas></div>
 
     <div id="dpad1Wrap">
       <div class="dpad-label" id="dpad1Label">Move</div>
-      <div class="dpad" id="dpad1" data-player="1">
+      <div class="dpad" id="dpad1" data-player="0">
         <button class="dpad-btn up" data-dir="up">▲</button>
         <button class="dpad-btn left" data-dir="left">◀</button>
         <button class="dpad-btn right" data-dir="right">▶</button>
@@ -289,7 +234,7 @@
 
     <div id="dpad2Wrap" class="hidden">
       <div class="dpad-label">Player 2</div>
-      <div class="dpad" id="dpad2" data-player="2">
+      <div class="dpad" id="dpad2" data-player="1">
         <button class="dpad-btn up" data-dir="up">▲</button>
         <button class="dpad-btn left" data-dir="left">◀</button>
         <button class="dpad-btn right" data-dir="right">▶</button>
@@ -299,49 +244,122 @@
   </div>
 
   <div id="hint">Swipe anywhere to steer. <b>Space</b> pauses, <b>R</b> restarts.</div>
+  <div id="legend">🍬 +10 &nbsp; 🍒 +25 &nbsp; 🍌 shrink &nbsp; ⚡ speed burst &nbsp; ❄️ slows everyone else</div>
   <button id="btnToggleDpad">Hide buttons</button>
 </div>
 
 <div id="gameOver" class="hidden">
   <p id="goText" style="font-size:1.2rem;"></p>
+  <div id="standings"></div>
   <button id="btnAgain">Play Again</button>
-  <button id="btnMenu">Back to Menu</button>
+  <button id="btnMenu" class="secondary">Back to Menu</button>
 </div>
 
 <script>
 (function () {
-  const CELLS = 30;                       // was 24 — bigger map
-  const canvas = document.getElementById('board');
+  'use strict';
+
+  // ============================================================
+  //  Constants
+  // ============================================================
+  const MAX_PLAYERS = 6;
+  const MIN_LEN = 3;
+  const START_LEN = 3;
+  const EFFECT_MS = 5000;
+  const BOOST_MULT = 1.8;
+  const SLOW_MULT = 0.55;
+  const BROADCAST_MS = 45;
+
+  const PALETTE = [
+    { key: 'green',  dark: '#22c55e', light: '#4ade80', name: 'Green'  },
+    { key: 'blue',   dark: '#3b82f6', light: '#60a5fa', name: 'Blue'   },
+    { key: 'orange', dark: '#f97316', light: '#fb923c', name: 'Orange' },
+    { key: 'purple', dark: '#a855f7', light: '#c084fc', name: 'Purple' },
+    { key: 'yellow', dark: '#eab308', light: '#facc15', name: 'Yellow' },
+    { key: 'cyan',   dark: '#06b6d4', light: '#22d3ee', name: 'Cyan'   }
+  ];
+  const colorByKey = k => PALETTE.find(c => c.key === k) || PALETTE[0];
+
+  // grow is the NET change in length. Everything is <= 1 so a move is always
+  // "add a head, then pop (1 - grow) times" — no special-casing needed.
+  const FRUITS = {
+    candy:     { emoji: '🍬', points: 10, grow: 1,  weight: 58 },
+    cherry:    { emoji: '🍒', points: 25, grow: 1,  weight: 14 },
+    banana:    { emoji: '🍌', points: 5,  grow: -3, weight: 11 },
+    lightning: { emoji: '⚡', points: 5,  grow: 0,  weight: 9, effect: 'fast' },
+    ice:       { emoji: '❄️', points: 5,  grow: 0,  weight: 8, effect: 'slowOthers' }
+  };
+  const FRUIT_KEYS = Object.keys(FRUITS);
+  const FRUIT_TOTAL_WEIGHT = FRUIT_KEYS.reduce((s, k) => s + FRUITS[k].weight, 0);
+
+  // Board grows with the crowd so six snakes aren't fighting over one corner.
+  function cellsForPlayers(n) {
+    if (n <= 2) return 30;
+    if (n <= 4) return 36;
+    return 40;
+  }
+  function fruitCountFor(n) { return 3 + n; }
+
+  // Spawn slots as fractions of the board, so they scale with map size.
+  const SPAWNS = [
+    { fx: 0.20, fy: 0.50, dir: { x: 1,  y: 0  } },
+    { fx: 0.80, fy: 0.50, dir: { x: -1, y: 0  } },
+    { fx: 0.50, fy: 0.20, dir: { x: 0,  y: 1  } },
+    { fx: 0.50, fy: 0.80, dir: { x: 0,  y: -1 } },
+    { fx: 0.25, fy: 0.25, dir: { x: 1,  y: 0  } },
+    { fx: 0.75, fy: 0.75, dir: { x: -1, y: 0  } }
+  ];
+
+  const DIRS = {
+    up:    { x: 0,  y: -1 }, down:  { x: 0, y: 1 },
+    left:  { x: -1, y: 0  }, right: { x: 1, y: 0 }
+  };
+
+  // ============================================================
+  //  DOM
+  // ============================================================
+  const $ = id => document.getElementById(id);
+  const canvas = $('board');
   const ctx = canvas.getContext('2d');
-  const cellSize = canvas.width / CELLS;
+  const menuEl = $('menu'), wrapEl = $('wrap'), playAreaEl = $('playArea');
+  const gameOverEl = $('gameOver'), goText = $('goText'), standingsEl = $('standings');
+  const hudEl = $('hud');
 
-  const menuEl = document.getElementById('menu');
-  const wrapEl = document.getElementById('wrap');
-  const playAreaEl = document.getElementById('playArea');
-  const gameOverEl = document.getElementById('gameOver');
-  const goText = document.getElementById('goText');
-  const score1El = document.getElementById('score1');
-  const score2El = document.getElementById('score2');
-  const speedBadgeEl = document.getElementById('speedBadge');
+  // ============================================================
+  //  Game state
+  // ============================================================
+  let CELLS = 30;
+  let cellSize = canvas.width / CELLS;
 
-  let mode = 1; // 1 or 2
-  let running = false;
-  let paused = false;
-  let timer = null;
-  let rafId = null;
+  let players = [];      // every snake in the match
+  let fruits = [];
+  let running = false, paused = false, roundOver = false;
+  let rafId = null, broadcastTimer = null;
+  let mode = 'solo';     // 'solo' | 'local2' | 'online'
+  let myIndex = 0;       // which player this device controls
 
-  // Online multiplayer state. Declared up here because selectDifficulty()
-  // below reads netRole, and it runs during setup.
-  let netRole = null; // null | 'host' | 'guest'
+  let tickMs = 230, difficultyName = 'Easy', difficultyEmoji = '🐌';
+  let myColorKey = 'green';
+  let myName = '';
+
+  // Networking
+  let netRole = null;    // null | 'host' | 'guest'
   let peer = null;
-  let conn = null;
+  let conns = [];        // host: one per guest.  guest: [hostConn]
+  let lobby = [];        // host's view: [{name, colorKey, conn|null}]
+  // Frozen copy of the lobby's connections taken when a match starts. Steering
+  // is routed by position in THIS list, so a player leaving mid-match can't
+  // shuffle everyone else's inputs onto the wrong snakes.
+  let matchConns = null;
 
-  // ---------- Difficulty ----------
-  // tickMs is the delay between moves: bigger number = slower snake.
-  let tickMs = 230;             // default to Easy, the most forgiving
-  let difficultyName = 'Easy';
-  let difficultyEmoji = '🐌';
+  function setBoardSize(n) {
+    CELLS = n;
+    cellSize = canvas.width / CELLS;
+  }
 
+  // ============================================================
+  //  Difficulty / colour / name pickers
+  // ============================================================
   const diffButtons = Array.from(document.querySelectorAll('.diff-btn'));
 
   function selectDifficulty(btn, persist) {
@@ -349,172 +367,223 @@
     difficultyName = btn.dataset.name;
     difficultyEmoji = btn.querySelector('.emoji').textContent;
     diffButtons.forEach(b => b.classList.toggle('active', b === btn));
-    speedBadgeEl.textContent = `${difficultyEmoji} ${difficultyName}`;
-
-    // If the speed changes mid-game, restart the clock at the new pace.
-    if (running && timer !== null && netRole !== 'guest') {
-      clearInterval(timer);
-      timer = setInterval(step, tickMs);
-    }
-    if (persist) {
-      try { localStorage.setItem('snakeCandyDifficulty', difficultyName); } catch (e) {}
-    }
+    if (persist) { try { localStorage.setItem('scDifficulty', difficultyName); } catch (e) {} }
   }
-
-  diffButtons.forEach(btn => btn.addEventListener('click', () => selectDifficulty(btn, true)));
-
-  (function initDifficulty() {
+  diffButtons.forEach(b => b.addEventListener('click', () => selectDifficulty(b, true)));
+  (function () {
     let saved = null;
-    try { saved = localStorage.getItem('snakeCandyDifficulty'); } catch (e) {}
-    const match = diffButtons.find(b => b.dataset.name === saved);
-    selectDifficulty(match || diffButtons[0], false);
+    try { saved = localStorage.getItem('scDifficulty'); } catch (e) {}
+    selectDifficulty(diffButtons.find(b => b.dataset.name === saved) || diffButtons[0], false);
   })();
 
-  let snake1, snake2, candy, dir1, dir2, nextDir1, nextDir2, score1, score2, alive1, alive2;
-  // The cell each snake's tail just vacated. Needed so the tail can slide out
-  // of it smoothly instead of vanishing. null means the snake grew this tick.
-  let tailFrom1 = null, tailFrom2 = null;
-  // Timestamp of the last logic tick, so rendering can work out how far
-  // between two grid squares the snakes currently are.
-  let lastStepAt = 0;
+  const colorRow = $('colorRow');
+  PALETTE.forEach(c => {
+    const b = document.createElement('button');
+    b.dataset.key = c.key;
+    b.title = c.name;
+    b.style.background = `linear-gradient(135deg, ${c.light}, ${c.dark})`;
+    b.addEventListener('click', () => {
+      if (b.classList.contains('taken')) return;
+      selectColor(c.key, true);
+    });
+    colorRow.appendChild(b);
+  });
+  function selectColor(key, persist) {
+    myColorKey = key;
+    Array.from(colorRow.children).forEach(b => b.classList.toggle('active', b.dataset.key === key));
+    if (persist) { try { localStorage.setItem('scColor', key); } catch (e) {} }
+  }
+  (function () {
+    let saved = null;
+    try { saved = localStorage.getItem('scColor'); } catch (e) {}
+    selectColor(PALETTE.some(c => c.key === saved) ? saved : 'green', false);
+  })();
 
-  function resetState() {
-    snake1 = [{x: 6, y: 15}, {x: 5, y: 15}, {x: 4, y: 15}];
-    dir1 = {x: 1, y: 0};
-    nextDir1 = dir1;
-    score1 = 0;
-    alive1 = true;
-    tailFrom1 = null;
+  const nameInput = $('nameInput');
+  (function () {
+    let saved = null;
+    try { saved = localStorage.getItem('scName'); } catch (e) {}
+    if (saved) nameInput.value = saved;
+  })();
+  nameInput.addEventListener('input', () => {
+    myName = nameInput.value.trim();
+    try { localStorage.setItem('scName', myName); } catch (e) {}
+  });
+  function myDisplayName() { return (nameInput.value.trim() || 'Player'); }
 
-    if (mode === 2) {
-      snake2 = [{x: 23, y: 15}, {x: 24, y: 15}, {x: 25, y: 15}];
-      dir2 = {x: -1, y: 0};
-      nextDir2 = dir2;
-      score2 = 0;
-      alive2 = true;
-      tailFrom2 = null;
-    } else {
-      snake2 = null;
-    }
-
-    candy = spawnCandy();
-    // Start fully settled on the grid rather than mid-glide.
-    lastStepAt = performance.now() - tickMs;
-    updateHud();
+  // ============================================================
+  //  Building players
+  // ============================================================
+  function makePlayer(idx, name, colorKey) {
+    const s = SPAWNS[idx % SPAWNS.length];
+    const hx = Math.max(MIN_LEN, Math.min(CELLS - 1 - MIN_LEN, Math.round(s.fx * CELLS)));
+    const hy = Math.max(MIN_LEN, Math.min(CELLS - 1 - MIN_LEN, Math.round(s.fy * CELLS)));
+    const cells = [];
+    for (let i = 0; i < START_LEN; i++) cells.push({ x: hx - s.dir.x * i, y: hy - s.dir.y * i });
+    return {
+      idx, name, colorKey,
+      cells, dir: { ...s.dir }, nextDir: { ...s.dir },
+      score: 0, alive: true, tailFrom: null,
+      boostUntil: 0, slowUntil: 0,
+      moveMs: tickMs, lastMoveAt: 0, prevHeadKey: -1
+    };
   }
 
-  function spawnCandy() {
-    let pos;
-    while (true) {
-      pos = { x: Math.floor(Math.random() * CELLS), y: Math.floor(Math.random() * CELLS) };
-      const hitS1 = snake1.some(s => s.x === pos.x && s.y === pos.y);
-      const hitS2 = snake2 ? snake2.some(s => s.x === pos.x && s.y === pos.y) : false;
-      if (!hitS1 && !hitS2) return pos;
-    }
+  // Nobody should share a colour. First come, first served.
+  function assignColors(list) {
+    const used = new Set();
+    return list.map(p => {
+      let k = p.colorKey;
+      if (!PALETTE.some(c => c.key === k) || used.has(k)) {
+        k = (PALETTE.find(c => !used.has(c.key)) || PALETTE[0]).key;
+      }
+      used.add(k);
+      return { ...p, colorKey: k };
+    });
   }
 
-  function updateHud() {
-    score1El.textContent = `Score: ${score1}`;
-    if (mode === 2) {
-      score2El.classList.remove('hidden');
-      score2El.textContent = `Score: ${score2}`;
-    } else {
-      score2El.classList.add('hidden');
-    }
+  function startRound(roster) {
+    const withColors = assignColors(roster);
+    setBoardSize(cellsForPlayers(withColors.length));
+    players = withColors.map((p, i) => makePlayer(i, p.name, p.colorKey));
+    const now = nowMs();
+    players.forEach(p => { p.lastMoveAt = now - tickMs; p.moveMs = tickMs; });
+    fruits = [];
+    refillFruits();
+    running = true; paused = false; roundOver = false;
+    showGameScreen();
+    startRenderLoop();
+    if (netRole === 'host') startBroadcasting();
   }
 
-  function inBounds(p) { return p.x >= 0 && p.x < CELLS && p.y >= 0 && p.y < CELLS; }
+  // ============================================================
+  //  Fruit
+  // ============================================================
+  function randomFruitType() {
+    let r = Math.random() * FRUIT_TOTAL_WEIGHT;
+    for (const k of FRUIT_KEYS) {
+      r -= FRUITS[k].weight;
+      if (r <= 0) return k;
+    }
+    return FRUIT_KEYS[0];
+  }
 
-  function selfOrOtherHit(head, self, other) {
-    if (self.some(s => s.x === head.x && s.y === head.y)) return true;
-    if (other && other.some(s => s.x === head.x && s.y === head.y)) return true;
+  function occupied(x, y) {
+    for (const p of players) {
+      for (const c of p.cells) if (c.x === x && c.y === y) return true;
+    }
+    for (const f of fruits) if (f.x === x && f.y === y) return true;
     return false;
   }
 
-  // step() is the authoritative simulation. It runs locally for 1P and
-  // same-device 2P, and on the HOST device for online play. The guest
-  // never runs this — it just renders state pushed over the data channel.
-  function step() {
-    if (!running || paused) return;
-
-    dir1 = nextDir1;
-    const head1 = { x: snake1[0].x + dir1.x, y: snake1[0].y + dir1.y };
-
-    let head2 = null;
-    if (mode === 2 && alive2) {
-      dir2 = nextDir2;
-      head2 = { x: snake2[0].x + dir2.x, y: snake2[0].y + dir2.y };
+  function refillFruits() {
+    const target = fruitCountFor(players.length);
+    let guard = 0;
+    while (fruits.length < target && guard++ < 800) {
+      const x = Math.floor(Math.random() * CELLS);
+      const y = Math.floor(Math.random() * CELLS);
+      if (!occupied(x, y)) fruits.push({ x, y, type: randomFruitType() });
     }
+  }
 
-    if (alive1) {
-      if (!inBounds(head1) || selfOrOtherHit(head1, snake1, snake2)) alive1 = false;
-    }
-    if (mode === 2 && alive2) {
-      if (!inBounds(head2) || selfOrOtherHit(head2, snake2, snake1)) alive2 = false;
-    }
-    if (mode === 2 && alive1 && alive2 && head1.x === head2.x && head1.y === head2.y) {
-      alive1 = false;
-      alive2 = false;
-    }
+  // ============================================================
+  //  Simulation (host / local only)
+  // ============================================================
+  function nowMs() {
+    return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+  }
 
-    if (mode === 1 && !alive1) return endGame();
-    if (mode === 2 && !alive1 && !alive2) return endGame();
+  function speedMultFor(p, now) {
+    let m = 1;
+    if (p.boostUntil > now) m *= BOOST_MULT;
+    if (p.slowUntil > now) m *= SLOW_MULT;
+    return m;
+  }
 
-    tailFrom1 = null;
-    tailFrom2 = null;
+  function movePlayer(p, now) {
+    p.dir = p.nextDir;
+    const head = { x: p.cells[0].x + p.dir.x, y: p.cells[0].y + p.dir.y };
+    p.cells.unshift(head);
 
-    if (alive1) {
-      snake1.unshift(head1);
-      if (head1.x === candy.x && head1.y === candy.y) {
-        score1 += 10;
-        candy = spawnCandy();
-      } else {
-        tailFrom1 = snake1.pop();
+    const fi = fruits.findIndex(f => f.x === head.x && f.y === head.y);
+    let pops = 1;
+    if (fi >= 0) {
+      const def = FRUITS[fruits[fi].type];
+      fruits.splice(fi, 1);
+      p.score += def.points;
+      pops = 1 - def.grow;                 // grow<=1 always, so pops >= 0
+      if (def.effect === 'fast') p.boostUntil = now + EFFECT_MS;
+      if (def.effect === 'slowOthers') {
+        players.forEach(o => { if (o !== p && o.alive) o.slowUntil = now + EFFECT_MS; });
       }
     }
 
-    if (mode === 2 && alive2) {
-      snake2.unshift(head2);
-      if (head2.x === candy.x && head2.y === candy.y) {
-        score2 += 10;
-        candy = spawnCandy();
-      } else {
-        tailFrom2 = snake2.pop();
+    p.tailFrom = null;
+    let popped = 0;
+    while (popped < pops && p.cells.length > MIN_LEN) { p.tailFrom = p.cells.pop(); popped++; }
+    // A multi-pop (banana) teleports the tail, so don't try to glide it.
+    if (popped > 1) p.tailFrom = null;
+  }
+
+  // Checked every frame for every snake, not just the ones that moved — that
+  // way a snake growing into a stationary one still counts as a crash.
+  function resolveCollisions() {
+    const doomed = [];
+    for (const p of players) {
+      if (!p.alive) continue;
+      const h = p.cells[0];
+      if (h.x < 0 || h.x >= CELLS || h.y < 0 || h.y >= CELLS) { doomed.push(p); continue; }
+      let hit = false;
+      for (const q of players) {
+        if (!q.alive) continue;
+        // Skip our own head (index 0); everything else, including another
+        // snake's head, is lethal. Two heads meeting kills both.
+        for (let i = (q === p ? 1 : 0); i < q.cells.length; i++) {
+          if (q.cells[i].x === h.x && q.cells[i].y === h.y) { hit = true; break; }
+        }
+        if (hit) break;
+      }
+      if (hit) doomed.push(p);
+    }
+    doomed.forEach(p => { p.alive = false; });
+    return doomed.length > 0;
+  }
+
+  function aliveCount() { return players.filter(p => p.alive).length; }
+
+  function roundShouldEnd() {
+    if (players.length <= 1) return aliveCount() === 0;
+    return aliveCount() <= 1;
+  }
+
+  function update(now) {
+    if (!running || paused || roundOver) return;
+
+    for (const p of players) {
+      if (!p.alive) continue;
+      p.moveMs = tickMs / speedMultFor(p, now);
+      if (now - p.lastMoveAt >= p.moveMs) {
+        p.lastMoveAt += p.moveMs;
+        // If the tab was backgrounded, don't try to replay a hundred moves.
+        if (now - p.lastMoveAt > p.moveMs * 3) p.lastMoveAt = now;
+        movePlayer(p, now);
       }
     }
 
-    lastStepAt = performance.now();
-    updateHud();
-    broadcastState();
+    resolveCollisions();
+    refillFruits();
+
+    if (roundShouldEnd()) endRound();
   }
 
-  function broadcastState() {
-    if (netRole === 'host' && conn && conn.open) {
-      conn.send({
-        type: 'state',
-        snake1, snake2, candy, score1, score2, alive1, alive2,
-        tailFrom1, tailFrom2
-      });
-    }
-  }
-
-  // ---------- Rendering ----------
-  // Logic moves the snake one whole square at a time. Rendering runs every
-  // animation frame and draws it partway between squares, which is what makes
-  // it glide instead of teleport.
-
-  function lerp(a, b, t) { return a + (b - a) * t; }
-  function centerOf(cell) {
-    return { x: cell.x * cellSize + cellSize / 2, y: cell.y * cellSize + cellSize / 2 };
-  }
+  // ============================================================
+  //  Rendering
+  // ============================================================
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const centerOf = c => ({ x: c.x * cellSize + cellSize / 2, y: c.y * cellSize + cellSize / 2 });
 
   function render() {
-    // How far through the current move are we? Clamped, so if a network
-    // packet is late the snake waits at the square rather than overshooting.
-    let t = tickMs > 0 ? (performance.now() - lastStepAt) / tickMs : 1;
-    if (t < 0) t = 0;
-    if (t > 1) t = 1;
-    if (paused) t = 1;
+    const now = nowMs();
 
     ctx.fillStyle = '#241533';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -522,82 +591,77 @@
     ctx.strokeStyle = 'rgba(255,255,255,0.03)';
     ctx.lineWidth = 1;
     for (let i = 1; i < CELLS; i++) {
-      ctx.beginPath();
-      ctx.moveTo(i * cellSize, 0);
-      ctx.lineTo(i * cellSize, canvas.height);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(0, i * cellSize);
-      ctx.lineTo(canvas.width, i * cellSize);
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(i * cellSize, 0); ctx.lineTo(i * cellSize, canvas.height); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, i * cellSize); ctx.lineTo(canvas.width, i * cellSize); ctx.stroke();
     }
 
-    drawCandy();
-
-    drawSnake(snake1, tailFrom1, t, '#22c55e', '#4ade80', alive1);
-    if (mode === 2) drawSnake(snake2, tailFrom2, t, '#3b82f6', '#60a5fa', alive2);
+    drawFruits(now);
+    // Dead snakes first so living ones sit on top.
+    players.filter(p => !p.alive).forEach(p => drawSnake(p, now));
+    players.filter(p => p.alive).forEach(p => drawSnake(p, now));
 
     if (paused) {
-      ctx.fillStyle = 'rgba(18,10,28,0.6)';
+      ctx.fillStyle = 'rgba(18,10,28,0.65)';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = '#f5f0ff';
-      ctx.font = `bold ${cellSize * 1.6}px 'Trebuchet MS', sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
+      ctx.font = `bold ${cellSize * 2}px 'Trebuchet MS', sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText('PAUSED', canvas.width / 2, canvas.height / 2);
-      ctx.textAlign = 'start';
-      ctx.textBaseline = 'alphabetic';
+      ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
     }
   }
 
-  function drawCandy() {
-    if (!candy) return;
-    const c = centerOf(candy);
-    // Gentle pulse so the candy reads as the thing to chase.
-    const pulse = 1 + Math.sin(performance.now() / 260) * 0.08;
-    ctx.fillStyle = '#ff5da2';
-    ctx.beginPath();
-    ctx.arc(c.x, c.y, cellSize * 0.36 * pulse, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.65)';
-    ctx.beginPath();
-    ctx.arc(c.x - cellSize * 0.11, c.y - cellSize * 0.11, cellSize * 0.09, 0, Math.PI * 2);
-    ctx.fill();
+  function drawFruits(now) {
+    const pulse = 1 + Math.sin(now / 260) * 0.07;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = `${cellSize * 1.25 * pulse}px system-ui, 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif`;
+    for (const f of fruits) {
+      const c = centerOf(f);
+      const def = FRUITS[f.type] || FRUITS.candy;
+      ctx.fillText(def.emoji, c.x, c.y);
+    }
+    ctx.textAlign = 'start';
+    ctx.textBaseline = 'alphabetic';
   }
 
-  function drawSnake(cells, tailFrom, t, colDark, colLight, alive) {
+  function drawSnake(p, now) {
+    const cells = p.cells;
     if (!cells || cells.length === 0) return;
     const n = cells.length;
+    const col = colorByKey(p.colorKey);
+
+    let t = p.moveMs > 0 ? (now - p.lastMoveAt) / p.moveMs : 1;
+    if (!p.alive || paused) t = 1;
+    if (t < 0) t = 0;
+    if (t > 1) t = 1;
 
     const pts = cells.map(centerOf);
-
-    // Head slides out of the square it previously occupied (which is the
-    // square the second segment is sitting in) into its new one.
-    if (n >= 2) pts[0] = {
-      x: lerp(pts[1].x, centerOf(cells[0]).x, t),
-      y: lerp(pts[1].y, centerOf(cells[0]).y, t)
-    };
-
-    // Tail slides out of the square it just vacated. If the snake grew this
-    // tick nothing was vacated, so the tail simply stays put.
-    // This is APPENDED rather than replacing the last point: overwriting it
-    // would make the final segment span two cells, which visibly cuts the
-    // corner whenever the tail is going round a bend.
+    if (n >= 2) {
+      const to = centerOf(cells[0]);
+      pts[0] = { x: lerp(pts[1].x, to.x, t), y: lerp(pts[1].y, to.y, t) };
+    }
+    // Appended, not overwritten: replacing the last point would make the final
+    // segment span two cells and visibly cut the corner on a bend.
     const tailTo = centerOf(cells[n - 1]);
-    const tailBase = tailFrom ? centerOf(tailFrom) : tailTo;
+    const tailBase = p.tailFrom ? centerOf(p.tailFrom) : tailTo;
     pts.push({ x: lerp(tailBase.x, tailTo.x, t), y: lerp(tailBase.y, tailTo.y, t) });
     const m = pts.length;
 
     ctx.save();
-    if (!alive) ctx.globalAlpha = 0.35;
+    if (!p.alive) ctx.globalAlpha = 0.3;
+
+    // Glow while a power-up is running so everyone can see who's affected.
+    const boosted = p.boostUntil > now, slowed = p.slowUntil > now;
+    if (p.alive && (boosted || slowed)) {
+      ctx.shadowColor = boosted ? '#fde047' : '#7dd3fc';
+      ctx.shadowBlur = cellSize * 0.9;
+    }
 
     const base = cellSize * 0.82;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.strokeStyle = colDark;
-
-    // Drawn tail-first so the thicker body overlaps the thinner tail, and
-    // segment-by-segment so the width can taper toward the tip.
+    ctx.strokeStyle = col.dark;
     for (let i = m - 1; i >= 1; i--) {
       const fromTail = m - 1 - i;
       ctx.lineWidth = base * Math.min(1, 0.38 + 0.62 * (fromTail / 3));
@@ -606,6 +670,7 @@
       ctx.lineTo(pts[i - 1].x, pts[i - 1].y);
       ctx.stroke();
     }
+    ctx.shadowBlur = 0;
 
     // ---- Head ----
     let dx = 1, dy = 0;
@@ -615,47 +680,39 @@
       const len = Math.hypot(dx, dy) || 1;
       dx /= len; dy /= len;
     }
-    const px = -dy, py = dx;   // perpendicular, for placing the eyes
+    const px = -dy, py = dx;
     const head = pts[0];
 
-    ctx.fillStyle = colLight;
+    ctx.fillStyle = col.light;
     ctx.beginPath();
     ctx.arc(head.x, head.y, base * 0.56, 0, Math.PI * 2);
     ctx.fill();
 
-    // ---- Tongue ---- flicks out briefly every so often
-    if (alive && (performance.now() % 1600) < 260) {
+    if (p.alive && (now % 1600) < 260) {
       ctx.strokeStyle = '#ff5da2';
       ctx.lineWidth = Math.max(1.5, base * 0.11);
-      const sx = head.x + dx * base * 0.5,  sy = head.y + dy * base * 0.5;
-      const ex = head.x + dx * base * 1.0,  ey = head.y + dy * base * 1.0;
+      const sx = head.x + dx * base * 0.5, sy = head.y + dy * base * 0.5;
+      const ex = head.x + dx * base, ey = head.y + dy * base;
       ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
       const fx = px * base * 0.17, fy = py * base * 0.17;
-      ctx.beginPath();
-      ctx.moveTo(ex, ey);
-      ctx.lineTo(ex + dx * base * 0.16 + fx, ey + dy * base * 0.16 + fy);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(ex, ey);
-      ctx.lineTo(ex + dx * base * 0.16 - fx, ey + dy * base * 0.16 - fy);
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(ex, ey);
+      ctx.lineTo(ex + dx * base * 0.16 + fx, ey + dy * base * 0.16 + fy); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(ex, ey);
+      ctx.lineTo(ex + dx * base * 0.16 - fx, ey + dy * base * 0.16 - fy); ctx.stroke();
     }
 
-    // ---- Eyes ----
     const eyeR = base * 0.16;
     for (const side of [1, -1]) {
       const ex = head.x + dx * base * 0.16 + px * side * base * 0.26;
       const ey = head.y + dy * base * 0.16 + py * side * base * 0.26;
       ctx.fillStyle = '#ffffff';
       ctx.beginPath(); ctx.arc(ex, ey, eyeR, 0, Math.PI * 2); ctx.fill();
-
-      if (alive) {
+      if (p.alive) {
         ctx.fillStyle = '#12101a';
         ctx.beginPath();
         ctx.arc(ex + dx * eyeR * 0.38, ey + dy * eyeR * 0.38, eyeR * 0.52, 0, Math.PI * 2);
         ctx.fill();
       } else {
-        // X eyes when it's game over
         ctx.strokeStyle = '#12101a';
         ctx.lineWidth = Math.max(1.2, eyeR * 0.4);
         const r = eyeR * 0.62;
@@ -665,48 +722,94 @@
         ctx.stroke();
       }
     }
-
     ctx.restore();
   }
 
+  function updateHud() {
+    const now = nowMs();
+    hudEl.innerHTML = '';
+    players.forEach(p => {
+      const col = colorByKey(p.colorKey);
+      const d = document.createElement('div');
+      d.className = 'hudPlayer' + (p.alive ? '' : ' dead');
+      let fx = '';
+      if (p.alive && p.boostUntil > now) fx = ' ⚡';
+      else if (p.alive && p.slowUntil > now) fx = ' ❄️';
+      d.innerHTML = `<span class="dot" style="background:${col.light}"></span>` +
+                    `<span style="color:${col.light}">${escapeHtml(p.name)}</span> ${p.score}${fx}`;
+      hudEl.appendChild(d);
+    });
+    const badge = document.createElement('div');
+    badge.id = 'speedBadge';
+    badge.textContent = `${difficultyEmoji} ${difficultyName}`;
+    hudEl.appendChild(badge);
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, ch =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+  }
+
+  let hudTick = 0;
   function startRenderLoop() {
     if (rafId !== null) return;
     const loop = () => {
+      const now = nowMs();
+      if (netRole !== 'guest') update(now);
       render();
+      if (hudTick++ % 6 === 0) updateHud();   // HUD doesn't need 60fps
       rafId = requestAnimationFrame(loop);
     };
     rafId = requestAnimationFrame(loop);
   }
-
   function stopRenderLoop() {
     if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null; }
   }
 
-  // ---------- Game flow ----------
+  // ============================================================
+  //  Round end
+  // ============================================================
+  function standingsText() {
+    const sorted = players.slice().sort((a, b) =>
+      (b.alive - a.alive) || (b.score - a.score));
+    return sorted.map((p, i) => {
+      const col = colorByKey(p.colorKey);
+      return `<div style="display:flex;gap:8px;justify-content:center;align-items:center;padding:3px;">
+        <span>${i + 1}.</span>
+        <span class="dot" style="background:${col.light}"></span>
+        <span style="color:${col.light}">${escapeHtml(p.name)}</span>
+        <span>${p.score}</span>${p.alive ? ' <span>👑</span>' : ''}</div>`;
+    }).join('');
+  }
 
-  function endGame() {
+  function endRound() {
+    roundOver = true;
     running = false;
-    clearInterval(timer);
-    render();          // one last frame so the X eyes are visible
+    stopBroadcasting();
+    render();
     stopRenderLoop();
+
     let msg;
-    if (mode === 1) {
-      msg = `Game over! Final score: ${score1} (${difficultyName})`;
+    if (players.length === 1) {
+      msg = `Game over! Score: ${players[0].score}`;
     } else {
-      if (!alive1 && !alive2 && score1 === score2) {
-        msg = `Draw! Both scored ${score1}`;
-      } else if ((!alive1 && !alive2 && score1 > score2) || (alive1 && !alive2)) {
-        msg = `Green wins! ${score1} - ${score2}`;
-      } else {
-        msg = `Blue wins! ${score2} - ${score1}`;
-      }
+      const survivors = players.filter(p => p.alive);
+      const best = players.slice().sort((a, b) => (b.alive - a.alive) || (b.score - a.score))[0];
+      msg = survivors.length === 1
+        ? `${survivors[0].name} wins!`
+        : `Everyone crashed — ${best.name} scored most!`;
     }
+    showEndScreen(msg, standingsText());
+    if (netRole === 'host') broadcast({ type: 'over', msg, standings: standingsText() });
+  }
+
+  function showEndScreen(msg, html) {
     goText.textContent = msg;
+    standingsEl.innerHTML = html;
     gameOverEl.classList.remove('hidden');
     wrapEl.style.display = 'none';
     document.body.classList.remove('playing');
-
-    if (netRole === 'host' && conn && conn.open) conn.send({ type: 'gameover', msg });
+    $('btnAgain').classList.toggle('hidden', netRole === 'guest');
   }
 
   function showGameScreen() {
@@ -714,127 +817,187 @@
     gameOverEl.classList.add('hidden');
     wrapEl.style.display = 'flex';
     document.body.classList.add('playing');
-    updateTouchControlsVisibility();
+    updateControlsForMode();
+    updateHud();
   }
 
-  function startGame(selectedMode) {
-    mode = selectedMode;
-    resetState();
-    running = true;
-    paused = false;
-    showGameScreen();
-    clearInterval(timer);
-    timer = setInterval(step, tickMs);
-    startRenderLoop();
-
-    if (netRole === 'host' && conn && conn.open) conn.send({ type: 'restart' });
-  }
-
-  document.getElementById('btn1p').addEventListener('click', () => startGame(1));
-  document.getElementById('btn2p').addEventListener('click', () => startGame(2));
-
-  document.getElementById('btnAgain').addEventListener('click', () => {
-    if (netRole === 'guest') {
-      if (conn && conn.open) conn.send({ type: 'restart-request' });
-    } else {
-      startGame(mode);
+  // ============================================================
+  //  Local games
+  // ============================================================
+  function startLocal(n) {
+    netRole = null;
+    matchConns = null;
+    mode = n === 2 ? 'local2' : 'solo';
+    myIndex = 0;
+    const roster = [{ name: myDisplayName(), colorKey: myColorKey }];
+    if (n === 2) {
+      const other = PALETTE.find(c => c.key !== myColorKey) || PALETTE[1];
+      roster.push({ name: 'Player 2', colorKey: other.key });
     }
+    startRound(roster);
+  }
+
+  $('btn1p').addEventListener('click', () => startLocal(1));
+  $('btn2p').addEventListener('click', () => startLocal(2));
+
+  $('btnAgain').addEventListener('click', () => {
+    if (netRole === 'guest') return;
+    // Host must tell everyone else to restart too, not just restart locally.
+    if (netRole === 'host') hostBeginMatch();
+    else startLocal(mode === 'local2' ? 2 : 1);
   });
 
-  document.getElementById('btnMenu').addEventListener('click', () => {
-    clearInterval(timer);
-    stopRenderLoop();
-    running = false;
+  $('btnMenu').addEventListener('click', () => {
+    stopRenderLoop(); stopBroadcasting();
+    running = false; roundOver = false;
     gameOverEl.classList.add('hidden');
     wrapEl.style.display = 'none';
     document.body.classList.remove('playing');
     if (netRole) teardownPeer();
+    refreshColorAvailability([]);
     showPanel('modeChoice');
     menuEl.classList.remove('hidden');
   });
 
-  // ---------- Online multiplayer (PeerJS, peer-to-peer) ----------
-
+  // ============================================================
+  //  Online
+  // ============================================================
   function showPanel(id) {
-    ['modeChoice', 'onlineChoice', 'onlineStatus'].forEach(p => {
-      document.getElementById(p).classList.toggle('hidden', p !== id);
-    });
+    ['modeChoice', 'onlineChoice', 'onlineStatus'].forEach(p =>
+      $(p).classList.toggle('hidden', p !== id));
   }
+  function setStatus(txt) { $('onlineStatusText').textContent = txt; }
 
-  function setStatus(text) {
-    document.getElementById('onlineStatusText').textContent = text;
-  }
-
-  document.getElementById('btnOnline').addEventListener('click', () => showPanel('onlineChoice'));
-  document.getElementById('btnOnlineBack').addEventListener('click', () => showPanel('modeChoice'));
-  document.getElementById('btnOnlineCancel').addEventListener('click', () => {
+  $('btnOnline').addEventListener('click', () => showPanel('onlineChoice'));
+  $('btnOnlineBack').addEventListener('click', () => showPanel('modeChoice'));
+  $('btnOnlineCancel').addEventListener('click', () => {
     teardownPeer();
+    refreshColorAvailability([]);
     showPanel('modeChoice');
   });
-  document.getElementById('btnCopyCode').addEventListener('click', () => {
-    const code = document.getElementById('roomCode').textContent;
-    if (navigator.clipboard) navigator.clipboard.writeText(code).catch(() => {});
+  $('btnCopyCode').addEventListener('click', () => {
+    if (navigator.clipboard) navigator.clipboard.writeText($('roomCode').textContent).catch(() => {});
+  });
+  $('btnHost').addEventListener('click', () => hostRoom());
+  $('btnJoin').addEventListener('click', joinRoom);
+  $('btnStartMatch').addEventListener('click', () => {
+    if (netRole !== 'host' || lobby.length < 2) return;
+    hostBeginMatch();
   });
 
-  document.getElementById('btnHost').addEventListener('click', hostRoom);
-  document.getElementById('btnJoin').addEventListener('click', joinRoom);
+  function lobbyRoster() { return lobby.map(l => ({ name: l.name, colorKey: l.colorKey })); }
+
+  // The single place a host starts or restarts an online match, so the
+  // broadcast and the local start can never drift apart.
+  function hostBeginMatch() {
+    if (netRole !== 'host') return;
+    mode = 'online';
+    myIndex = 0;
+    const roster = lobbyRoster();
+    matchConns = lobby.map(l => l.conn);
+    broadcast({ type: 'begin', ms: tickMs, name: difficultyName,
+                emoji: difficultyEmoji, roster });
+    startRound(roster);
+  }
 
   function teardownPeer() {
-    clearInterval(timer);
+    stopBroadcasting();
     stopRenderLoop();
     running = false;
-    if (conn) { try { conn.close(); } catch (e) {} conn = null; }
+    conns.forEach(c => { try { c.close(); } catch (e) {} });
+    conns = [];
     if (peer) { try { peer.destroy(); } catch (e) {} peer = null; }
     netRole = null;
+    lobby = [];
+    matchConns = null;
   }
 
-  function handleRemoteDisconnect() {
-    if (running) {
-      running = false;
-      clearInterval(timer);
-      stopRenderLoop();
-      goText.textContent = 'Your friend disconnected.';
-      gameOverEl.classList.remove('hidden');
-      wrapEl.style.display = 'none';
-      document.body.classList.remove('playing');
-    }
-  }
-
-  // Short, easy-to-read room codes instead of PeerJS's long default IDs.
-  // Avoids ambiguous characters (0/O, 1/I/L) since these get read aloud or typed.
   const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
   function generateRoomCode() {
-    let code = '';
-    for (let i = 0; i < 4; i++) code += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
-    return code;
+    let s = '';
+    for (let i = 0; i < 4; i++) s += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+    return s;
+  }
+
+  function renderLobby() {
+    const list = $('lobbyList');
+    list.innerHTML = '';
+    lobby.forEach((l, i) => {
+      const col = colorByKey(l.colorKey);
+      const li = document.createElement('li');
+      li.innerHTML = `<span class="dot" style="background:${col.light}"></span>` +
+                     `<span style="color:${col.light}">${escapeHtml(l.name)}</span>` +
+                     (i === 0 ? ' <span style="opacity:.5">(host)</span>' : '');
+      list.appendChild(li);
+    });
+    if (netRole === 'host') {
+      const btn = $('btnStartMatch');
+      btn.classList.remove('hidden');
+      btn.disabled = lobby.length < 2;
+      btn.textContent = lobby.length < 2 ? 'Waiting for players...' :
+        `Start Game (${lobby.length} players)`;
+    }
+    refreshColorAvailability(lobby.map(l => l.colorKey));
+  }
+
+  function refreshColorAvailability(takenKeys) {
+    Array.from(colorRow.children).forEach(b => {
+      const taken = takenKeys.includes(b.dataset.key) && b.dataset.key !== myColorKey;
+      b.classList.toggle('taken', taken);
+    });
   }
 
   function hostRoom(attemptsLeft) {
     if (attemptsLeft === undefined) attemptsLeft = 5;
     netRole = 'host';
+    myIndex = 0;
     showPanel('onlineStatus');
-    document.getElementById('roomCodeBox').classList.add('hidden');
+    $('roomCodeBox').classList.add('hidden');
     setStatus('Setting up room...');
+    lobby = [{ name: myDisplayName(), colorKey: myColorKey, conn: null }];
 
-    const code = generateRoomCode();
-    peer = new Peer(code);
+    peer = new Peer(generateRoomCode());
+
     peer.on('open', id => {
-      document.getElementById('roomCode').textContent = id;
-      document.getElementById('roomCodeBox').classList.remove('hidden');
-      setStatus('Share this code with your friend, then wait for them to join.');
+      $('roomCode').textContent = id;
+      $('roomCodeBox').classList.remove('hidden');
+      setStatus(`Share the code. Up to ${MAX_PLAYERS} players.`);
+      renderLobby();
     });
+
     peer.on('connection', c => {
-      conn = c;
-      conn.on('open', () => {
-        setStatus('Friend connected! Starting game...');
-        setTimeout(() => beginOnlineGame('host'), 500);
+      if (lobby.length >= MAX_PLAYERS || running) {
+        c.on('open', () => { try { c.send({ type: 'full' }); c.close(); } catch (e) {} });
+        return;
+      }
+      conns.push(c);
+      c.on('open', () => {
+        // The guest sends its name/colour in 'hello'; placeholder until then.
+        if (!lobby.some(l => l.conn === c)) {
+          lobby.push({ name: 'Player ' + (lobby.length + 1), colorKey: freeColor(), conn: c });
+        }
+        c.send({ type: 'lobby', you: lobby.findIndex(l => l.conn === c), list: lobbyRoster() });
+        renderLobby();
+        pushLobby();
       });
-      conn.on('data', handleHostData);
-      conn.on('close', handleRemoteDisconnect);
+      c.on('data', d => handleHostData(c, d));
+      c.on('close', () => {
+        conns = conns.filter(x => x !== c);
+        if (running) {
+          // Mid-match drop: keep their slot so the remaining players' inputs
+          // stay pointed at the right snakes. Their snake just stops steering.
+          const gone = lobby.find(l => l.conn === c);
+          if (gone) gone.left = true;
+        } else {
+          lobby = lobby.filter(l => l.conn !== c);
+          renderLobby();
+          pushLobby();
+        }
+      });
     });
+
     peer.on('error', err => {
       if (err.type === 'unavailable-id' && attemptsLeft > 0) {
-        // that code was already taken by someone else's active room, try a fresh one
         if (peer) { try { peer.destroy(); } catch (e) {} peer = null; }
         hostRoom(attemptsLeft - 1);
       } else {
@@ -843,255 +1006,302 @@
     });
   }
 
+  function freeColor() {
+    const used = lobby.map(l => l.colorKey);
+    return (PALETTE.find(c => !used.includes(c.key)) || PALETTE[0]).key;
+  }
+
+  function pushLobby() {
+    conns.forEach(c => {
+      if (!c.open) return;
+      try { c.send({ type: 'lobby', you: lobby.findIndex(l => l.conn === c), list: lobbyRoster() }); }
+      catch (e) {}
+    });
+  }
+
   function joinRoom() {
-    const code = document.getElementById('joinCodeInput').value.trim().toUpperCase();
+    const code = $('joinCodeInput').value.trim().toUpperCase();
     if (!code) { alert('Enter a room code first.'); return; }
     netRole = 'guest';
     showPanel('onlineStatus');
-    document.getElementById('roomCodeBox').classList.add('hidden');
-    setStatus('Connecting to room...');
+    $('roomCodeBox').classList.add('hidden');
+    setStatus('Connecting...');
 
     peer = new Peer();
     peer.on('open', () => {
-      conn = peer.connect(code, { reliable: true });
-      conn.on('open', () => {
-        setStatus('Connected! Starting game...');
-        beginOnlineGame('guest');
+      const c = peer.connect(code, { reliable: true });
+      conns = [c];
+      c.on('open', () => {
+        setStatus('Connected! Waiting for the host to start...');
+        c.send({ type: 'hello', name: myDisplayName(), colorKey: myColorKey });
       });
-      conn.on('data', handleGuestData);
-      conn.on('close', handleRemoteDisconnect);
+      c.on('data', handleGuestData);
+      c.on('close', handleHostGone);
     });
-    peer.on('error', err => setStatus('Connection error: ' + err.type + '. Check the code and try again.'));
+    peer.on('error', err =>
+      setStatus('Connection error: ' + err.type + '. Check the code and try again.'));
   }
 
-  function beginOnlineGame(role) {
-    mode = 2;
-    showGameScreen();
-
-    if (role === 'host') {
-      resetState();
-      running = true;
-      paused = false;
-      clearInterval(timer);
-      timer = setInterval(step, tickMs);
-      startRenderLoop();
-      // The host's device runs the simulation, so the host's speed setting
-      // governs the match. The guest needs tickMs too, to time its gliding.
-      if (conn && conn.open) {
-        conn.send({ type: 'difficulty', name: difficultyName, emoji: difficultyEmoji, ms: tickMs });
-      }
-    } else {
-      // guest: no local simulation, just render whatever the host sends
-      running = true;
-      lastStepAt = performance.now();
-      startRenderLoop();
-    }
-  }
-
-  function handleHostData(msg) {
-    if (msg.type === 'input') {
-      if (!(msg.dir.x === -dir2.x && msg.dir.y === -dir2.y)) nextDir2 = msg.dir;
-    } else if (msg.type === 'restart-request') {
-      startGame(2);
-    }
-  }
-
-  function handleGuestData(msg) {
-    if (msg.type === 'state') {
-      snake1 = msg.snake1;
-      snake2 = msg.snake2;
-      candy = msg.candy;
-      score1 = msg.score1;
-      score2 = msg.score2;
-      alive1 = msg.alive1;
-      alive2 = msg.alive2;
-      tailFrom1 = msg.tailFrom1;
-      tailFrom2 = msg.tailFrom2;
-      lastStepAt = performance.now();
-      updateHud();
-    } else if (msg.type === 'difficulty') {
-      speedBadgeEl.textContent = `${msg.emoji} ${msg.name}`;
-      if (msg.ms) tickMs = msg.ms;
-    } else if (msg.type === 'gameover') {
+  function handleHostGone() {
+    if (running || !roundOver) {
       running = false;
       stopRenderLoop();
-      goText.textContent = msg.msg;
-      gameOverEl.classList.remove('hidden');
-      wrapEl.style.display = 'none';
-      document.body.classList.remove('playing');
-    } else if (msg.type === 'restart') {
-      gameOverEl.classList.add('hidden');
-      wrapEl.style.display = 'flex';
-      document.body.classList.add('playing');
-      running = true;
-      lastStepAt = performance.now();
+      showEndScreen('The host left the game.', '');
+    }
+  }
+
+  // ---- Host receives ----
+  function handleHostData(c, msg) {
+    const entry = lobby.find(l => l.conn === c);
+    if (!msg || !entry) return;
+
+    if (msg.type === 'hello') {
+      entry.name = String(msg.name || 'Player').slice(0, 12);
+      const used = lobby.filter(l => l !== entry).map(l => l.colorKey);
+      entry.colorKey = used.includes(msg.colorKey) ? freeColor() : (msg.colorKey || freeColor());
+      renderLobby();
+      pushLobby();
+    } else if (msg.type === 'input') {
+      // Routed by the frozen match list, NOT the live lobby — otherwise a
+      // player leaving would slide everyone below them onto the wrong snake.
+      const idx = matchConns ? matchConns.indexOf(c) : lobby.indexOf(entry);
+      const p = idx >= 0 ? players[idx] : null;
+      if (p && p.alive && msg.dir) applyDirTo(p, msg.dir);
+    }
+  }
+
+  // ---- Guest receives ----
+  function handleGuestData(msg) {
+    if (!msg) return;
+
+    if (msg.type === 'full') {
+      setStatus('That room is full or already playing.');
+    } else if (msg.type === 'lobby') {
+      myIndex = msg.you;
+      lobby = msg.list.map(p => ({ ...p, conn: null }));
+      renderLobby();
+      $('btnStartMatch').classList.add('hidden');
+      setStatus('Waiting for the host to start...');
+    } else if (msg.type === 'begin') {
+      tickMs = msg.ms; difficultyName = msg.name; difficultyEmoji = msg.emoji;
+      mode = 'online';
+      setBoardSize(cellsForPlayers(msg.roster.length));
+      players = msg.roster.map((p, i) => makePlayer(i, p.name, p.colorKey));
+      const now = nowMs();
+      players.forEach(p => { p.lastMoveAt = now; p.moveMs = tickMs; });
+      fruits = [];
+      running = true; paused = false; roundOver = false;
+      showGameScreen();
       startRenderLoop();
+    } else if (msg.type === 'state') {
+      applyState(msg);
+    } else if (msg.type === 'over') {
+      running = false;
+      roundOver = true;      // so a later disconnect doesn't overwrite the result
+      stopRenderLoop();
+      showEndScreen(msg.msg, msg.standings || '');
     }
   }
 
-  // ---------- Input ----------
+  // ---- State sync ----
+  // Cells travel as single integers (y * CELLS + x) instead of {x,y} objects.
+  // With six snakes at 25 updates a second that difference matters.
+  const encodeCell = c => c.y * CELLS + c.x;
+  const decodeCell = i => ({ x: i % CELLS, y: Math.floor(i / CELLS) });
 
-  const DIRS = {
-    up:    { x: 0,  y: -1 },
-    down:  { x: 0,  y: 1  },
-    left:  { x: -1, y: 0  },
-    right: { x: 1,  y: 0  }
-  };
+  function snapshot() {
+    const now = nowMs();
+    return {
+      type: 'state',
+      z: paused ? 1 : 0,
+      f: fruits.map(f => ({ i: encodeCell(f), t: f.type })),
+      p: players.map(p => ({
+        c: p.cells.map(encodeCell),
+        s: p.score,
+        a: p.alive ? 1 : 0,
+        t: p.tailFrom ? encodeCell(p.tailFrom) : -1,
+        m: p.moveMs,
+        b: p.boostUntil > now ? 1 : 0,
+        w: p.slowUntil > now ? 1 : 0
+      }))
+    };
+  }
 
-  // Single entry point for "move this player in this direction," used by
-  // keyboard, the on-screen D-pads, and swipes. `player` (1 or 2) only
-  // matters in local same-device 2P mode, where two snakes share one screen.
-  function applyDirection(newDir, player) {
-    if (!newDir) return;
+  function applyState(msg) {
+    const now = nowMs();
+    paused = !!msg.z;      // so guests see the PAUSED overlay too
+    fruits = msg.f.map(f => ({ ...decodeCell(f.i), type: f.t }));
+    msg.p.forEach((sp, i) => {
+      const p = players[i];
+      if (!p) return;
+      const headKey = sp.c[0];
+      // Restart the glide only when the snake actually moved a square.
+      if (headKey !== p.prevHeadKey) {
+        p.prevHeadKey = headKey;
+        p.lastMoveAt = now;
+      }
+      p.cells = sp.c.map(decodeCell);
+      p.score = sp.s;
+      p.alive = !!sp.a;
+      p.tailFrom = sp.t >= 0 ? decodeCell(sp.t) : null;
+      p.moveMs = sp.m || tickMs;
+      p.boostUntil = sp.b ? now + 200 : 0;   // just for the glow/HUD icon
+      p.slowUntil = sp.w ? now + 200 : 0;
+    });
+  }
 
+  function broadcast(msg) {
+    conns.forEach(c => { if (c.open) { try { c.send(msg); } catch (e) {} } });
+  }
+  function startBroadcasting() {
+    stopBroadcasting();
+    if (netRole !== 'host') return;
+    // Sent even while paused, so guests learn about the pause and unpause.
+    broadcastTimer = setInterval(() => {
+      if (running) broadcast(snapshot());
+    }, BROADCAST_MS);
+  }
+  function stopBroadcasting() {
+    if (broadcastTimer !== null) { clearInterval(broadcastTimer); broadcastTimer = null; }
+  }
+
+  // ============================================================
+  //  Input
+  // ============================================================
+  function applyDirTo(p, d) {
+    if (!p || !p.alive || !d) return;
+    // Reversing straight back into yourself is instant death, so ignore it.
+    if (d.x === -p.dir.x && d.y === -p.dir.y) return;
+    p.nextDir = d;
+  }
+
+  function applyDirection(d, localSlot) {
+    if (!running || roundOver || !d) return;
     if (netRole === 'guest') {
-      if (conn && conn.open) conn.send({ type: 'input', dir: newDir });
+      const c = conns[0];
+      if (c && c.open) { try { c.send({ type: 'input', dir: d }); } catch (e) {} }
       return;
     }
-    if (netRole === 'host') {
-      if (!(newDir.x === -dir1.x && newDir.y === -dir1.y)) nextDir1 = newDir;
-      return;
-    }
-    if (mode === 1) {
-      if (!(newDir.x === -dir1.x && newDir.y === -dir1.y)) nextDir1 = newDir;
-      return;
-    }
-    // local same-device 2P
-    if (player === 2) {
-      if (!(newDir.x === -dir2.x && newDir.y === -dir2.y)) nextDir2 = newDir;
-    } else {
-      if (!(newDir.x === -dir1.x && newDir.y === -dir1.y)) nextDir1 = newDir;
-    }
+    const idx = (mode === 'local2') ? localSlot : myIndex;
+    applyDirTo(players[idx], d);
   }
 
-  function updateTouchControlsVisibility() {
-    const twoLocalPlayers = (mode === 2 && !netRole);
-    document.getElementById('dpad2Wrap').classList.toggle('hidden', !twoLocalPlayers);
-    playAreaEl.classList.toggle('local2p', twoLocalPlayers);
-    document.getElementById('dpad1Label').textContent = twoLocalPlayers ? 'Player 1' : 'Move';
-    document.getElementById('hint').innerHTML = twoLocalPlayers
-      ? 'P1 swipes the <b>left</b> half, P2 the <b>right</b> half. <b>Space</b> pauses, <b>R</b> restarts.'
-      : 'Swipe anywhere to steer. <b>Space</b> pauses, <b>R</b> restarts.';
+  function updateControlsForMode() {
+    const two = (mode === 'local2');
+    $('dpad2Wrap').classList.toggle('hidden', !two);
+    playAreaEl.classList.toggle('local2p', two);
+    $('dpad1Label').textContent = two ? 'Player 1' : 'Move';
+    $('hint').innerHTML = two
+      ? 'P1 swipes the <b>left</b> half, P2 the <b>right</b> half. <b>Space</b> pauses.'
+      : (netRole === 'guest'
+          ? 'Swipe anywhere to steer.'
+          : 'Swipe anywhere to steer. <b>Space</b> pauses, <b>R</b> restarts.');
   }
 
-  // ---------- Swipe steering ----------
-  // Fires the moment the finger passes the threshold rather than waiting for
-  // touchend, so steering feels immediate. One direction change per touch —
-  // `fired` prevents a single wandering finger from spamming turns.
-  const SWIPE_THRESHOLD = 22; // px of travel before we call it a swipe
+  // ---- Swipe ----
+  const SWIPE_THRESHOLD = 22;
   let touchState = null;
 
-  function swipePlayerFor(clientX) {
-    // Only same-device 2P needs the screen split; everywhere else one snake
-    // is being driven, so a swipe anywhere belongs to it.
-    if (mode === 2 && !netRole) return clientX < window.innerWidth / 2 ? 1 : 2;
-    return 1;
+  function swipeSlotFor(clientX) {
+    if (mode === 'local2') return clientX < window.innerWidth / 2 ? 0 : 1;
+    return 0;
   }
 
-  wrapEl.addEventListener('touchstart', (e) => {
+  wrapEl.addEventListener('touchstart', e => {
     if (!running) return;
     if (e.target.closest('.dpad-btn') || e.target.closest('#btnToggleDpad')) return;
     const t = e.changedTouches[0];
-    touchState = {
-      id: t.identifier,
-      x: t.clientX,
-      y: t.clientY,
-      player: swipePlayerFor(t.clientX),
-      fired: false
-    };
+    touchState = { id: t.identifier, x: t.clientX, y: t.clientY,
+                   slot: swipeSlotFor(t.clientX), fired: false };
   }, { passive: true });
 
-  wrapEl.addEventListener('touchmove', (e) => {
+  wrapEl.addEventListener('touchmove', e => {
     if (!touchState || touchState.fired || !running) return;
-
     let t = null;
     for (let i = 0; i < e.changedTouches.length; i++) {
       if (e.changedTouches[i].identifier === touchState.id) { t = e.changedTouches[i]; break; }
     }
     if (!t) return;
-
-    const dx = t.clientX - touchState.x;
-    const dy = t.clientY - touchState.y;
+    const dx = t.clientX - touchState.x, dy = t.clientY - touchState.y;
     if (Math.abs(dx) < SWIPE_THRESHOLD && Math.abs(dy) < SWIPE_THRESHOLD) return;
-
-    // Whichever axis moved further wins, so a slightly diagonal swipe
-    // still resolves to a clean up/down/left/right.
     const dir = Math.abs(dx) > Math.abs(dy)
       ? (dx > 0 ? DIRS.right : DIRS.left)
       : (dy > 0 ? DIRS.down : DIRS.up);
-
-    applyDirection(dir, touchState.player);
+    applyDirection(dir, touchState.slot);
     touchState.fired = true;
   }, { passive: true });
 
-  function endTouch() { touchState = null; }
-  wrapEl.addEventListener('touchend', endTouch, { passive: true });
-  wrapEl.addEventListener('touchcancel', endTouch, { passive: true });
+  const clearTouch = () => { touchState = null; };
+  wrapEl.addEventListener('touchend', clearTouch, { passive: true });
+  wrapEl.addEventListener('touchcancel', clearTouch, { passive: true });
 
-  // ---------- D-pad buttons ----------
+  // ---- D-pads ----
   document.querySelectorAll('.dpad-btn').forEach(btn => {
-    btn.addEventListener('pointerdown', (e) => {
+    btn.addEventListener('pointerdown', e => {
       e.preventDefault();
       if (!running) return;
-      const player = Number(btn.closest('.dpad').dataset.player);
-      applyDirection(DIRS[btn.dataset.dir], player);
+      applyDirection(DIRS[btn.dataset.dir], Number(btn.closest('.dpad').dataset.player));
     });
   });
 
-  const toggleBtn = document.getElementById('btnToggleDpad');
+  const toggleBtn = $('btnToggleDpad');
   toggleBtn.addEventListener('click', () => {
-    const nowHidden = playAreaEl.classList.toggle('dpads-off');
-    toggleBtn.textContent = nowHidden ? 'Show buttons' : 'Hide buttons';
-    try { localStorage.setItem('snakeCandyHideDpad', nowHidden ? '1' : '0'); } catch (e) {}
+    const off = playAreaEl.classList.toggle('dpads-off');
+    toggleBtn.textContent = off ? 'Show buttons' : 'Hide buttons';
+    try { localStorage.setItem('scHideDpad', off ? '1' : '0'); } catch (e) {}
   });
-  (function initDpadVisibility() {
-    let hidden = null;
-    try { hidden = localStorage.getItem('snakeCandyHideDpad'); } catch (e) {}
-    if (hidden === '1') {
-      playAreaEl.classList.add('dpads-off');
-      toggleBtn.textContent = 'Show buttons';
-    }
+  (function () {
+    let v = null;
+    try { v = localStorage.getItem('scHideDpad'); } catch (e) {}
+    if (v === '1') { playAreaEl.classList.add('dpads-off'); toggleBtn.textContent = 'Show buttons'; }
   })();
 
-  // ---------- Keyboard ----------
-  window.addEventListener('keydown', (e) => {
+  // ---- Keyboard ----
+  window.addEventListener('keydown', e => {
     const key = e.key;
-
     if (key === ' ') {
-      if (running && netRole !== 'guest') paused = !paused;
+      if (running && netRole !== 'guest') {
+        paused = !paused;
+        // Don't let the paused time count as glide progress.
+        if (!paused) { const n = nowMs(); players.forEach(p => { p.lastMoveAt = n; }); }
+      }
       e.preventDefault();
       return;
     }
-    if (key.toLowerCase() === 'r' && running) {
-      if (netRole === 'host') {
-        startGame(2);
-      } else if (netRole === 'guest') {
-        if (conn && conn.open) conn.send({ type: 'restart-request' });
-      } else {
-        startGame(mode);
-      }
+    if (key.toLowerCase() === 'r' && running && netRole !== 'guest') {
+      if (netRole === 'host') hostBeginMatch();
+      else startLocal(mode === 'local2' ? 2 : 1);
       return;
     }
-
     const isWASD = ['w', 'a', 's', 'd'].includes(key.toLowerCase());
     const isArrow = key.startsWith('Arrow');
     if (!isWASD && !isArrow) return;
 
-    let newDir = null;
-    if (key === 'ArrowUp' || key.toLowerCase() === 'w') newDir = DIRS.up;
-    else if (key === 'ArrowDown' || key.toLowerCase() === 's') newDir = DIRS.down;
-    else if (key === 'ArrowLeft' || key.toLowerCase() === 'a') newDir = DIRS.left;
-    else if (key === 'ArrowRight' || key.toLowerCase() === 'd') newDir = DIRS.right;
+    let d = null;
+    if (key === 'ArrowUp' || key.toLowerCase() === 'w') d = DIRS.up;
+    else if (key === 'ArrowDown' || key.toLowerCase() === 's') d = DIRS.down;
+    else if (key === 'ArrowLeft' || key.toLowerCase() === 'a') d = DIRS.left;
+    else if (key === 'ArrowRight' || key.toLowerCase() === 'd') d = DIRS.right;
 
-    if (newDir) {
-      // In local same-device 2P, WASD always drives player 1 and Arrows
-      // always drive player 2, regardless of online/1P branching above.
-      const player = (mode === 2 && !netRole) ? (isWASD ? 1 : 2) : 1;
-      applyDirection(newDir, player);
-    }
-
+    if (d) applyDirection(d, (mode === 'local2') ? (isWASD ? 0 : 1) : 0);
     if (isArrow) e.preventDefault();
   });
+
+  // Exposed purely so the logic can be exercised in tests.
+  window.__snake = {
+    get players() { return players; },
+    set players(v) { players = v; },
+    get fruits() { return fruits; },
+    set fruits(v) { fruits = v; },
+    get CELLS() { return CELLS; },
+    FRUITS, PALETTE, MIN_LEN, MAX_PLAYERS,
+    setBoardSize, makePlayer, movePlayer, resolveCollisions, refillFruits,
+    roundShouldEnd, aliveCount, assignColors, cellsForPlayers, fruitCountFor,
+    applyDirTo, encodeCell: c => c.y * CELLS + c.x,
+    decodeCell: i => ({ x: i % CELLS, y: Math.floor(i / CELLS) }),
+    setTick(ms) { tickMs = ms; },
+    startRoundWith(roster) { startRound(roster); }
+  };
 })();
 </script>
 
