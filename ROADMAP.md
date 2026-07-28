@@ -63,13 +63,13 @@ Hulk with a rainbow trail.
 
 | Points | Reward | Kind | Look |
 |---|---|---|---|
-| 100 | ⚡ Lightning Trail | Trail | White-and-yellow sparks that flash and vanish fast |
+| 100 | ⚡ Lightning Trail | Trail | Forked bolts with a white-hot core and blue halo, flickering |
 | 200 | 🤖 Iron Man | Skin | Red and gold, pulsing arc reactor on the head |
-| 300 | 🌈 Rainbow Trail | Trail | Colour-cycling bubbles that drift and shrink |
+| 300 | 🌈 Rainbow Trail | Trail | One continuous glowing ribbon, colour shifting along it |
 | 400 | 🔨 Thor | Skin | Silver and blue, lightning bolt on the head |
-| 500 | ☠️ Poison Trail | Trail | Green bubbles that wobble upward and pop |
+| 500 | ☠️ Poison Trail | Trail | Gas clouds that billow outward, fade in fast and out slow |
 | 600 | 🕷️ Spider-Man | Skin | Red with dark blue webbing across the body |
-| 700 | 💨 Dirt Trail | Trail | Brown clods kicked up that arc and fall |
+| 700 | 💨 Dirt Trail | Trail | Clods + fine dust sprayed backward, tumbling and settling |
 | 800 | 💚 Hulk | Skin | Green with purple bands, drawn 18% chunkier |
 | 900 | 🦸 Superman | Skin | Blue and red with a diamond emblem |
 | 1000 | 🐜 Ant-Man | Skin | Dark red, drawn at 66% size — genuinely tiny |
@@ -83,7 +83,13 @@ Notes:
 - Trails are drawn from each device's own copy of the game, so they cost
   **nothing** in network traffic even with six players.
 - Particles are capped at 80 per snake and expire on a timer, so they can't pile
-  up and slow the game down.
+  up and slow the game down. Measured steady state: lightning 6, rainbow 35,
+  poison 38, dirt 57.
+- **The physics is top-down.** An early version had dirt falling and poison
+  rising, which looked wrong because the camera looks straight *down* at the
+  board — there is no "down" on screen for things to fall toward. Dirt now
+  sprays backward from the tail and skids to a halt with friction; poison
+  spreads outward like a real cloud.
 - Several players can wear the same skin online. Your chosen colour is drawn as
   an **aura around your snake** so you can always find yourself.
 - In same-device 2P the **better** of the two scores counts. Online, only your
