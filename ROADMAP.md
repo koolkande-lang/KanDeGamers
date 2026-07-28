@@ -113,6 +113,25 @@ Notes:
   project. To change them, edit the `name` fields in the `SKINS` list near the
   top of the file — nothing else depends on them.
 
+### ✕ Quitting
+
+There's a **✕ Quit** button under the board in every mode (or press **Escape**).
+
+- **Two taps.** The first turns it red and asks "Really quit?"; a second within
+  three seconds actually leaves. After three seconds it goes back to normal.
+  Stops a stray thumb ending a good game.
+- **You keep every point you scored.** It banks toward your Path exactly as if
+  you'd crashed, and the results screen shows what you earned — including any
+  reward you just unlocked.
+- **Host quits** → everyone is told "The host ended the game" and taken to the
+  results. Nobody is left staring at a snake that has quietly stopped moving.
+- **Guest quits** → the host and everyone else carry on; the leaver's snake
+  stays on the board but stops steering.
+
+> ⚠️ The armed state is tracked with a **boolean**, not just a timestamp. Using
+> `if (quitArmedAt)` looked fine but a clock reading of exactly `0` is falsy, so
+> the second tap silently re-armed instead of quitting.
+
 ### ⚡ Skin abilities
 
 Six skins now have a power. One button under the board (or press **H**), and

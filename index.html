@@ -162,10 +162,16 @@
     background: #14101c !important; box-shadow: none !important; cursor: not-allowed;
   }
 
-  #btnToggleDpad {
-    margin-top: 8px; padding: 6px 16px; font-size: 0.72rem;
+  #bottomRow { display: flex; gap: 10px; justify-content: center; margin-top: 8px; }
+  #btnToggleDpad, #btnQuit {
+    padding: 6px 16px; font-size: 0.72rem;
     border: 1px solid var(--panel); border-radius: 20px;
-    background: transparent; color: var(--text); opacity: 0.5; cursor: pointer;
+    background: transparent; color: var(--text); opacity: 0.55; cursor: pointer;
+  }
+  #btnQuit { border-color: #7f1d1d; color: #fca5a5; }
+  #btnQuit.armed {
+    opacity: 1; background: #7f1d1d; color: #fff; border-color: #ef4444;
+    font-weight: bold;
   }
 
   #legend { margin-top: 6px; font-size: 0.7rem; opacity: 0.45; text-align: center; max-width: 92vw; }
@@ -241,6 +247,7 @@
     .dpad { grid-template-columns: 40px 40px 40px; grid-template-rows: 40px 40px 40px; }
     body.playing h1 { display: none; }
     body.playing #hint, body.playing #legend { display: none; }
+    #bottomRow { margin-top: 4px; }
     #btnAbility {
     margin-top: 10px; padding: 10px 26px; font-size: 0.95rem; font-weight: bold;
     font-family: 'Courier New', monospace; letter-spacing: 2px;
@@ -371,7 +378,10 @@
   <button id="btnAbility" class="hidden">💻 HACK</button>
   <div id="hint">Swipe anywhere to steer. <b>Space</b> pauses, <b>R</b> restarts, <b>H</b> = ability.</div>
   <div id="legend">🍬 +10 &nbsp; 🍒 +25 &nbsp; 🍌 shrink &nbsp; ⚡ speed burst &nbsp; ❄️ slows everyone else</div>
-  <button id="btnToggleDpad">Hide buttons</button>
+  <div id="bottomRow">
+    <button id="btnQuit">✕ Quit</button>
+    <button id="btnToggleDpad">Hide buttons</button>
+  </div>
 </div>
 
 <div id="gameOver" class="hidden">
@@ -1909,6 +1919,7 @@
       hudEl.appendChild(d);
     });
     updateAbilityButton(now);
+    updateQuitButton(now);
 
     const badge = document.createElement('div');
     badge.id = 'speedBadge';
@@ -2065,20 +2076,77 @@
     return html;
   }
 
-  function showEndScreen(msg, html) {
+  function showEndScreen(msg, html, hideAgain) {
     goText.textContent = msg;
     standingsEl.innerHTML = html;
     gameOverEl.classList.remove('hidden');
     wrapEl.style.display = 'none';
     document.body.classList.remove('playing');
-    $('btnAgain').classList.toggle('hidden', netRole === 'guest');
+    $('btnAgain').classList.toggle('hidden', hideAgain === true || netRole === 'guest');
   }
+
+  // Leaving mid-game. You keep whatever you scored — you earned it — and
+  // anyone playing with you is told, rather than being left staring at a
+  // snake that has quietly stopped moving.
+  function quitGame() {
+    if (!running) return;
+    const pathHtml = pathResultHtml();     // banks the points before we tear down
+    const finalStandings = standingsText();
+
+    running = false;
+    roundOver = true;
+    stopBroadcasting();
+    stopRenderLoop();
+
+    if (netRole === 'host') {
+      broadcast({ type: 'over', msg: 'The host ended the game.',
+                  standings: finalStandings });
+    }
+    if (netRole) teardownPeer();
+    mode = 'solo';
+    myIndex = 0;
+    showEndScreen('You left the game', pathHtml + finalStandings, true);
+    renderPath();
+  }
+
+  const quitBtn = $('btnQuit');
+  // An explicit flag, NOT just a timestamp: a clock reading of exactly 0 is
+  // falsy, which silently threw the armed state away.
+  let quitArmed = false, quitArmedAt = 0;
+
+  function disarmQuit() {
+    quitArmed = false;
+    quitArmedAt = 0;
+    quitBtn.textContent = '✕ Quit';
+    quitBtn.classList.remove('armed');
+  }
+
+  function updateQuitButton(now) {
+    if (quitArmed && now - quitArmedAt > 3000) disarmQuit();
+  }
+
+  function pressQuit() {
+    if (!running) return;
+    const now = nowMs();
+    // Two taps, so a stray thumb mid-game doesn't end it.
+    if (quitArmed && now - quitArmedAt <= 3000) {
+      disarmQuit();
+      quitGame();
+      return;
+    }
+    quitArmed = true;
+    quitArmedAt = now;
+    quitBtn.textContent = '✕ Really quit?';
+    quitBtn.classList.add('armed');
+  }
+  quitBtn.addEventListener('click', e => { e.preventDefault(); pressQuit(); });
 
   function showGameScreen() {
     menuEl.classList.add('hidden');
     gameOverEl.classList.add('hidden');
     wrapEl.style.display = 'flex';
     document.body.classList.add('playing');
+    disarmQuit();
     updateControlsForMode();
     updateHud();
   }
@@ -2516,7 +2584,7 @@
   wrapEl.addEventListener('touchstart', e => {
     if (!running) return;
     if (e.target.closest('.dpad-btn') || e.target.closest('#btnToggleDpad') ||
-        e.target.closest('#btnAbility')) return;
+        e.target.closest('#btnAbility') || e.target.closest('#btnQuit')) return;
     const t = e.changedTouches[0];
     touchState = { id: t.identifier, x: t.clientX, y: t.clientY,
                    slot: swipeSlotFor(t.clientX), fired: false };
@@ -2582,6 +2650,7 @@
       else startLocal(mode === 'local2' ? 2 : 1);
       return;
     }
+    if (key === 'Escape' && running) { pressQuit(); e.preventDefault(); return; }
     if (key.toLowerCase() === 'h' && running) { requestAbility(); return; }
 
     const isWASD = ['w', 'a', 's', 'd'].includes(key.toLowerCase());
@@ -2615,7 +2684,7 @@
     teamPlay, FORMATS, TEAMS, BOT_LEVELS,
     setFormat(f) { matchFormat = f; }, getFormat() { return matchFormat; },
     setBots(n) { botCount = n; }, setBotLevel(l) { botLevel = l; },
-    applyDirTo, tryHack, myPlayer, HACK_MIN, HACK_MAX, HACK_COOLDOWN_MS,
+    applyDirTo, tryHack, myPlayer, quitGame, HACK_MIN, HACK_MAX, HACK_COOLDOWN_MS,
     setRunning(v) { running = v; }, setRoundOver(v) { roundOver = v; },
     setPaused(v) { paused = v; },
     encodeCell: c => c.y * CELLS + c.x,
