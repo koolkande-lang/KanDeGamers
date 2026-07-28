@@ -54,12 +54,13 @@
 
 **🏆 Path of Prey — reward track**
 
-Every **100 points you score, in any game, ever** earns one reward. Ten rewards
-in total. Progress is saved on your device and never resets.
+Rewards unlock as your **total score across every game ever** climbs. Twelve
+rewards in total. Progress is saved on your device and never resets.
 
-Skins and trails **alternate**, so you get something new every 100 points rather
-than waiting ages for the first trail. They're **separate slots** — you can wear
-Hulk with a rainbow trail.
+The first ten alternate skin/trail, so you get something new every 100 points
+rather than waiting ages for the first trail. Then there's a long gap to the
+**legendary** pair. They're **separate slots** — you can wear Hulk with a
+rainbow trail, or the Hacker skin with the Hacker trail once you've earned both.
 
 | Points | Reward | Kind | Look |
 |---|---|---|---|
@@ -73,6 +74,8 @@ Hulk with a rainbow trail.
 | 800 | 💚 Hulk | Skin | Green with purple bands, drawn 18% chunkier |
 | 900 | 🦸 Superman | Skin | Blue and red with a diamond emblem |
 | 1000 | 🐜 Ant-Man | Skin | Dark red, drawn at 66% size — genuinely tiny |
+| **2750** | 💻 **Hacker Trail** | Trail | 🟢 **LEGENDARY** — streams of code shed off the tail, every glyph re-rolling as it fades |
+| **3000** | 💻 **Hacker** | Skin | 🟢 **LEGENDARY** — near-black body, neon green, a terminal screen on the head with a blinking cursor |
 
 **Classic** skin and **No Trail** are free from the start.
 
@@ -84,7 +87,10 @@ Notes:
   **nothing** in network traffic even with six players.
 - Particles are capped at 80 per snake and expire on a timer, so they can't pile
   up and slow the game down. Measured steady state: lightning 6, rainbow 35,
-  poison 38, dirt 57.
+  poison 38, dirt 57, hacker 39.
+- The Hacker **skin** uses the key `hacker`; the Hacker **trail** uses
+  `hackertrail`. They must not share a key — skins and trails are looked up
+  separately today, but one id meaning two things is a trap.
 - **The physics is top-down.** An early version had dirt falling and poison
   rising, which looked wrong because the camera looks straight *down* at the
   board — there is no "down" on screen for things to fall toward. Dirt now
@@ -94,8 +100,14 @@ Notes:
   an **aura around your snake** so you can always find yourself.
 - In same-device 2P the **better** of the two scores counts. Online, only your
   own snake's score counts — not the winner's.
-- Roughly 13 games to complete the whole path; the first reward lands in game
-  1–3.
+- **Pacing** (simulated): first reward in game 1–3, Ant-Man around game 13–20,
+  then a long climb — the Hacker pair lands somewhere around game **25–60**
+  depending on how well you score. That gap is deliberate: it's the legendary
+  tier. If it feels too far, lower the two `unlockAt` numbers.
+- The first ten rewards sit on a neat 100-point grid; the legendary two do not
+  (2750 and 3000). The progress bar measures from the **last reward you passed
+  to the next one**, so it fills smoothly across the big gap instead of sitting
+  full for twenty games.
 - ⚠️ The hero names are trademarks of Marvel and DC. Fine for a personal
   project. To change them, edit the `name` fields in the `SKINS` list near the
   top of the file — nothing else depends on them.

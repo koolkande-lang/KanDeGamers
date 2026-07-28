@@ -161,6 +161,12 @@
   }
   .skinTile.locked { opacity: 0.45; cursor: not-allowed; }
   .skinTile.equipped { border-color: #fde68a; box-shadow: 0 0 14px rgba(253,230,138,0.45); }
+  .skinTile.legendary {
+    border-color: #39ff14;
+    background: linear-gradient(160deg, #0b2417, #1d1029);
+  }
+  .skinTile.legendary .sreq { color: #39ff14; opacity: 0.9; font-weight: bold; }
+  .skinTile.legendary.locked { border-color: #1f513a; }
   .skinTile .swatch {
     height: 16px; border-radius: 20px; margin: 0 auto 6px; width: 72%;
   }
@@ -243,8 +249,9 @@
   <div id="pathPanel" class="hidden">
     <p class="fieldLabel">🏆 Path of Prey</p>
     <p class="note" style="margin-bottom:8px !important;">
-      Every <b>100 points</b> you score — in any game, ever — earns one reward.<br>
-      Skins and trails are separate slots, so you can wear one of each.</p>
+      Rewards unlock as your <b>total score across every game ever</b> climbs.<br>
+      Skins and trails are separate slots, so you can wear one of each.<br>
+      The last two are <b style="color:#39ff14">legendary</b> — a serious grind.</p>
 
     <div id="pathTotal"></div>
     <div id="pathBarOuter"><div id="pathBarFill"></div></div>
@@ -392,7 +399,10 @@
     { key: 'superman', name: 'Superman',    unlockAt: 900,  emoji: '🦸',
       dark: '#1d4ed8', light: '#3b82f6', accent: '#dc2626', badge: 'diamond', width: 1 },
     { key: 'antman',   name: 'Ant-Man',     unlockAt: 1000, emoji: '🐜',
-      dark: '#7f1d1d', light: '#dc2626', accent: '#111827', badge: 'none',    width: 0.66 }
+      dark: '#7f1d1d', light: '#dc2626', accent: '#111827', badge: 'none',    width: 0.66 },
+    // Legendary tier — a long way past everything else.
+    { key: 'hacker',   name: 'Hacker',      unlockAt: 3000, emoji: '💻', legendary: true,
+      dark: '#0b2417', light: '#39ff14', accent: '#00ff41', badge: 'matrix',  width: 1 }
   ];
   const skinByKey = k => SKINS.find(s => s.key === k) || SKINS[0];
 
@@ -400,6 +410,10 @@
   // Purely decorative sparks dropped behind the tail. Because they're cosmetic,
   // every device generates its own — none of this crosses the network.
   const TRAIL_CAP = 80;   // per snake, so six players can't drown the frame rate
+
+  // Deliberately ASCII — katakana would look more the part but doesn't render
+  // reliably on every phone.
+  const HACK_CHARS = '01010110<>[]{}/\\|=+*#$%&!?01'.split('');
 
   const TRAILS = [
     { key: 'none', name: 'No Trail', unlockAt: 0, emoji: '·' },
@@ -536,6 +550,35 @@
           c.closePath(); c.fill();
           c.restore();
         }
+      } },
+
+    // Legendary. Streams of code shed from the tail, each glyph re-rolling as
+    // it fades — the constant character churn is what sells the effect.
+    // Key is 'hackertrail', not 'hacker' — the Hacker SKIN already owns that
+    // key, and two rewards sharing one id is a bug waiting to happen.
+    { key: 'hackertrail', name: 'Hacker Trail', unlockAt: 2750, emoji: '💻', legendary: true,
+      every: 55, count: 2, swatch: 'linear-gradient(90deg,#052e16,#39ff14)',
+      spawn: (pt, now, cs, dir) => ({
+        x: pt.x + (Math.random() - 0.5) * cs * 0.85,
+        y: pt.y + (Math.random() - 0.5) * cs * 0.85,
+        born: now, life: 800 + Math.random() * 500,
+        vx: -dir.x * cs * 0.0004 + (Math.random() - 0.5) * cs * 0.0003,
+        vy: -dir.y * cs * 0.0004 + (Math.random() - 0.5) * cs * 0.0003,
+        ci: Math.floor(Math.random() * HACK_CHARS.length),
+        lead: Math.random() < 0.25          // a few bright leading glyphs
+      }),
+      draw: (c, q, t, cs) => {
+        const age = t * q.life;
+        const ch = HACK_CHARS[(q.ci + Math.floor(age / 70)) % HACK_CHARS.length];
+        const x = q.x + q.vx * age, y = q.y + q.vy * age;
+        c.font = `bold ${cs * (q.lead ? 0.72 : 0.58)}px "Courier New", monospace`;
+        c.textAlign = 'center';
+        c.textBaseline = 'middle';
+        c.globalAlpha = (1 - t) * (q.lead ? 1 : 0.7);
+        if (q.lead) { c.shadowColor = '#39ff14'; c.shadowBlur = cs * 0.5; c.fillStyle = '#e6ffe9'; }
+        else        { c.shadowBlur = 0;          c.fillStyle = '#22c55e'; }
+        c.fillText(ch, x, y);
+        c.shadowBlur = 0;
       } }
   ];
   const trailByKey = k => TRAILS.find(t => t.key === k) || TRAILS[0];
@@ -545,9 +588,16 @@
                 ...TRAILS.filter(t => t.unlockAt > 0).map(t => ({ kind: 'trail', item: t }))]
                .sort((a, b) => a.item.unlockAt - b.item.unlockAt);
 
-  const rewardsEarned = pts => Math.floor(pts / POINTS_PER_REWARD);
+  // Counted from the real thresholds, NOT floor(points/100): the legendary
+  // tier sits at 2750 and 3000, which aren't on the 100-point grid.
+  const rewardsEarned = pts => PATH.filter(r => r.item.unlockAt <= pts).length;
   const isSkinUnlocked = (s, pts) => pts >= s.unlockAt;
   const nextLockedReward = pts => PATH.find(r => r.item.unlockAt > pts) || null;
+  const lastUnlockedAt = pts => {
+    let at = 0;
+    for (const r of PATH) { if (r.item.unlockAt <= pts) at = r.item.unlockAt; else break; }
+    return at;
+  };
   const nextLockedSkin = pts => SKINS.find(s => !isSkinUnlocked(s, pts)) || null;
 
   // ============================================================
@@ -699,12 +749,20 @@
     $('pathMini').textContent = `· ${pathPoints} pts`;
     $('pathTotal').textContent = `${pathPoints} points · ${earned} reward${earned === 1 ? '' : 's'}`;
 
-    // Bar shows progress through the CURRENT 100-point block.
-    const into = pathPoints % POINTS_PER_REWARD;
-    $('pathBarFill').style.width = (next ? (into / POINTS_PER_REWARD) * 100 : 100) + '%';
-    $('pathNext').textContent = next
-      ? `${next.item.unlockAt - pathPoints} more points to unlock ${next.item.name}`
-      : 'Every reward unlocked! 🎉';
+    // Bar spans from the last reward you passed to the next one. The gaps
+    // aren't equal (1000 -> 2750), so a fixed 100-point block would either
+    // sit full for ages or jump backwards.
+    if (next) {
+      const from = lastUnlockedAt(pathPoints);
+      const span = next.item.unlockAt - from;
+      const pct = span > 0 ? ((pathPoints - from) / span) * 100 : 0;
+      $('pathBarFill').style.width = Math.max(0, Math.min(100, pct)) + '%';
+      $('pathNext').textContent =
+        `${next.item.unlockAt - pathPoints} more points to unlock ${next.item.name}`;
+    } else {
+      $('pathBarFill').style.width = '100%';
+      $('pathNext').textContent = 'Every reward unlocked! 🎉';
+    }
 
     const me = colorByKey(myColorKey);
     const grid = $('skinGrid');
@@ -717,7 +775,8 @@
       const unlocked = isSkinUnlocked(item, pathPoints);
       const equipped = kind === 'skin' ? item.key === mySkinKey : item.key === myTrailKey;
       const tile = document.createElement('div');
-      tile.className = 'skinTile' + (unlocked ? '' : ' locked') + (equipped ? ' equipped' : '');
+      tile.className = 'skinTile' + (unlocked ? '' : ' locked') +
+                       (equipped ? ' equipped' : '') + (item.legendary ? ' legendary' : '');
 
       let sw;
       if (kind === 'trail') sw = item.swatch || 'repeating-linear-gradient(90deg,#3d2255 0 6px,transparent 6px 12px)';
@@ -1185,6 +1244,30 @@
       ctx.moveTo(a.x, a.y); ctx.lineTo(b2.x, b2.y);
       ctx.lineTo(c2.x, c2.y); ctx.lineTo(d2.x, d2.y);
       ctx.stroke();
+
+    } else if (skin.badge === 'matrix') {
+      // A little terminal screen with a blinking cursor. Deliberately NOT
+      // rotated with the snake, so it always reads the right way up.
+      const w = base * 0.72, h = base * 0.54;
+      ctx.fillStyle = '#04240f';
+      ctx.fillRect(head.x - w / 2, head.y - h / 2, w, h);
+      ctx.strokeStyle = skin.accent;
+      ctx.lineWidth = Math.max(1, base * 0.055);
+      ctx.strokeRect(head.x - w / 2, head.y - h / 2, w, h);
+      // two lines of "code"
+      ctx.globalAlpha = 0.55;
+      ctx.lineWidth = Math.max(0.6, base * 0.035);
+      ctx.beginPath();
+      ctx.moveTo(head.x - w * 0.32, head.y - h * 0.18);
+      ctx.lineTo(head.x + w * 0.02, head.y - h * 0.18);
+      ctx.moveTo(head.x - w * 0.32, head.y + h * 0.08);
+      ctx.lineTo(head.x - w * 0.06, head.y + h * 0.08);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      if ((now % 900) < 550) {            // blinking cursor
+        ctx.fillStyle = '#39ff14';
+        ctx.fillRect(head.x + w * 0.10, head.y + h * 0.00, w * 0.16, h * 0.30);
+      }
 
     } else if (skin.badge === 'diamond') {
       ctx.fillStyle = skin.accent;
@@ -1814,7 +1897,7 @@
     applyDirTo, encodeCell: c => c.y * CELLS + c.x,
     decodeCell: i => ({ x: i % CELLS, y: Math.floor(i / CELLS) }),
     SKINS, skinByKey, TRAILS, trailByKey, PATH, nextLockedReward,
-    rewardsEarned, isSkinUnlocked, nextLockedSkin, newlyUnlocked,
+    rewardsEarned, isSkinUnlocked, nextLockedSkin, newlyUnlocked, lastUnlockedAt,
     get myTrailKey() { return myTrailKey; },
     set myTrailKey(v) { myTrailKey = v; },
     POINTS_PER_REWARD,
