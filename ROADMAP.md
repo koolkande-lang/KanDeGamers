@@ -17,38 +17,41 @@ Everything we want to add, written down so nothing gets forgotten.
 - 2 player on the same device
 - 2 player online with a room code
 - On-screen arrow buttons
-- **Swipe to steer** (new)
-- **Four speed levels: Easy / Medium / Hard / Insane** (new)
 
-⚠️ The two "new" ones are finished but **not uploaded to the website yet.**
+**Round 1 — finished, waiting to be uploaded:**
+
+- **Swipe to steer**
+- **Four speed levels: Easy / Medium / Hard / Insane** (Easy is the default now)
+- **Arrow buttons beside the board** on iPads and laptops — no more scrolling
+- **Realistic snake** — smooth connected body, tapered tail, eyes that face the
+  way you're going, a flicking tongue, X eyes when you crash, and it **glides**
+  between squares instead of jumping
+- **Bigger map** — 30×30 squares, was 24×24
+- Pause overlay, and a candy that gently pulses
+
+⚠️ All of the above is finished but **not uploaded to the website yet.**
 
 ---
 
 ## 🎯 The top three (your picks)
 
-### 1. Move the arrow buttons to the right of the board
-**Why:** On an iPad the buttons sit below the board, so you have to scroll down to reach them. Annoying mid-game.
-
-**Plan:** On wide screens, put the board on the left and the arrows on the right, side by side. On narrow phones, keep them below where they are now. Everything fits on one screen, no scrolling.
-
-**Difficulty:** 🟢 Easy — this is a layout change only, no game logic touched.
+### 1. ✅ Move the arrow buttons to the right of the board — DONE
+On screens 900px and wider the arrows sit beside the board. In same-device
+2-player, P1's pad goes on the left and P2's on the right, which matches the
+swipe halves. Phones keep them underneath. Checked against every common iPhone
+and iPad size, portrait and landscape — nothing needs scrolling.
 
 ---
 
-### 2. Make the snake look more realistic
-**Why:** Right now it's a line of plain squares. It should look like an actual snake.
+### 2. ✅ Make the snake look more realistic — DONE
+All four things you picked:
 
-**Ideas for what "realistic" could mean — pick your favourites:**
+- Eyes on the head, pointing where it's going 👀
+- Smooth connected body with a tail that tapers to a point
+- Glides between squares instead of snapping
+- Flicking tongue
 
-- Rounded body instead of squares
-- Segments joined together so it's one smooth ribbon, not a dotted line
-- **Eyes on the head**, looking in the direction it's moving 👀
-- A flicking tongue
-- A tail that tapers to a point
-- Smooth corners when it turns
-- Body that glides between squares instead of jumping (this one is the hardest, but it's what makes it feel *alive*)
-
-**Difficulty:** 🟡 Medium — it's all drawing code, so it can't break the gameplay. Safe to experiment with.
+Bonus: X eyes when a snake dies.
 
 ---
 
@@ -72,12 +75,9 @@ The online part also changes: today the host talks to **one** friend. It would n
 
 ## 💡 The other ideas
 
-### 4. Bigger map
-**Why:** More room to move, and it's needed anyway if 4 snakes are sharing the board.
-
-The board is 24×24 squares today. Could go to 32×32 or bigger.
-
-**Difficulty:** 🟢 Easy, with one thing to watch: more squares on the same screen = smaller squares. On a phone they could get too tiny to see. Might need the map size to depend on how many players there are.
+### 4. ✅ Bigger map — DONE
+Now 30×30 squares (was 24×24), on a 600px board. Could go bigger still once
+there are 4 snakes sharing it — worth revisiting during #3.
 
 ---
 
@@ -115,13 +115,13 @@ Here's the thing worth knowing: **#5 (more fruits) and #6 (colours) both touch t
 
 If we build them before the multiplayer rewrite, we'd have to build them a second time afterwards. So it's smarter to group them.
 
-**Round 1 — quick wins, low risk**
+**Round 1 — quick wins, low risk** ✅ BUILT
 
-1. Arrow buttons to the right (#1)
-2. Realistic snake (#2)
-3. Bigger map (#4)
+1. ~~Arrow buttons to the right (#1)~~
+2. ~~Realistic snake (#2)~~
+3. ~~Bigger map (#4)~~
 
-Nothing here can break the game. Ship it fast, see it live.
+**← YOU ARE HERE.** Upload it and test on a real iPad before starting Round 2.
 
 **Round 2 — the foundation**
 
@@ -151,4 +151,8 @@ This is the heavy one. Doing it here means colours and fruits become easy afterw
 - Online play uses **PeerJS**, loaded from a CDN. Phones talk directly to each other; there's no server of ours
 - The **host** device runs the actual game and sends the picture to everyone else. Guests only draw what they're told
 - Difficulty speeds: Easy 230ms · Medium 160ms · Hard 110ms · Insane 75ms (bigger number = slower)
-- Board is 24×24 squares on a 480×480 canvas
+- Board is 30×30 squares on a 600×600 canvas
+- Two separate loops now: the **logic** moves the snake one square every
+  `tickMs`, and the **drawing** runs every animation frame and paints the snake
+  partway between squares. That split is what makes it glide
+- The board is sized with `min(vw, vh, px)` so it always fits without scrolling
