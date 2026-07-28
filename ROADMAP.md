@@ -134,6 +134,12 @@ the host checks the skin, the cooldown and whether you're alive before allowing
 it. Tested: 3000 spammed requests in three seconds land exactly one use, for
 every ability.
 
+> ⚠️ **The guest must ask unconditionally.** An early version had the guest
+> check its own copy first and bail out if it thought it had no ability — so
+> any drift in the guest's local picture produced a completely dead button with
+> no feedback. The host re-checks everything anyway, so the guest has no
+> business refusing. Don't reintroduce that check.
+
 ### 📊 How balanced is it? (simulated, 300 rounds, 6 players)
 
 The answer changes completely with skill level, which was the surprise:
@@ -334,7 +340,21 @@ Any of those are easy to tune — they're just numbers in the file.
 - Canvas is always 720×720 internally; the *number of squares* changes with
   player count, and CSS shrinks the display size to fit the screen
 
-**Two things in the code that look odd but are deliberate:**
+**Bugs found by running two real copies of the game against each other**
+(`onlinetest.js` boots a host and a guest in isolated VM contexts and wires
+their fake PeerJS together — the only way to test the online path properly):
+
+1. **Guests couldn't use abilities.** `requestAbility()` checked the guest's own
+   copy of itself and returned early if it looked wrong — silently. Now the
+   guest always asks and the host decides.
+2. **Bots were different colours on every screen.** The host broadcast the
+   roster *before* assigning colours, and bots join with no colour, so guests
+   drew them all green while the host drew them properly.
+3. **A connection with no lobby seat was told it was "player -1"**, which
+   permanently broke that player's controls. Now skipped, and guests ignore a
+   nonsense index.
+
+**Three things in the code that look odd but are deliberate:**
 
 - The tail's glide point is **appended** to the body path, not written over the
   last one. Overwriting made the final segment span two squares, which visibly
@@ -343,3 +363,7 @@ Any of those are easy to tune — they're just numbers in the file.
   lobby taken when the match starts — not the live lobby. If someone quits
   mid-game, the live list shrinks and everyone below them would slide onto the
   wrong snake.
+- The guest shows a brief **⏳** on the ability button after pressing. The real
+  answer comes back from the host within ~45ms, but without that placeholder a
+  laggy press looks like the button is broken — which is exactly how this bug
+  got reported in the first place.

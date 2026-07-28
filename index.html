@@ -1928,6 +1928,14 @@
     const activeLeft = Math.max(0, (me.abUntil || 0) - now);
     abilityBtn.style.borderColor = ab.colour;
     abilityBtn.style.color = ab.colour;
+    // Waiting on the host to answer — show something, so a press never looks
+    // like it was ignored.
+    if (netRole === 'guest' && left === 0 && activeLeft === 0 &&
+        now - guestPressedAt < 500) {
+      abilityBtn.classList.add('cooling');
+      abilityBtn.textContent = '⏳ …';
+      return;
+    }
     if (activeLeft > 0) {
       abilityBtn.classList.add('cooling');
       abilityBtn.textContent = `${ab.emoji} ${Math.ceil(activeLeft / 1000)}s ACTIVE`;
@@ -1941,15 +1949,20 @@
   }
 
   // One entry point for the button and the H key.
+  let guestPressedAt = 0;
   function requestAbility() {
-    const me = myPlayer();
-    if (!abilityFor(me)) return;
     if (netRole === 'guest') {
-      // Ask the host; it decides. The cooldown is enforced there, not here.
+      // ALWAYS ask, even if our local copy thinks we can't. The host is the
+      // authority and re-checks everything; refusing here just meant a dead
+      // button whenever the guest's own view of itself was stale or wrong.
       const c = conns[0];
-      if (c && c.open) { try { c.send({ type: 'ability' }); } catch (e) {} }
+      if (c && c.open) {
+        try { c.send({ type: 'ability' }); guestPressedAt = nowMs(); } catch (e) {}
+      }
       return;
     }
+    const me = myPlayer();
+    if (!abilityFor(me)) return;
     useAbility(me, nowMs());
     updateAbilityButton(nowMs());
   }
@@ -2148,7 +2161,10 @@
     mode = 'online';
     myIndex = 0;
     matchConns = lobby.map(l => l.conn);
-    const roster = buildRoster(lobbyRoster());   // humans first, bots after
+    // Colours must be resolved BEFORE broadcasting. Bots join with colorKey
+    // null, so sending the raw roster left every guest drawing them green
+    // while the host drew them properly — six screens, six different pictures.
+    const roster = assignColors(buildRoster(lobbyRoster()));
     broadcast({ type: 'begin', ms: tickMs, name: difficultyName,
                 emoji: difficultyEmoji, roster, fmt: matchFormat });
     startRound(roster);
@@ -2270,8 +2286,10 @@
   function pushLobby() {
     conns.forEach(c => {
       if (!c.open) return;
-      try { c.send({ type: 'lobby', you: lobby.findIndex(l => l.conn === c), list: lobbyRoster() }); }
-      catch (e) {}
+      const you = lobby.findIndex(l => l.conn === c);
+      if (you < 0) return;          // no seat yet — telling them "player -1"
+                                    // permanently broke their controls
+      try { c.send({ type: 'lobby', you, list: lobbyRoster() }); } catch (e) {}
     });
   }
 
@@ -2342,6 +2360,7 @@
     if (msg.type === 'full') {
       setStatus('That room is full or already playing.');
     } else if (msg.type === 'lobby') {
+      if (typeof msg.you !== 'number' || msg.you < 0) return;   // ignore nonsense
       myIndex = msg.you;
       lobby = msg.list.map(p => ({ ...p, conn: null }));
       renderLobby();
