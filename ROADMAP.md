@@ -75,14 +75,15 @@ rainbow trail, or the Hacker skin with the Hacker trail once you've earned both.
 | 900 | 🦸 Superman | Skin | Blue and red with a diamond emblem |
 | 1000 | 🐜 Ant-Man | Skin | Dark red, drawn at 66% size — genuinely tiny |
 | **2750** | 💻 **Hacker Trail** | Trail | 🟢 **LEGENDARY** — streams of code shed off the tail, every glyph re-rolling as it fades |
-| **3000** | 💻 **Hacker** | Skin | 🟢 **LEGENDARY** — near-black body, neon green, a terminal screen on the head with a blinking cursor |
+| **3000** | 💻 **Hacker** | Skin | 🟢 **LEGENDARY** — near-black body, neon green, a terminal screen on the head with a blinking cursor. **The only skin with a real power.** |
 
 **Classic** skin and **No Trail** are free from the start.
 
 Notes:
 
-- Everything here is **cosmetic only** — tested to confirm no skin or trail
-  changes scoring or collisions. Ant-Man looks tiny but fills the same squares.
+- Everything here is **cosmetic only, with one exception** — tested to confirm
+  no skin or trail changes scoring or collisions. Ant-Man looks tiny but fills
+  the same squares. The exception is the Hacker skin's HACK button (below).
 - Trails are drawn from each device's own copy of the game, so they cost
   **nothing** in network traffic even with six players.
 - Particles are capped at 80 per snake and expire on a timer, so they can't pile
@@ -112,6 +113,28 @@ Notes:
   project. To change them, edit the `name` fields in the `SKINS` list near the
   top of the file — nothing else depends on them.
 
+### 💻 The HACK button
+
+Wearing the Hacker skin puts a green **HACK** button under the board (or press
+**H**). Pressing it steals a random **10–30 points**, then goes on a **15 second
+cooldown**. It works in every mode, including online.
+
+- Roughly **80 points a minute** if you press it the moment it's ready — about
+  eight candies' worth. A real edge, not an instant win.
+- Everyone sees a green **"+17"** pop off your snake's head when it lands, so it
+  never feels like invisible cheating.
+- **The host decides, not you.** A guest pressing HACK only *asks* the host,
+  which checks the skin and the cooldown before allowing it. Tested: 5000 forged
+  hack messages in five seconds land exactly one hack, and a guest lying about
+  owning the skin gets nothing.
+- Hacking can't move you, resize you, kill you or disturb the fruit — it only
+  touches your score.
+
+⚠️ **This is a genuine advantage online.** You chose that deliberately, and it's
+earned — 3000 points is a long climb. But if friends without it stop enjoying
+the game, the fix is easy: raise `HACK_COOLDOWN_MS`, lower `HACK_MAX`, or gate
+it to 1-player only. All near the top of the file.
+
 ---
 
 ## ⚠️ What still needs doing
@@ -126,6 +149,8 @@ watching for:
 - Is ⚡ too strong? Is ❄️ annoying to be on the receiving end of?
 - Does online play stay smooth with 5 friends, or does it lag?
 - Are the fruits easy to tell apart at small sizes on a phone?
+- Does the HACK button feel powerful but fair, or does it ruin games for
+  everyone else?
 
 Any of those are easy to tune — they're just numbers in the file.
 

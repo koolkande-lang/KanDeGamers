@@ -134,6 +134,20 @@
   .dpad-btn.down { grid-column: 2; grid-row: 3; }
   #playArea.dpads-off #dpad1Wrap, #playArea.dpads-off #dpad2Wrap { display: none !important; }
 
+  #btnHack {
+    margin-top: 10px; padding: 10px 26px; font-size: 0.95rem; font-weight: bold;
+    font-family: 'Courier New', monospace; letter-spacing: 2px;
+    border: 2px solid #39ff14; border-radius: 10px;
+    background: #04240f; color: #39ff14; cursor: pointer;
+    box-shadow: 0 0 16px rgba(57,255,20,0.35);
+    touch-action: manipulation;
+  }
+  #btnHack:active { background: #39ff14; color: #04240f; }
+  #btnHack.cooling {
+    border-color: #1f513a; color: #4d7c5f;
+    background: #0a1410; box-shadow: none; cursor: not-allowed;
+  }
+
   #btnToggleDpad {
     margin-top: 8px; padding: 6px 16px; font-size: 0.72rem;
     border: 1px solid var(--panel); border-radius: 20px;
@@ -188,7 +202,21 @@
     #playArea canvas { width: min(86vw, 50vh, 640px); }
     .dpad { grid-template-columns: 44px 44px 44px; grid-template-rows: 44px 44px 44px; }
     #hint, #legend { margin-top: 5px; font-size: 0.68rem; }
-    #btnToggleDpad { margin-top: 5px; }
+    #btnHack {
+    margin-top: 10px; padding: 10px 26px; font-size: 0.95rem; font-weight: bold;
+    font-family: 'Courier New', monospace; letter-spacing: 2px;
+    border: 2px solid #39ff14; border-radius: 10px;
+    background: #04240f; color: #39ff14; cursor: pointer;
+    box-shadow: 0 0 16px rgba(57,255,20,0.35);
+    touch-action: manipulation;
+  }
+  #btnHack:active { background: #39ff14; color: #04240f; }
+  #btnHack.cooling {
+    border-color: #1f513a; color: #4d7c5f;
+    background: #0a1410; box-shadow: none; cursor: not-allowed;
+  }
+
+  #btnToggleDpad { margin-top: 5px; }
     body.playing h1 { font-size: 1rem; }
   }
   /* Phone turned sideways: little height, lots of width. */
@@ -199,7 +227,21 @@
     .dpad { grid-template-columns: 40px 40px 40px; grid-template-rows: 40px 40px 40px; }
     body.playing h1 { display: none; }
     body.playing #hint, body.playing #legend { display: none; }
-    #btnToggleDpad { margin-top: 3px; }
+    #btnHack {
+    margin-top: 10px; padding: 10px 26px; font-size: 0.95rem; font-weight: bold;
+    font-family: 'Courier New', monospace; letter-spacing: 2px;
+    border: 2px solid #39ff14; border-radius: 10px;
+    background: #04240f; color: #39ff14; cursor: pointer;
+    box-shadow: 0 0 16px rgba(57,255,20,0.35);
+    touch-action: manipulation;
+  }
+  #btnHack:active { background: #39ff14; color: #04240f; }
+  #btnHack.cooling {
+    border-color: #1f513a; color: #4d7c5f;
+    background: #0a1410; box-shadow: none; cursor: not-allowed;
+  }
+
+  #btnToggleDpad { margin-top: 3px; }
   }
 </style>
 </head>
@@ -303,6 +345,7 @@
     </div>
   </div>
 
+  <button id="btnHack" class="hidden">💻 HACK</button>
   <div id="hint">Swipe anywhere to steer. <b>Space</b> pauses, <b>R</b> restarts.</div>
   <div id="legend">🍬 +10 &nbsp; 🍒 +25 &nbsp; 🍌 shrink &nbsp; ⚡ speed burst &nbsp; ❄️ slows everyone else</div>
   <button id="btnToggleDpad">Hide buttons</button>
@@ -329,6 +372,9 @@
   const BOOST_MULT = 1.8;
   const SLOW_MULT = 0.55;
   const BROADCAST_MS = 45;
+
+  // The Hacker skin's one gameplay power: steal a random pile of points.
+  const HACK_MIN = 10, HACK_MAX = 30, HACK_COOLDOWN_MS = 15000;
 
   const PALETTE = [
     { key: 'green',  dark: '#22c55e', light: '#4ade80', name: 'Green'  },
@@ -821,6 +867,7 @@
       cells, dir: { ...s.dir }, nextDir: { ...s.dir },
       score: 0, alive: true, tailFrom: null,
       boostUntil: 0, slowUntil: 0,
+      hackReadyAt: 0, hackCount: 0, hackGain: 0, hackFlash: null,
       moveMs: tickMs, lastMoveAt: 0, prevHeadKey: -1
     };
   }
@@ -943,6 +990,28 @@
     }
     doomed.forEach(p => { p.alive = false; });
     return doomed.length > 0;
+  }
+
+  // Authoritative: only ever called on the host or in a local game, so a guest
+  // spamming the button can't do anything the host doesn't allow.
+  function tryHack(p, now) {
+    if (!p || !p.alive || !running || paused || roundOver) return false;
+    if (p.skinKey !== 'hacker') return false;
+    if (now < (p.hackReadyAt || 0)) return false;
+    const gain = HACK_MIN + Math.floor(Math.random() * (HACK_MAX - HACK_MIN + 1));
+    p.score += gain;
+    p.hackReadyAt = now + HACK_COOLDOWN_MS;
+    p.hackCount = (p.hackCount || 0) + 1;
+    p.hackGain = gain;
+    p.hackFlash = { at: now, gain };
+    return true;
+  }
+
+  // The snake this device is actually steering.
+  function myPlayer() {
+    if (!players.length) return null;
+    if (mode === 'local2') return players[0];   // only P1 wears your skin
+    return players[myIndex] || null;
   }
 
   function aliveCount() { return players.filter(p => p.alive).length; }
@@ -1174,6 +1243,22 @@
         ctx.stroke();
       }
     }
+    // "+N" popping off the head when a hack lands. Everyone sees it, so the
+    // power never feels like invisible cheating.
+    if (p.hackFlash && now - p.hackFlash.at < 1100) {
+      const ft = (now - p.hackFlash.at) / 1100;
+      ctx.save();
+      ctx.globalAlpha = 1 - ft;
+      ctx.font = `bold ${cellSize * 0.95}px "Courier New", monospace`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.shadowColor = '#39ff14';
+      ctx.shadowBlur = cellSize * 0.6;
+      ctx.fillStyle = '#d9ffe0';
+      ctx.fillText('+' + p.hackFlash.gain, head.x, head.y - cellSize * (1 + ft * 1.4));
+      ctx.restore();
+    }
+
     ctx.restore();
   }
 
@@ -1296,10 +1381,42 @@
                     `<span style="color:${col.light}">${escapeHtml(p.name)}</span> ${p.score}${fx}`;
       hudEl.appendChild(d);
     });
+    updateHackButton(now);
+
     const badge = document.createElement('div');
     badge.id = 'speedBadge';
     badge.textContent = `${difficultyEmoji} ${difficultyName}`;
     hudEl.appendChild(badge);
+  }
+
+  const hackBtn = $('btnHack');
+  function updateHackButton(now) {
+    const me = myPlayer();
+    const has = !!me && me.skinKey === 'hacker' && running && !roundOver;
+    hackBtn.classList.toggle('hidden', !has);
+    if (!has) return;
+    const left = Math.max(0, (me.hackReadyAt || 0) - now);
+    if (left > 0) {
+      hackBtn.classList.add('cooling');
+      hackBtn.textContent = `🔒 ${Math.ceil(left / 1000)}s`;
+    } else {
+      hackBtn.classList.remove('cooling');
+      hackBtn.textContent = '💻 HACK';
+    }
+  }
+
+  // One entry point for the button and the H key.
+  function requestHack() {
+    const me = myPlayer();
+    if (!me || me.skinKey !== 'hacker') return;
+    if (netRole === 'guest') {
+      // Ask the host; it decides. Cooldown is enforced there, not here.
+      const c = conns[0];
+      if (c && c.open) { try { c.send({ type: 'hack' }); } catch (e) {} }
+      return;
+    }
+    tryHack(me, nowMs());
+    updateHackButton(nowMs());
   }
 
   function escapeHtml(s) {
@@ -1664,6 +1781,10 @@
       const idx = matchConns ? matchConns.indexOf(c) : lobby.indexOf(entry);
       const p = idx >= 0 ? players[idx] : null;
       if (p && p.alive && msg.dir) applyDirTo(p, msg.dir);
+
+    } else if (msg.type === 'hack') {
+      const idx = matchConns ? matchConns.indexOf(c) : lobby.indexOf(entry);
+      if (idx >= 0) tryHack(players[idx], nowMs());
     }
   }
 
@@ -1719,7 +1840,10 @@
         t: p.tailFrom ? encodeCell(p.tailFrom) : -1,
         m: p.moveMs,
         b: p.boostUntil > now ? 1 : 0,
-        w: p.slowUntil > now ? 1 : 0
+        w: p.slowUntil > now ? 1 : 0,
+        k: p.hackCount || 0,                              // rises once per hack
+        kg: p.hackGain || 0,
+        kr: Math.max(0, (p.hackReadyAt || 0) - now)       // cooldown remaining
       }))
     };
   }
@@ -1744,6 +1868,14 @@
       p.moveMs = sp.m || tickMs;
       p.boostUntil = sp.b ? now + 200 : 0;   // just for the glow/HUD icon
       p.slowUntil = sp.w ? now + 200 : 0;
+      // Trigger the "+N" popup only when the counter actually moves, otherwise
+      // 22 updates a second would re-fire it constantly.
+      if ((sp.k || 0) !== (p.hackCount || 0)) {
+        p.hackCount = sp.k || 0;
+        p.hackGain = sp.kg || 0;
+        p.hackFlash = { at: now, gain: sp.kg || 0 };
+      }
+      p.hackReadyAt = now + (sp.kr || 0);
     });
   }
 
@@ -1806,7 +1938,8 @@
 
   wrapEl.addEventListener('touchstart', e => {
     if (!running) return;
-    if (e.target.closest('.dpad-btn') || e.target.closest('#btnToggleDpad')) return;
+    if (e.target.closest('.dpad-btn') || e.target.closest('#btnToggleDpad') ||
+        e.target.closest('#btnHack')) return;
     const t = e.changedTouches[0];
     touchState = { id: t.identifier, x: t.clientX, y: t.clientY,
                    slot: swipeSlotFor(t.clientX), fired: false };
@@ -1841,6 +1974,8 @@
     });
   });
 
+  hackBtn.addEventListener('click', e => { e.preventDefault(); requestHack(); });
+
   const toggleBtn = $('btnToggleDpad');
   toggleBtn.addEventListener('click', () => {
     const off = playAreaEl.classList.toggle('dpads-off');
@@ -1870,6 +2005,8 @@
       else startLocal(mode === 'local2' ? 2 : 1);
       return;
     }
+    if (key.toLowerCase() === 'h' && running) { requestHack(); return; }
+
     const isWASD = ['w', 'a', 's', 'd'].includes(key.toLowerCase());
     const isArrow = key.startsWith('Arrow');
     if (!isWASD && !isArrow) return;
@@ -1894,7 +2031,10 @@
     FRUITS, PALETTE, MIN_LEN, MAX_PLAYERS,
     setBoardSize, makePlayer, movePlayer, resolveCollisions, refillFruits,
     roundShouldEnd, aliveCount, assignColors, cellsForPlayers, fruitCountFor,
-    applyDirTo, encodeCell: c => c.y * CELLS + c.x,
+    applyDirTo, tryHack, myPlayer, HACK_MIN, HACK_MAX, HACK_COOLDOWN_MS,
+    setRunning(v) { running = v; }, setRoundOver(v) { roundOver = v; },
+    setPaused(v) { paused = v; },
+    encodeCell: c => c.y * CELLS + c.x,
     decodeCell: i => ({ x: i % CELLS, y: Math.floor(i / CELLS) }),
     SKINS, skinByKey, TRAILS, trailByKey, PATH, nextLockedReward,
     rewardsEarned, isSkinUnlocked, nextLockedSkin, newlyUnlocked, lastUnlockedAt,
