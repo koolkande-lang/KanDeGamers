@@ -321,26 +321,42 @@ clock runs out.
 
 **🎨 Texture packs** (Settings → Texture pack)
 
-Six looks for the board. Cosmetic only — same words, same scores, same rules.
+Seven board looks, **earned with points**. Every point you score in any Wuzzle
+game, ever, adds to a running total saved on your device.
 
-| Pack | Look |
-|---|---|
-| 🌊 Ocean | The original deep blue. Default. |
-| ☀️ Sunny | Warm daylight — cream tiles on amber, dark brown letters |
-| 🍃 Windy | Pale and airy — white/mint tiles, teal letters |
-| ⛈️ Stormy | Dark and moody — near-black tiles, glowing violet letters |
-| ❄️ Frosty | Icy — white-blue tiles, deep blue letters |
-| 🪵 Sturdy | Stone and wood — brown tiles, mossy green selection |
+| Cost | Pack | Look |
+|---|---|---|
+| free | 🌑 Midnight | Dark slate with a fine grain. You start with this. |
+| 15 | 🌊 Ocean | Deep water — ripple bands and a light shaft from above |
+| 30 | ☀️ Sunny | Sun-bleached cream and amber, warm highlight top-left |
+| 45 | 🍃 Windy | Soft cloud shapes drifting over pale mint |
+| 60 | ⛈️ Stormy | Near-black storm bands with a violet glow behind the letters |
+| 75 | ❄️ Frosty | Pale ice with crystalline crack lines across each tile |
+| 90 | 🪵 Sturdy | Wood grain with a dark knot, on a speckled stone board |
 
-- A pack is just **11 CSS variables**. Adding one means adding a row of colours
-  to the `THEMES` list — no new CSS, no new markup.
-- Your choice is saved on the device and the board **fades** between packs
-  rather than snapping.
-- **Every pack is contrast-checked in the tests.** The first attempt looked fine
-  on the unselected tiles but five of six packs had barely-readable letters
-  *while selected* — which is exactly when you're staring at them mid-drag. The
-  test now requires 4.5:1 (the standard for normal text) for both the resting
-  and the selected state, and every pack clears it.
+**They're real textures, not flat colour.** Each tile layers 2–5 CSS gradients:
+`repeating-linear-gradient` for wood grain and rain, `radial-gradient` for
+cloud and shading, angled slivers for ice cracks — all as translucent overlays
+on a solid base. No image files, so it costs nothing to download.
+
+**Pacing** (simulated): a beginner scoring ~4 points a round gets Ocean by
+round 4 and everything by round 22. A good player has all seven in about 6
+rounds. Quick enough to feel generous, slow enough to be worth something.
+
+Notes:
+
+- A pack is **11 CSS variables**. Adding one is a row of colours in `THEMES` —
+  no new CSS, no new markup.
+- **Points are banked from your own words** at the end of every round, solo or
+  online, so it doesn't depend on the host's final tally arriving.
+- You can't wear a locked pack. If progress is ever cleared, anyone wearing an
+  earned pack drops back to the free one rather than breaking.
+- Packs are **cosmetic only** — verified by solving the same board under every
+  pack and confirming identical words and scores.
+- **Every pack is contrast-tested**, both resting and selected. An early version
+  looked fine at rest but had barely-readable letters *while selected* — which
+  is exactly when you're staring at them mid-drag. All seven now clear 4.5:1 in
+  both states, measured rather than eyeballed.
 
 **Fitting on one screen**
 
