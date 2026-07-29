@@ -364,6 +364,11 @@ const DICT_ENC = 'AaalCmCrdvarkDonBbaDckEusDloneDndonHedHmentDteFmentEtoirCbDaEs
 
   const $ = id => document.getElementById(id);
 
+  // The class on each letter square. renderBoard() sets it and tileAt() looks
+  // for it — these two drifted apart once and tracing silently died, so the
+  // name lives in one place now, declared before anything uses it.
+  const TILE_CLASS = 'tileL';
+
   // Measure what's on screen and shrink it if it doesn't fit. Guarantees the
   // whole game is visible on any device without ever scrolling.
   let fitPending = null;
@@ -602,7 +607,7 @@ const DICT_ENC = 'AaalCmCrdvarkDonBbaDckEusDloneDndonHedHmentDteFmentEtoirCbDaEs
     boardEl.innerHTML = '';
     tileEls = letters.map((ch, i) => {
       const d = document.createElement('div');
-      d.className = 'tileL';
+      d.className = TILE_CLASS;
       d.dataset.idx = i;
       d.textContent = ch;
       boardEl.appendChild(d);
@@ -650,7 +655,8 @@ const DICT_ENC = 'AaalCmCrdvarkDonBbaDckEusDloneDndonHedHmentDteFmentEtoirCbDaEs
 
   const tileAt = (x, y) => {
     const el = document.elementFromPoint(x, y);
-    return el && el.classList && el.classList.contains('tile') ? Number(el.dataset.idx) : null;
+    return el && el.classList && el.classList.contains(TILE_CLASS)
+      ? Number(el.dataset.idx) : null;
   };
 
   function extendTo(idx) {
@@ -673,6 +679,7 @@ const DICT_ENC = 'AaalCmCrdvarkDonBbaDckEusDloneDndonHedHmentDteFmentEtoirCbDaEs
     e.preventDefault();
     dragging = true;
     movedDuringDrag = false;
+    try { boardEl.setPointerCapture(e.pointerId); } catch (err) {}
     if (myPath.length && myPath[myPath.length - 1] === idx) return;   // tap-mode continue
     if (!myPath.length) { myPath = [idx]; refreshSelection(); }
     else extendTo(idx);
@@ -688,9 +695,12 @@ const DICT_ENC = 'AaalCmCrdvarkDonBbaDckEusDloneDndonHedHmentDteFmentEtoirCbDaEs
     }
   });
 
-  function endDrag() {
+  function endDrag(e) {
     if (!dragging) return;
     dragging = false;
+    if (e && e.pointerId !== undefined) {
+      try { boardEl.releasePointerCapture(e.pointerId); } catch (err) {}
+    }
     // A drag means "I've finished the word". A single tap doesn't — that's
     // tap-to-build mode, so people can pick letters one at a time.
     if (movedDuringDrag) submitWord();
