@@ -319,6 +319,29 @@ clock runs out.
   shares with the previous one, then the rest. 306 KB → 135 KB, and 69 KB
   gzipped over the wire
 
+**🎨 Texture packs** (Settings → Texture pack)
+
+Six looks for the board. Cosmetic only — same words, same scores, same rules.
+
+| Pack | Look |
+|---|---|
+| 🌊 Ocean | The original deep blue. Default. |
+| ☀️ Sunny | Warm daylight — cream tiles on amber, dark brown letters |
+| 🍃 Windy | Pale and airy — white/mint tiles, teal letters |
+| ⛈️ Stormy | Dark and moody — near-black tiles, glowing violet letters |
+| ❄️ Frosty | Icy — white-blue tiles, deep blue letters |
+| 🪵 Sturdy | Stone and wood — brown tiles, mossy green selection |
+
+- A pack is just **11 CSS variables**. Adding one means adding a row of colours
+  to the `THEMES` list — no new CSS, no new markup.
+- Your choice is saved on the device and the board **fades** between packs
+  rather than snapping.
+- **Every pack is contrast-checked in the tests.** The first attempt looked fine
+  on the unselected tiles but five of six packs had barely-readable letters
+  *while selected* — which is exactly when you're staring at them mid-drag. The
+  test now requires 4.5:1 (the standard for normal text) for both the resting
+  and the selected state, and every pack clears it.
+
 **Fitting on one screen**
 
 Nothing in Wuzzle or the hub ever scrolls. Two things make that true:
@@ -344,6 +367,26 @@ than a silent scrollbar — much easier to notice and fix.
   host doesn't get a peek either. An earlier version broadcast live counts;
   that's now removed and `pushLive()` is a deliberate no-op with a comment
   saying why.
+
+**⚠️ The one that got away — tracing stopped working**
+
+While restyling, the letter squares were renamed from `.tile` to `.tileL` (to
+stop them clashing with the home-screen menu tiles). The place that *creates*
+them was updated; the place that *hit-tests* them was not. `tileAt()` went on
+looking for `.tile`, never matched anything, and **dragging silently did
+nothing at all**.
+
+Two things stop it happening again:
+
+- The class name now lives in a single `TILE_CLASS` constant, declared at the
+  top of the file, used by both the renderer and the hit-test.
+- `dragtest.js` drives the **real pointer handlers** with real coordinates —
+  pointerdown, a series of pointermoves across squares, pointerup — and asserts
+  the word is accepted. Verified by putting the bug back: the test fails.
+
+The deeper cause was a **gap in the test harness**, not the game. The fake DOM
+never connected `.className` to `.classList`, so a class-name mismatch was
+invisible to every test. It does now.
 
 **Things worth knowing**
 
@@ -444,6 +487,29 @@ clock runs out.
   shares with the previous one, then the rest. 306 KB → 135 KB, and 69 KB
   gzipped over the wire
 
+**🎨 Texture packs** (Settings → Texture pack)
+
+Six looks for the board. Cosmetic only — same words, same scores, same rules.
+
+| Pack | Look |
+|---|---|
+| 🌊 Ocean | The original deep blue. Default. |
+| ☀️ Sunny | Warm daylight — cream tiles on amber, dark brown letters |
+| 🍃 Windy | Pale and airy — white/mint tiles, teal letters |
+| ⛈️ Stormy | Dark and moody — near-black tiles, glowing violet letters |
+| ❄️ Frosty | Icy — white-blue tiles, deep blue letters |
+| 🪵 Sturdy | Stone and wood — brown tiles, mossy green selection |
+
+- A pack is just **11 CSS variables**. Adding one means adding a row of colours
+  to the `THEMES` list — no new CSS, no new markup.
+- Your choice is saved on the device and the board **fades** between packs
+  rather than snapping.
+- **Every pack is contrast-checked in the tests.** The first attempt looked fine
+  on the unselected tiles but five of six packs had barely-readable letters
+  *while selected* — which is exactly when you're staring at them mid-drag. The
+  test now requires 4.5:1 (the standard for normal text) for both the resting
+  and the selected state, and every pack clears it.
+
 **Fitting on one screen**
 
 Nothing in Wuzzle or the hub ever scrolls. Two things make that true:
@@ -469,6 +535,26 @@ than a silent scrollbar — much easier to notice and fix.
   host doesn't get a peek either. An earlier version broadcast live counts;
   that's now removed and `pushLive()` is a deliberate no-op with a comment
   saying why.
+
+**⚠️ The one that got away — tracing stopped working**
+
+While restyling, the letter squares were renamed from `.tile` to `.tileL` (to
+stop them clashing with the home-screen menu tiles). The place that *creates*
+them was updated; the place that *hit-tests* them was not. `tileAt()` went on
+looking for `.tile`, never matched anything, and **dragging silently did
+nothing at all**.
+
+Two things stop it happening again:
+
+- The class name now lives in a single `TILE_CLASS` constant, declared at the
+  top of the file, used by both the renderer and the hit-test.
+- `dragtest.js` drives the **real pointer handlers** with real coordinates —
+  pointerdown, a series of pointermoves across squares, pointerup — and asserts
+  the word is accepted. Verified by putting the bug back: the test fails.
+
+The deeper cause was a **gap in the test harness**, not the game. The fake DOM
+never connected `.className` to `.classList`, so a class-name mismatch was
+invisible to every test. It does now.
 
 **Things worth knowing**
 

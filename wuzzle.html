@@ -15,6 +15,13 @@
     --c3:#f472b6;   /* pink   */
     --good:#34d399; --warn:#fbbf24; --bad:#fb7185;
     --pad: clamp(10px, 2.2vh, 18px);
+    /* board texture pack — overwritten by applyTheme() */
+    --bBoardBg:rgba(255,255,255,.03); --bBoardBorder:#22456f;
+    --bBoardShadow:inset 0 2px 20px rgba(0,0,0,.35);
+    --bTile:linear-gradient(160deg,#1f4570,#102741); --bTileBorder:#2f5d90;
+    --bInk:#eaf4ff; --bInkShadow:none;
+    --bSel:linear-gradient(160deg,#38bdf8,#0284c7); --bSelInk:#06172a; --bSelBorder:#e0f2fe;
+    --bTrace:rgba(224,242,254,.5);
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{height:100%;overflow:hidden;overscroll-behavior:none}
@@ -131,6 +138,17 @@
   }
 
   /* player list — names only, never scores */
+  #themeRow{ display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:0 0 6px }
+  #themeRow button{
+    padding:clamp(6px,1.4vh,9px) 2px;border-radius:10px;background:#132741;color:var(--ink);
+    border:2px solid transparent;opacity:.75;font-size:clamp(.56rem,1.3vh,.66rem);
+    letter-spacing:.06em;line-height:1.3;
+  }
+  #themeRow button.active{ border-color:#bae6fd;opacity:1;background:#1b3a5e }
+  #themeRow .sw{ display:flex;gap:2px;justify-content:center;margin-bottom:4px }
+  #themeRow .sw i{ width:10px;height:10px;border-radius:3px;display:block }
+  #themeRow .tn{ display:block;font-weight:700 }
+
   .plist{ display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:8px 0 0 }
   .pchip{
     display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:20px;
@@ -165,19 +183,25 @@
   #board{
     display:grid;grid-template-columns:repeat(4,1fr);gap:clamp(5px,1.1vh,9px);
     width:min(88vw, 46vh, 400px);aspect-ratio:1;touch-action:none;
+    padding:clamp(5px,1.1vh,9px);border-radius:16px;
+    background:var(--bBoardBg);border:2px solid var(--bBoardBorder);
+    box-shadow:var(--bBoardShadow);
+    transition:background .25s ease, border-color .25s ease;
   }
   .tileL{
     display:flex;align-items:center;justify-content:center;
-    background:linear-gradient(160deg,#1f4570,#102741);
-    border:2px solid #2f5d90;border-radius:12px;
+    background:var(--bTile);color:var(--bInk);
+    border:2px solid var(--bTileBorder);border-radius:12px;
     font-size:clamp(1rem,4.6vh,1.9rem);font-weight:800;text-transform:uppercase;
+    text-shadow:var(--bInkShadow);
     user-select:none;-webkit-user-select:none;touch-action:none;cursor:pointer;
-    transition:transform .08s,background .08s;
+    transition:transform .08s,background .08s,border-color .08s;
   }
-  .tileL.sel{ background:linear-gradient(160deg,var(--c1),#0284c7);color:#06172a;border-color:#e0f2fe;transform:scale(.93) }
-  .tileL.sel.valid{ background:linear-gradient(160deg,var(--good),#059669);border-color:#d1fae5 }
-  .tileL.sel.dupe{ background:linear-gradient(160deg,var(--warn),#b45309);border-color:#fef3c7 }
+  .tileL.sel{ background:var(--bSel);color:var(--bSelInk);border-color:var(--bSelBorder);transform:scale(.93) }
+  .tileL.sel.valid{ background:linear-gradient(160deg,#047857,#065f46);color:#ecfdf5;border-color:#6ee7b7 }
+  .tileL.sel.dupe{ background:linear-gradient(160deg,#b45309,#92400e);color:#fffbeb;border-color:#fde68a }
   #trace{ position:absolute;inset:0;pointer-events:none }
+  #tracePath{ stroke:var(--bTrace) }
 
   #wordList{
     margin-top:8px;width:min(88vw,400px);height:clamp(26px,5vh,46px);overflow:hidden;
@@ -312,6 +336,9 @@
     <input id="nameInput" maxlength="12" placeholder="Player">
     <p class="lbl">Default round length</p>
     <div class="row" id="timeRow2"></div>
+    <p class="lbl">Texture pack</p>
+    <div id="themeRow"></div>
+
     <p class="lbl">Dictionary</p>
     <p class="note" id="dictNote">Loading…</p>
     <button class="ghost" id="btnSettingsBack">◀ BACK</button>
@@ -436,6 +463,94 @@ const DICT_ENC = 'AaalCmCrdvarkDonBbaDckEusDloneDndonHedHmentDteFmentEtoirCbDaEs
     return lo < WORDS.length && WORDS[lo].startsWith(p);
   }
 
+
+  // ============================================================
+  //  Texture packs — board look only. No rules change.
+  // ============================================================
+  const THEMES = [
+    { key:'ocean', name:'Ocean', emoji:'🌊', chips:['#38bdf8','#1f4570','#0e2740'], vars:{
+      bBoardBg:'rgba(255,255,255,.03)', bBoardBorder:'#22456f',
+      bBoardShadow:'inset 0 2px 20px rgba(0,0,0,.35)',
+      bTile:'linear-gradient(160deg,#1f4570,#102741)', bTileBorder:'#2f5d90',
+      bInk:'#eaf4ff', bInkShadow:'none',
+      bSel:'linear-gradient(160deg,#7dd3fc,#38bdf8)', bSelInk:'#04283f', bSelBorder:'#e0f2fe',
+      bTrace:'rgba(224,242,254,.5)' } },
+
+    { key:'sunny', name:'Sunny', emoji:'☀️', chips:['#fbbf24','#fde68a','#b45309'], vars:{
+      bBoardBg:'linear-gradient(160deg,#fef3c7,#fcd34d)', bBoardBorder:'#f59e0b',
+      bBoardShadow:'inset 0 2px 22px rgba(180,83,9,.30)',
+      bTile:'linear-gradient(160deg,#fffbeb,#fde68a)', bTileBorder:'#f59e0b',
+      bInk:'#7c2d12', bInkShadow:'0 1px 0 rgba(255,255,255,.6)',
+      bSel:'linear-gradient(160deg,#9a3412,#7c2d12)', bSelInk:'#fff7ed', bSelBorder:'#fed7aa',
+      bTrace:'rgba(124,45,18,.55)' } },
+
+    { key:'windy', name:'Windy', emoji:'🍃', chips:['#a7f3d0','#e0f2f1','#0f766e'], vars:{
+      bBoardBg:'linear-gradient(160deg,#ecfeff,#d1fae5)', bBoardBorder:'#5eead4',
+      bBoardShadow:'inset 0 2px 22px rgba(15,118,110,.18)',
+      bTile:'linear-gradient(160deg,#ffffff,#ccfbf1)', bTileBorder:'#7dd3fc',
+      bInk:'#134e4a', bInkShadow:'0 1px 0 rgba(255,255,255,.7)',
+      bSel:'linear-gradient(160deg,#0f766e,#115e59)', bSelInk:'#ecfeff', bSelBorder:'#99f6e4',
+      bTrace:'rgba(19,78,74,.45)' } },
+
+    { key:'stormy', name:'Stormy', emoji:'⛈️', chips:['#a78bfa','#312e5c','#0b0b18'], vars:{
+      bBoardBg:'linear-gradient(160deg,#181832,#0a0a16)', bBoardBorder:'#4c3f8a',
+      bBoardShadow:'inset 0 2px 26px rgba(0,0,0,.7)',
+      bTile:'linear-gradient(160deg,#2b2952,#14142a)', bTileBorder:'#4c3f8a',
+      bInk:'#e9e4ff', bInkShadow:'0 0 10px rgba(167,139,250,.7)',
+      bSel:'linear-gradient(160deg,#6d28d9,#4c1d95)', bSelInk:'#f5f3ff', bSelBorder:'#ddd6fe',
+      bTrace:'rgba(196,181,253,.65)' } },
+
+    { key:'frosty', name:'Frosty', emoji:'❄️', chips:['#e0f2fe','#bae6fd','#0369a1'], vars:{
+      bBoardBg:'linear-gradient(160deg,#f0f9ff,#bae6fd)', bBoardBorder:'#7dd3fc',
+      bBoardShadow:'inset 0 2px 22px rgba(3,105,161,.22)',
+      bTile:'linear-gradient(160deg,#ffffff,#dbeafe)', bTileBorder:'#93c5fd',
+      bInk:'#0c4a6e', bInkShadow:'0 1px 0 rgba(255,255,255,.8)',
+      bSel:'linear-gradient(160deg,#0369a1,#075985)', bSelInk:'#f0f9ff', bSelBorder:'#bae6fd',
+      bTrace:'rgba(12,74,110,.45)' } },
+
+    { key:'sturdy', name:'Sturdy', emoji:'🪵', chips:['#a16207','#78350f','#3f3f46'], vars:{
+      bBoardBg:'linear-gradient(160deg,#3f3a34,#26221e)', bBoardBorder:'#6b5537',
+      bBoardShadow:'inset 0 2px 24px rgba(0,0,0,.6)',
+      bTile:'linear-gradient(160deg,#8a5a2b,#5b3a1a)', bTileBorder:'#a67c4a',
+      bInk:'#fdf3e3', bInkShadow:'0 1px 2px rgba(0,0,0,.55)',
+      bSel:'linear-gradient(160deg,#4d7c0f,#365314)', bSelInk:'#f7fee7', bSelBorder:'#d9f99d',
+      bTrace:'rgba(253,243,227,.55)' } }
+  ];
+  const themeByKey = k => THEMES.find(t => t.key === k) || THEMES[0];
+  let myTheme = 'ocean';
+
+  // Themes are just CSS variables, so applying one is a single loop and the
+  // board transitions rather than snapping.
+  function applyTheme(key) {
+    const t = themeByKey(key);
+    myTheme = t.key;
+    const root = document.documentElement;
+    for (const [k, v] of Object.entries(t.vars)) root.style.setProperty('--' + k, v);
+    try { localStorage.setItem('wzTheme', myTheme); } catch (e) {}
+    refreshThemeRow();
+  }
+
+  function buildThemeRow() {
+    const row = $('themeRow');
+    if (!row) return;
+    row.innerHTML = '';
+    THEMES.forEach(t => {
+      const b = document.createElement('button');
+      b.dataset.key = t.key;
+      b.innerHTML = `<span class="sw">${t.chips.map(c =>
+        `<i style="background:${c}"></i>`).join('')}</span>` +
+        `<span class="tn">${t.emoji} ${t.name}</span>`;
+      b.addEventListener('click', () => applyTheme(t.key));
+      row.appendChild(b);
+    });
+  }
+  function refreshThemeRow() {
+    const row = $('themeRow');
+    if (!row) return;
+    Array.from(row.children).forEach(b =>
+      b.classList.toggle('active', b.dataset.key === myTheme));
+  }
+
   // ============================================================
   //  Board
   // ============================================================
@@ -547,6 +662,8 @@ const DICT_ENC = 'AaalCmCrdvarkDonBbaDckEusDloneDndonHedHmentDteFmentEtoirCbDaEs
     const t = parseInt(localStorage.getItem('wzTime') || '90', 10);
     if ([60, 90, 180].includes(t)) roundLen = t;
     bestSolo = parseInt(localStorage.getItem('wzBest') || '0', 10) || 0;
+    const th = localStorage.getItem('wzTheme');
+    if (th) myTheme = th;
   } catch (e) {}
 
   // ============================================================
@@ -1151,6 +1268,8 @@ const DICT_ENC = 'AaalCmCrdvarkDonBbaDckEusDloneDndonHedHmentDteFmentEtoirCbDaEs
   loadDict();
   buildTimeRow('timeRow');
   buildTimeRow('timeRow2');
+  buildThemeRow();
+  applyTheme(myTheme);
   refreshTimeRows();
   refreshProfile();
   showPanel('mainMenu');
@@ -1159,6 +1278,7 @@ const DICT_ENC = 'AaalCmCrdvarkDonBbaDckEusDloneDndonHedHmentDteFmentEtoirCbDaEs
 
   window.__wuzzle = {
     decodeDict, isWord, isPrefix, rollBoard, solve, scoreWord, scoreList, fitScreen,
+    THEMES, themeByKey, applyTheme, get myTheme() { return myTheme; },
     tallyRound, pathValid, pathWord, wordIsOnBoard, NEIGHBOURS, SIZE, DICE,
     get WORDS() { return WORDS; },
     get letters() { return letters; },
