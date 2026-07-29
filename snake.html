@@ -1,0 +1,2846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Snake & Candy</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
+<style>
+  :root {
+    --candy: #ff5da2;
+    --text: #f5f0ff;
+    --panel: #3d2255;
+  }
+  * { box-sizing: border-box; }
+  html, body { overscroll-behavior: none; }
+  body {
+    margin: 0; min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: radial-gradient(circle at top, #2b1a3f, #120a1c 70%);
+    font-family: 'Trebuchet MS', system-ui, sans-serif;
+    color: var(--text); padding: 6px 0 20px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  h1 { margin: 6px 0 2px; font-size: 1.8rem; letter-spacing: 1px; text-shadow: 0 0 12px rgba(255,93,162,0.6); }
+  #subtitle { margin: 0 0 10px; opacity: 0.75; font-size: 0.85rem; }
+  body.playing h1 { font-size: 1.15rem; margin: 2px 0 0; }
+  body.playing #subtitle { display: none; }
+
+  #menu, #gameOver {
+    background: linear-gradient(160deg, rgba(28,14,42,0.94), rgba(14,8,22,0.96));
+    border: 1px solid #4a2c66;
+    border-radius: 4px;
+    padding: 20px 22px; text-align: center;
+    box-shadow: 0 0 60px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.06);
+    width: min(94vw, 430px);
+    max-height: 92vh; overflow-y: auto;
+    position: relative;
+  }
+  #menu::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, transparent, var(--candy), transparent);
+  }
+
+  .screen { animation: screenIn 0.20s ease both; }
+  @keyframes screenIn {
+    from { opacity: 0; transform: translateX(20px); }
+    to   { opacity: 1; transform: none; }
+  }
+  .screenTitle {
+    margin: 2px 0 16px; font-size: 1.05rem; letter-spacing: 3px;
+    text-transform: uppercase; color: #e9d5ff; font-weight: bold;
+    border-bottom: 1px solid #4a2c66; padding-bottom: 10px;
+  }
+
+  #menu button, #gameOver button {
+    display: block; width: 250px; margin: 9px auto; padding: 12px;
+    font-size: 0.95rem; letter-spacing: 1.5px; border: none; border-radius: 4px;
+    background: linear-gradient(135deg, var(--candy), #b23b6f);
+    color: white; cursor: pointer; font-weight: bold; transition: transform 0.1s ease;
+  }
+  #menu button.secondary, #gameOver button.secondary { background: var(--panel); }
+  #menu button:hover, #gameOver button:hover { transform: scale(1.04); }
+  #menu button:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  #menu p, #gameOver p { opacity: 0.8; font-size: 0.85rem; line-height: 1.5; }
+
+  #menu .menuBtn {
+    display: block; width: 100%; margin: 0 0 8px; padding: 13px 14px 13px 18px;
+    text-align: left; border: none; border-left: 4px solid var(--candy);
+    border-radius: 0 4px 4px 0; cursor: pointer; color: var(--text);
+    background: linear-gradient(90deg, rgba(255,93,162,0.20), rgba(255,93,162,0.02));
+    transition: background 0.14s ease, transform 0.14s ease;
+  }
+  #menu .menuBtn:hover, #menu .menuBtn:focus {
+    background: linear-gradient(90deg, rgba(255,93,162,0.48), rgba(255,93,162,0.05));
+    transform: translateX(5px);
+  }
+  .menuBtn .mIcon { font-size: 1rem; margin-right: 9px; }
+  .menuBtn .mLabel { font-size: 1.05rem; font-weight: bold; letter-spacing: 2px; }
+  .menuBtn .mSub {
+    display: block; font-size: 0.7rem; opacity: 0.55; letter-spacing: 0.4px;
+    margin-top: 3px; margin-left: 25px; font-weight: normal;
+  }
+
+  #profileCard {
+    text-align: left; padding: 10px 14px; margin-bottom: 16px;
+    background: rgba(0,0,0,0.35); border-left: 3px solid #6b21a8; border-radius: 0 4px 4px 0;
+  }
+  #profileName { font-weight: bold; font-size: 1rem; letter-spacing: 1px; }
+  #profileRank { font-size: 0.7rem; opacity: 0.55; margin-top: 2px; }
+
+  #menu .backBtn {
+    background: transparent; border: 1px solid #4a2c66; color: var(--text);
+    opacity: 0.7; font-size: 0.78rem; letter-spacing: 2px; width: 150px;
+    margin-top: 16px; padding: 9px;
+  }
+  #menu .backBtn:hover { opacity: 1; background: rgba(255,255,255,0.05); }
+
+  .fieldLabel {
+    margin: 14px 0 7px !important; font-weight: bold; opacity: 0.75 !important;
+    font-size: 0.72rem !important; letter-spacing: 2px; text-transform: uppercase;
+    text-align: left; border-bottom: 1px solid rgba(255,255,255,0.07); padding-bottom: 5px;
+  }
+  .note { font-size: 0.74rem !important; opacity: 0.5 !important; margin: 4px 0 14px !important; }
+
+  #formatRow, #botRow, #botDiffRow { display: flex; gap: 5px; justify-content: center; margin: 0 0 6px; }
+  #menu #formatRow button, #menu #botRow button, #menu #botDiffRow button {
+    display: block; flex: 1; width: auto; margin: 0; padding: 8px 2px;
+    font-size: 0.74rem; line-height: 1.2; border-radius: 9px;
+    background: #2c1a3d; border: 2px solid transparent; opacity: 0.7;
+  }
+  #menu #formatRow button.active, #menu #botRow button.active,
+  #menu #botDiffRow button.active {
+    background: linear-gradient(135deg, var(--candy), #b23b6f);
+    border-color: #ffb3d4; opacity: 1;
+  }
+  #menu #botRow button { flex: 0 0 34px; }
+  #menu #botRow button:disabled, #menu #botDiffRow button:disabled { opacity: 0.25; }
+
+  #difficultyRow { display: flex; gap: 5px; justify-content: center; margin: 0 0 4px; }
+  #menu #difficultyRow button {
+    display: block; flex: 1; width: auto; margin: 0; padding: 8px 2px;
+    font-size: 0.75rem; line-height: 1.2; border-radius: 9px;
+    background: #2c1a3d; border: 2px solid transparent; opacity: 0.75;
+  }
+  #menu #difficultyRow button .emoji { display: block; font-size: 1rem; }
+  #menu #difficultyRow button.active {
+    background: linear-gradient(135deg, var(--candy), #b23b6f);
+    border-color: #ffb3d4; opacity: 1; box-shadow: 0 0 14px rgba(255,93,162,0.55);
+  }
+
+  #colorRow { display: flex; gap: 8px; justify-content: center; margin: 0 0 4px; flex-wrap: wrap; }
+  #menu #colorRow button {
+    display: block; width: 40px; height: 40px; margin: 0; padding: 0;
+    border-radius: 50%; border: 3px solid transparent; opacity: 0.55;
+  }
+  #menu #colorRow button.active { opacity: 1; border-color: #fff; transform: scale(1.1); }
+  #menu #colorRow button.taken { opacity: 0.18; cursor: not-allowed; }
+
+  #nameInput, #joinCodeInput {
+    display: block; width: 250px; margin: 6px auto; padding: 10px;
+    font-size: 1rem; border-radius: 4px; border: 1px solid var(--panel);
+    background: #120a1c; color: var(--text); text-align: center;
+  }
+  #joinCodeInput { letter-spacing: 3px; text-transform: uppercase; font-weight: bold; }
+
+  #roomCode {
+    font-size: 2.4rem; font-weight: bold; letter-spacing: 4px; margin: 8px 0;
+    padding: 10px; background: #120a1c; border-radius: 4px;
+  }
+  #lobbyList { list-style: none; padding: 0; margin: 10px 0; }
+  #lobbyList li {
+    display: flex; align-items: center; gap: 9px; justify-content: center;
+    padding: 6px; font-size: 0.92rem;
+  }
+  .dot { width: 15px; height: 15px; border-radius: 50%; flex: none; }
+
+  /* ---- Path of Prey ---- */
+  #pathMini { font-size: 0.78rem; opacity: 0.8; font-weight: normal; }
+  #pathTotal { font-size: 1.5rem; font-weight: bold; color: #fde68a; margin: 2px 0 8px; }
+  #pathBarOuter {
+    height: 14px; background: #241533; border-radius: 20px;
+    overflow: hidden; border: 1px solid var(--panel);
+  }
+  #pathBarFill {
+    height: 100%; width: 0%; border-radius: 20px;
+    background: linear-gradient(90deg, #fbbf24, #f59e0b);
+    transition: width 0.5s ease;
+  }
+  #skinGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 14px 0; }
+  .skinTile {
+    border: 2px solid var(--panel); border-radius: 12px; padding: 9px 6px;
+    background: #1d1029; cursor: pointer; text-align: center; position: relative;
+  }
+  .skinTile.locked { opacity: 0.45; cursor: not-allowed; }
+  .skinTile.equipped { border-color: #fde68a; box-shadow: 0 0 14px rgba(253,230,138,0.45); }
+  .skinTile.legendary {
+    border-color: #39ff14;
+    background: linear-gradient(160deg, #0b2417, #1d1029);
+  }
+  .skinTile.legendary .sreq { color: #39ff14; opacity: 0.9; font-weight: bold; }
+  .skinTile.legendary.locked { border-color: #1f513a; }
+  .skinTile .swatch { height: 16px; border-radius: 20px; margin: 0 auto 6px; width: 72%; }
+  .skinTile .kindTag { font-size: 0.55rem; letter-spacing: 1px; opacity: 0.45; margin-bottom: 1px; }
+  .skinTile .sname { font-size: 0.8rem; font-weight: bold; }
+  .skinTile .sreq { font-size: 0.68rem; opacity: 0.6; }
+  .skinTile .equippedTag { font-size: 0.62rem; color: #fde68a; }
+
+  #unlockBanner {
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    color: #2b1a0a; font-weight: bold; border-radius: 12px;
+    padding: 10px; margin: 10px 0; font-size: 0.95rem;
+  }
+
+  /* ---- HUD ---- */
+  #hud {
+    display: flex; gap: 8px; align-items: center; justify-content: center;
+    flex-wrap: wrap; margin-bottom: 6px; font-size: 0.88rem;
+    font-weight: bold; max-width: 96vw;
+  }
+  .hudPlayer {
+    display: flex; align-items: center; gap: 5px;
+    background: rgba(20,10,30,0.6); border-radius: 20px; padding: 3px 10px;
+  }
+  .hudPlayer.dead { opacity: 0.35; text-decoration: line-through; }
+  #speedBadge {
+    font-size: 0.7rem; font-weight: normal; opacity: 0.55;
+    border: 1px solid var(--panel); border-radius: 20px; padding: 3px 9px;
+  }
+
+  canvas {
+    background: #241533; border: 3px solid var(--panel); border-radius: 10px;
+    box-shadow: 0 0 24px rgba(0,0,0,0.6) inset;
+    width: min(92vw, 58vh, 640px); height: auto; touch-action: none; display: block;
+  }
+
+  #wrap { display: none; flex-direction: column; align-items: center; touch-action: none; }
+  #hint { margin-top: 8px; font-size: 0.75rem; opacity: 0.55; text-align: center; max-width: 92vw; }
+  #legend { margin-top: 6px; font-size: 0.7rem; opacity: 0.45; text-align: center; max-width: 92vw; }
+  .hidden { display: none !important; }
+
+  #playArea {
+    display: grid; justify-items: center; align-items: center; gap: 12px;
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas: "board board" "d1 d2";
+  }
+  #playArea:not(.local2p) { grid-template-columns: 1fr; grid-template-areas: "board" "d1"; }
+  #boardWrap { grid-area: board; }
+  #dpad1Wrap { grid-area: d1; }
+  #dpad2Wrap { grid-area: d2; }
+
+  @media (min-width: 900px) {
+    #playArea { grid-template-columns: auto auto auto; grid-template-areas: "d1 board d2"; gap: 30px; }
+    #playArea:not(.local2p) { grid-template-columns: auto auto; grid-template-areas: "board d1"; }
+    #playArea canvas { width: min(58vh, 640px, calc(96vw - 230px)); }
+    #playArea.local2p canvas { width: min(58vh, 640px, calc(96vw - 440px)); }
+  }
+
+  .dpad { display: grid; grid-template-columns: 52px 52px 52px; grid-template-rows: 52px 52px 52px; gap: 5px; }
+  .dpad-label { text-align: center; font-size: 0.72rem; opacity: 0.7; margin-bottom: 4px; }
+  .dpad-btn {
+    border: none; border-radius: 10px; background: var(--panel); color: var(--text);
+    font-size: 1.2rem; touch-action: none; user-select: none; -webkit-user-select: none;
+  }
+  .dpad-btn:active { background: var(--candy); }
+  .dpad-btn.up { grid-column: 2; grid-row: 1; }
+  .dpad-btn.left { grid-column: 1; grid-row: 2; }
+  .dpad-btn.right { grid-column: 3; grid-row: 2; }
+  .dpad-btn.down { grid-column: 2; grid-row: 3; }
+  #playArea.dpads-off #dpad1Wrap, #playArea.dpads-off #dpad2Wrap { display: none !important; }
+
+  #btnAbility {
+    margin-top: 10px; padding: 10px 26px; font-size: 0.95rem; font-weight: bold;
+    font-family: 'Courier New', monospace; letter-spacing: 2px;
+    border: 2px solid #39ff14; border-radius: 10px;
+    background: #04240f; color: #39ff14; cursor: pointer;
+    box-shadow: 0 0 16px rgba(57,255,20,0.35);
+    touch-action: manipulation;
+  }
+  #btnAbility:active { filter: brightness(2); }
+  #btnAbility.cooling {
+    border-color: #33324a !important; color: #6b7280 !important;
+    background: #14101c !important; box-shadow: none !important; cursor: not-allowed;
+  }
+
+  #bottomRow { display: flex; gap: 10px; justify-content: center; margin-top: 8px; }
+  #btnToggleDpad, #btnQuit {
+    padding: 6px 16px; font-size: 0.72rem;
+    border: 1px solid var(--panel); border-radius: 20px;
+    background: transparent; color: var(--text); opacity: 0.55; cursor: pointer;
+  }
+  #btnQuit { border-color: #7f1d1d; color: #fca5a5; }
+  #btnQuit.armed {
+    opacity: 1; background: #7f1d1d; color: #fff; border-color: #ef4444; font-weight: bold;
+  }
+
+  /* Small phones: shrink so the board plus D-pad still fit. */
+  @media (max-height: 720px) and (max-width: 899px) {
+    #playArea canvas { width: min(86vw, 50vh, 640px); }
+    .dpad { grid-template-columns: 44px 44px 44px; grid-template-rows: 44px 44px 44px; }
+    #hint, #legend { margin-top: 5px; font-size: 0.68rem; }
+    #btnToggleDpad { margin-top: 5px; }
+    body.playing h1 { font-size: 1rem; }
+  }
+  /* Phone turned sideways: little height, lots of width. */
+  @media (max-height: 480px) and (orientation: landscape) {
+    #playArea { grid-template-columns: auto auto auto; grid-template-areas: "d1 board d2"; gap: 16px; }
+    #playArea:not(.local2p) { grid-template-columns: auto auto; grid-template-areas: "board d1"; }
+    #playArea canvas { width: min(72vh, 640px, calc(96vw - 200px)); }
+    .dpad { grid-template-columns: 40px 40px 40px; grid-template-rows: 40px 40px 40px; }
+    body.playing h1 { display: none; }
+    body.playing #hint, body.playing #legend { display: none; }
+    #bottomRow { margin-top: 4px; }
+    #btnToggleDpad { margin-top: 3px; }
+  }
+</style>
+</head>
+<body>
+
+<h1>🐍 Snake &amp; Candy</h1>
+<p id="subtitle">Slither around, gobble fruit, don't bite anyone.</p>
+
+<div id="menu">
+
+  <!-- ======================= HOME ======================= -->
+  <div id="mainMenu" class="screen">
+    <div id="profileCard">
+      <div id="profileName">Player</div>
+      <div id="profileRank"></div>
+    </div>
+
+    <button class="menuBtn" id="btnGoPlay">
+      <span class="mIcon">▶</span><span class="mLabel">PLAY</span>
+      <span class="mSub">Solo, split screen and bots</span></button>
+    <button class="menuBtn" id="btnGoOnline">
+      <span class="mIcon">🌐</span><span class="mLabel">ONLINE</span>
+      <span class="mSub">Up to 6 players with a room code</span></button>
+    <button class="menuBtn" id="btnGoCustomize">
+      <span class="mIcon">🎨</span><span class="mLabel">CUSTOMISE</span>
+      <span class="mSub">Name, colour, skins and trails</span></button>
+    <button class="menuBtn" id="btnGoSettings">
+      <span class="mIcon">⚙️</span><span class="mLabel">SETTINGS</span>
+      <span class="mSub">Speed and controls</span></button>
+    <p class="note" style="margin-top:14px !important;">
+      <a href="index.html" style="color:var(--candy);">← back to KanDe Bros</a></p>
+  </div>
+
+  <!-- ======================= PLAY ======================= -->
+  <div id="playPanel" class="screen hidden">
+    <h2 class="screenTitle">▶ PLAY</h2>
+
+    <p class="fieldLabel">Game mode</p>
+    <div id="formatRow"></div>
+    <p id="formatNote" class="note"></p>
+
+    <p class="fieldLabel">Computer players</p>
+    <div id="botRow"></div>
+    <div id="botDiffRow"></div>
+    <p id="botNote" class="note"></p>
+
+    <button id="btn1p">1 PLAYER</button>
+    <button id="btn2p">2 PLAYERS — same device</button>
+    <p class="note">Swipe to steer, or arrow keys / WASD.<br>
+       Same device: P1 = left half or WASD, P2 = right half or Arrows.</p>
+
+    <button class="backBtn" id="btnPlayBack">◀ BACK</button>
+  </div>
+
+  <!-- ===================== CUSTOMISE ==================== -->
+  <div id="customizePanel" class="screen hidden">
+    <h2 class="screenTitle">🎨 CUSTOMISE</h2>
+
+    <p class="fieldLabel">Your name</p>
+    <input id="nameInput" maxlength="12" placeholder="Player">
+
+    <p class="fieldLabel">Your colour</p>
+    <div id="colorRow"></div>
+    <p class="note">In team games your team colour is shown instead.</p>
+
+    <button id="btnPath">🏆 PATH OF PREY <span id="pathMini"></span></button>
+
+    <button class="backBtn" id="btnCustomizeBack">◀ BACK</button>
+  </div>
+
+  <!-- ====================== SETTINGS ==================== -->
+  <div id="settingsPanel" class="screen hidden">
+    <h2 class="screenTitle">⚙️ SETTINGS</h2>
+
+    <p class="fieldLabel">Snake speed</p>
+    <div id="difficultyRow">
+      <button class="diff-btn" data-ms="230" data-name="Easy"><span class="emoji">🐌</span>Easy</button>
+      <button class="diff-btn" data-ms="160" data-name="Medium"><span class="emoji">🙂</span>Medium</button>
+      <button class="diff-btn" data-ms="110" data-name="Hard"><span class="emoji">🔥</span>Hard</button>
+      <button class="diff-btn" data-ms="75" data-name="Insane"><span class="emoji">💀</span>Insane</button>
+    </div>
+    <p class="note">Easy is the gentlest. You can change this any time.</p>
+
+    <p class="fieldLabel">In-game keys</p>
+    <p class="note" style="line-height:1.8 !important;">
+      <b>Space</b> pause &nbsp;·&nbsp; <b>R</b> restart<br>
+      <b>H</b> use ability &nbsp;·&nbsp; <b>Esc</b> quit</p>
+
+    <button class="backBtn" id="btnSettingsBack">◀ BACK</button>
+  </div>
+
+  <!-- ================== PATH OF PREY ==================== -->
+  <div id="pathPanel" class="screen hidden">
+    <h2 class="screenTitle">🏆 PATH OF PREY</h2>
+    <p class="note" style="margin-bottom:8px !important;">
+      Rewards unlock as your <b>total score across every game ever</b> climbs.<br>
+      Skins and trails are separate slots, so you can wear one of each.<br>
+      The last two are <b style="color:#39ff14">legendary</b> — a serious grind.</p>
+
+    <div id="pathTotal"></div>
+    <div id="pathBarOuter"><div id="pathBarFill"></div></div>
+    <p id="pathNext" class="note"></p>
+
+    <div id="skinGrid"></div>
+
+    <button class="backBtn" id="btnPathBack">◀ BACK</button>
+  </div>
+
+  <!-- ================= ONLINE: host/join ================ -->
+  <div id="onlineChoice" class="screen hidden">
+    <h2 class="screenTitle">🌐 ONLINE</h2>
+    <p class="note">Play with friends on other devices. The host picks the game
+       mode and speed for everyone.</p>
+
+    <button id="btnHost">CREATE ROOM</button>
+    <p class="note" style="margin:8px 0 !important;">— or join one —</p>
+    <input id="joinCodeInput" maxlength="4" placeholder="CODE">
+    <button id="btnJoin">JOIN ROOM</button>
+
+    <button class="backBtn" id="btnOnlineBack">◀ BACK</button>
+  </div>
+
+  <!-- ==================== ONLINE: lobby ================= -->
+  <div id="onlineStatus" class="screen hidden">
+    <h2 class="screenTitle">🌐 LOBBY</h2>
+    <p id="onlineStatusText">Connecting...</p>
+    <div id="roomCodeBox" class="hidden">
+      <p style="margin-bottom:0;">Room code</p>
+      <div id="roomCode"></div>
+      <button id="btnCopyCode" class="secondary">Copy code</button>
+    </div>
+    <ul id="lobbyList"></ul>
+    <button id="btnStartMatch" class="hidden">START GAME</button>
+    <button class="backBtn" id="btnOnlineCancel">◀ LEAVE</button>
+  </div>
+
+</div>
+
+<div id="wrap">
+  <div id="hud"></div>
+
+  <div id="playArea">
+    <div id="boardWrap"><canvas id="board" width="720" height="720"></canvas></div>
+
+    <div id="dpad1Wrap">
+      <div class="dpad-label" id="dpad1Label">Move</div>
+      <div class="dpad" id="dpad1" data-player="0">
+        <button class="dpad-btn up" data-dir="up">▲</button>
+        <button class="dpad-btn left" data-dir="left">◀</button>
+        <button class="dpad-btn right" data-dir="right">▶</button>
+        <button class="dpad-btn down" data-dir="down">▼</button>
+      </div>
+    </div>
+
+    <div id="dpad2Wrap" class="hidden">
+      <div class="dpad-label">Player 2</div>
+      <div class="dpad" id="dpad2" data-player="1">
+        <button class="dpad-btn up" data-dir="up">▲</button>
+        <button class="dpad-btn left" data-dir="left">◀</button>
+        <button class="dpad-btn right" data-dir="right">▶</button>
+        <button class="dpad-btn down" data-dir="down">▼</button>
+      </div>
+    </div>
+  </div>
+
+  <button id="btnAbility" class="hidden">💻 HACK</button>
+  <div id="hint">Swipe anywhere to steer. <b>Space</b> pauses, <b>R</b> restarts, <b>H</b> = ability.</div>
+  <div id="legend">🍬 +10 &nbsp; 🍒 +25 &nbsp; 🍌 shrink &nbsp; ⚡ speed burst &nbsp; ❄️ slows everyone else</div>
+  <div id="bottomRow">
+    <button id="btnQuit">✕ Quit</button>
+    <button id="btnToggleDpad">Hide buttons</button>
+  </div>
+</div>
+
+<div id="gameOver" class="hidden">
+  <p id="goText" style="font-size:1.2rem;"></p>
+  <div id="standings"></div>
+  <button id="btnAgain">PLAY AGAIN</button>
+  <button id="btnMenu" class="secondary">◀ BACK TO MENU</button>
+</div>
+
+<script>
+
+(function () {
+  'use strict';
+
+  // ============================================================
+  //  Constants
+  // ============================================================
+  const MAX_PLAYERS = 6;
+
+  // size 0 == free-for-all, take whoever turns up.
+  const FORMATS = {
+    ffa:   { label: 'Free for all', size: 0, teams: false },
+    '1v1': { label: '1 v 1',        size: 2, teams: true },
+    '2v2': { label: '2 v 2',        size: 4, teams: true },
+    '3v3': { label: '3 v 3',        size: 6, teams: true }
+  };
+  const TEAMS = [
+    { name: 'Red',  colour: '#ef4444', light: '#fca5a5', emoji: '🔴' },
+    { name: 'Blue', colour: '#3b82f6', light: '#93c5fd', emoji: '🔵' }
+  ];
+  const BOT_LEVELS = {
+    easy:   { label: '🙂 Easy',   lookahead: 0,  mistake: 0.35, aggression: 0.15 },
+    medium: { label: '😐 Medium', lookahead: 40, mistake: 0.12, aggression: 0.55 },
+    hard:   { label: '😈 Hard',   lookahead: 90, mistake: 0.02, aggression: 0.95 }
+  };
+  const MIN_LEN = 3;
+  const START_LEN = 3;
+  const EFFECT_MS = 5000;
+  const BOOST_MULT = 1.8;
+  const SLOW_MULT = 0.55;
+  const BROADCAST_MS = 45;
+
+  // Skin abilities. Every one shares the same 15 second cooldown.
+  const ABILITY_COOLDOWN_MS = 15000;
+  const HACK_MIN = 10, HACK_MAX = 30, HACK_COOLDOWN_MS = ABILITY_COOLDOWN_MS;
+  const LASER_RANGE = 12;      // squares
+  const SMASH_RADIUS = 4;      // squares
+  const HAMMER_RADIUS = 2.6;   // squares from the head
+  const HAMMER_SPIN_MS = 420;  // one full orbit
+
+  // duration 0 == instant. Anything else stays active for that long.
+  const ABILITIES = {
+    thor:     { key: 'hammer', label: 'HAMMER', emoji: '🔨', duration: 3500, colour: '#93c5fd' },
+    spidey:   { key: 'web',    label: 'WEB',    emoji: '🕸️', duration: 6000, colour: '#f87171' },
+    ironman:  { key: 'laser',  label: 'LASER',  emoji: '🔆', duration: 0,    colour: '#fbbf24' },
+    hulk:     { key: 'smash',  label: 'SMASH',  emoji: '👊', duration: 0,    colour: '#4ade80' },
+    antman:   { key: 'tiny',   label: 'SHRINK', emoji: '🐜', duration: 5000, colour: '#fca5a5' },
+    hacker:   { key: 'hack',   label: 'HACK',   emoji: '💻', duration: 0,    colour: '#39ff14' }
+    // Superman is still purely cosmetic.
+  };
+  const abilityFor = p => (p ? ABILITIES[p.skinKey] || null : null);
+  const teamPlay = () => FORMATS[matchFormat].teams;
+  const sameTeam = (a, b) => a.team !== null && a.team !== undefined && a.team === b.team;
+  const isTiny = (q, now) => q.abKind === 'tiny' && now < (q.abUntil || 0);
+  const webActive = (q, now) => q.abKind === 'web' && now < (q.abUntil || 0);
+  const hammerActive = (q, now) => q.abKind === 'hammer' && now < (q.abUntil || 0);
+
+  const PALETTE = [
+    { key: 'green',  dark: '#22c55e', light: '#4ade80', name: 'Green'  },
+    { key: 'blue',   dark: '#3b82f6', light: '#60a5fa', name: 'Blue'   },
+    { key: 'orange', dark: '#f97316', light: '#fb923c', name: 'Orange' },
+    { key: 'purple', dark: '#a855f7', light: '#c084fc', name: 'Purple' },
+    { key: 'yellow', dark: '#eab308', light: '#facc15', name: 'Yellow' },
+    { key: 'cyan',   dark: '#06b6d4', light: '#22d3ee', name: 'Cyan'   }
+  ];
+  const colorByKey = k => PALETTE.find(c => c.key === k) || PALETTE[0];
+
+  // grow is the NET change in length. Everything is <= 1 so a move is always
+  // "add a head, then pop (1 - grow) times" — no special-casing needed.
+  const FRUITS = {
+    candy:     { emoji: '🍬', points: 10, grow: 1,  weight: 58 },
+    cherry:    { emoji: '🍒', points: 25, grow: 1,  weight: 14 },
+    banana:    { emoji: '🍌', points: 5,  grow: -3, weight: 11 },
+    lightning: { emoji: '⚡', points: 5,  grow: 0,  weight: 9, effect: 'fast' },
+    ice:       { emoji: '❄️', points: 5,  grow: 0,  weight: 8, effect: 'slowOthers' }
+  };
+  const FRUIT_KEYS = Object.keys(FRUITS);
+  const FRUIT_TOTAL_WEIGHT = FRUIT_KEYS.reduce((s, k) => s + FRUITS[k].weight, 0);
+
+  // Board grows with the crowd so six snakes aren't fighting over one corner.
+  function cellsForPlayers(n) {
+    if (n <= 2) return 30;
+    if (n <= 4) return 36;
+    return 40;
+  }
+  function fruitCountFor(n) { return 3 + n; }
+
+  // Spawn slots as fractions of the board, so they scale with map size.
+  const SPAWNS = [
+    { fx: 0.20, fy: 0.50, dir: { x: 1,  y: 0  } },
+    { fx: 0.80, fy: 0.50, dir: { x: -1, y: 0  } },
+    { fx: 0.50, fy: 0.20, dir: { x: 0,  y: 1  } },
+    { fx: 0.50, fy: 0.80, dir: { x: 0,  y: -1 } },
+    { fx: 0.25, fy: 0.25, dir: { x: 1,  y: 0  } },
+    { fx: 0.75, fy: 0.75, dir: { x: -1, y: 0  } }
+  ];
+
+  const DIRS = {
+    up:    { x: 0,  y: -1 }, down:  { x: 0, y: 1 },
+    left:  { x: -1, y: 0  }, right: { x: 1, y: 0 }
+  };
+
+  // ============================================================
+  //  Path of Prey — skins earned with total points ever scored
+  // ============================================================
+  const POINTS_PER_REWARD = 100;
+
+  // NOTE: these names are trademarks of Marvel / DC. Fine for a personal
+  // project; if this ever goes somewhere bigger, change the `name` fields —
+  // nothing else in the code depends on them.
+  // Skins and trails ALTERNATE up the path, so you never wait more than two
+  // rewards for a change of kind.
+  const SKINS = [
+    { key: 'classic',  name: 'Classic',     unlockAt: 0,
+      dark: null, light: null, accent: null, badge: 'none', width: 1 },
+    { key: 'ironman',  name: 'Iron Man',    unlockAt: 200,  emoji: '🤖',
+      dark: '#b91c1c', light: '#f59e0b', accent: '#fde68a', badge: 'reactor', width: 1 },
+    { key: 'thor',     name: 'Thor',        unlockAt: 400,  emoji: '🔨',
+      dark: '#475569', light: '#e2e8f0', accent: '#60a5fa', badge: 'bolt',    width: 1 },
+    { key: 'spidey',   name: 'Spider-Man',  unlockAt: 600,  emoji: '🕷️',
+      dark: '#b91c1c', light: '#ef4444', accent: '#1e3a8a', badge: 'web',     width: 1 },
+    { key: 'hulk',     name: 'Hulk',        unlockAt: 800,  emoji: '💚',
+      dark: '#15803d', light: '#4ade80', accent: '#7e22ce', badge: 'none',    width: 1.18 },
+    { key: 'superman', name: 'Superman',    unlockAt: 900,  emoji: '🦸',
+      dark: '#1d4ed8', light: '#3b82f6', accent: '#dc2626', badge: 'diamond', width: 1 },
+    { key: 'antman',   name: 'Ant-Man',     unlockAt: 1000, emoji: '🐜',
+      dark: '#7f1d1d', light: '#dc2626', accent: '#111827', badge: 'none',    width: 0.66 },
+    // Legendary tier — a long way past everything else.
+    { key: 'hacker',   name: 'Hacker',      unlockAt: 3000, emoji: '💻', legendary: true,
+      dark: '#0b2417', light: '#39ff14', accent: '#00ff41', badge: 'matrix',  width: 1 }
+  ];
+  const skinByKey = k => SKINS.find(s => s.key === k) || SKINS[0];
+
+  // ---- Trails ----
+  // Purely decorative sparks dropped behind the tail. Because they're cosmetic,
+  // every device generates its own — none of this crosses the network.
+  const TRAIL_CAP = 80;   // per snake, so six players can't drown the frame rate
+
+  // Deliberately ASCII — katakana would look more the part but doesn't render
+  // reliably on every phone.
+  const HACK_CHARS = '01010110<>[]{}/\\|=+*#$%&!?01'.split('');
+
+  const TRAILS = [
+    { key: 'none', name: 'No Trail', unlockAt: 0, emoji: '·' },
+
+    // Crackling arcs. Real lightning flickers and branches rather than fading
+    // smoothly, and it's white-hot in the middle with a coloured halo.
+    { key: 'lightning', name: 'Lightning Trail', unlockAt: 100, emoji: '⚡',
+      every: 55, count: 1, swatch: 'linear-gradient(90deg,#ffffff,#facc15,#7dd3fc)',
+      spawn: (pt, now, cs) => {
+        const a = Math.random() * Math.PI * 2;
+        const len = cs * (0.7 + Math.random() * 0.9);
+        const segs = 4, path = [{ x: 0, y: 0 }];
+        for (let i = 1; i <= segs; i++) {
+          const f = i / segs;
+          path.push({ x: Math.cos(a) * len * f + (Math.random() - 0.5) * cs * 0.45,
+                      y: Math.sin(a) * len * f + (Math.random() - 0.5) * cs * 0.45 });
+        }
+        const b = path[2];
+        const branch = [{ x: b.x, y: b.y },
+                        { x: b.x + (Math.random() - 0.5) * cs * 0.8,
+                          y: b.y + (Math.random() - 0.5) * cs * 0.8 }];
+        return { x: pt.x, y: pt.y, born: now, life: 200 + Math.random() * 130,
+                 path, branch, seed: Math.random() * 10 };
+      },
+      draw: (c, q, t, cs) => {
+        const flick = 0.55 + 0.45 * Math.sin(t * 22 + q.seed);
+        const a = (1 - t) * flick;
+        const stroke = arr => {
+          c.beginPath();
+          c.moveTo(q.x + arr[0].x, q.y + arr[0].y);
+          for (let i = 1; i < arr.length; i++) c.lineTo(q.x + arr[i].x, q.y + arr[i].y);
+          c.stroke();
+        };
+        c.lineCap = 'round'; c.lineJoin = 'round';
+        c.globalAlpha = a * 0.30; c.strokeStyle = '#7dd3fc'; c.lineWidth = cs * 0.30;
+        stroke(q.path);
+        c.globalAlpha = a * 0.55; c.strokeStyle = '#facc15'; c.lineWidth = cs * 0.15;
+        stroke(q.path); stroke(q.branch);
+        c.globalAlpha = a;        c.strokeStyle = '#ffffff'; c.lineWidth = cs * 0.055;
+        stroke(q.path); stroke(q.branch);
+      } },
+
+    // Drawn as one continuous RIBBON joining the particles, not loose dots —
+    // that's what reads as a rainbow rather than confetti.
+    { key: 'rainbow', name: 'Rainbow Trail', unlockAt: 300, emoji: '🌈',
+      every: 18, count: 1,
+      swatch: 'linear-gradient(90deg,#f87171,#fbbf24,#4ade80,#60a5fa,#c084fc)',
+      spawn: (pt, now) => ({ x: pt.x, y: pt.y, born: now, life: 1100,
+                             hue: (now / 2.2) % 360 }),
+      drawAll: (c, list, now, cs) => {
+        if (list.length < 2) return;
+        c.lineCap = 'round'; c.lineJoin = 'round';
+        // Wide soft halo first, then the bright core on top.
+        for (const pass of [{ w: 1.05, a: 0.20, l: 70 }, { w: 0.42, a: 0.95, l: 62 }]) {
+          for (let i = 1; i < list.length; i++) {
+            const A = list[i - 1], B = list[i];
+            // A restart or a banana shrink can teleport the tail; don't draw a
+            // stripe across the whole board when that happens.
+            if (Math.abs(B.x - A.x) > cs * 3 || Math.abs(B.y - A.y) > cs * 3) continue;
+            const t = (now - B.born) / B.life;
+            c.globalAlpha = (1 - t) * pass.a;
+            c.strokeStyle = `hsl(${B.hue}, 95%, ${pass.l}%)`;
+            c.lineWidth = cs * pass.w * (1 - t * 0.7);
+            c.beginPath(); c.moveTo(A.x, A.y); c.lineTo(B.x, B.y); c.stroke();
+          }
+        }
+      } },
+
+    // Gas seen from above spreads OUTWARD, it doesn't rise. Fades in fast and
+    // out slowly, the way a cloud actually behaves.
+    { key: 'poison', name: 'Poison Trail', unlockAt: 500, emoji: '☠️',
+      every: 70, count: 2, swatch: 'linear-gradient(90deg,#bef264,#365314)',
+      spawn: (pt, now, cs) => ({
+        x: pt.x + (Math.random() - 0.5) * cs * 0.5,
+        y: pt.y + (Math.random() - 0.5) * cs * 0.5,
+        born: now, life: 1500,
+        vx: (Math.random() - 0.5) * cs * 0.00035,
+        vy: (Math.random() - 0.5) * cs * 0.00035,
+        r0: cs * 0.10, r1: cs * (0.45 + Math.random() * 0.3),
+        wob: Math.random() * 6.283
+      }),
+      draw: (c, q, t, cs) => {
+        const age = t * q.life;
+        const x = q.x + q.vx * age + Math.sin(q.wob + age / 260) * cs * 0.09;
+        const y = q.y + q.vy * age + Math.cos(q.wob + age / 300) * cs * 0.09;
+        const r = q.r0 + (q.r1 - q.r0) * Math.pow(t, 0.55);   // billows out, then slows
+        const a = (t < 0.15 ? t / 0.15 : 1 - (t - 0.15) / 0.85) * 0.55;
+        c.globalAlpha = a * 0.55; c.fillStyle = '#4d7c0f';
+        c.beginPath(); c.arc(x, y, r, 0, 6.283); c.fill();
+        c.globalAlpha = a * 0.8;  c.fillStyle = '#84cc16';
+        c.beginPath(); c.arc(x, y, r * 0.5, 0, 6.283); c.fill();
+      } },
+
+    // Kicked BACKWARD from the tail and skidding to a stop. Mixed clods and
+    // fine dust, because real kicked-up dirt isn't uniform.
+    { key: 'dirt', name: 'Dirt Trail', unlockAt: 700, emoji: '💨',
+      every: 45, count: 3, swatch: 'linear-gradient(90deg,#e7d3b3,#78350f)',
+      spawn: (pt, now, cs, dir) => {
+        let bx = -dir.x, by = -dir.y;
+        if (!bx && !by) { const a = Math.random() * 6.283; bx = Math.cos(a); by = Math.sin(a); }
+        const spread = (Math.random() - 0.5) * 1.5;
+        const cos = Math.cos(spread), sin = Math.sin(spread);
+        const dx = bx * cos - by * sin, dy = bx * sin + by * cos;
+        const speed = cs * (0.0012 + Math.random() * 0.0022);
+        const dust = Math.random() < 0.45;
+        return {
+          x: pt.x + (Math.random() - 0.5) * cs * 0.4,
+          y: pt.y + (Math.random() - 0.5) * cs * 0.4,
+          born: now, life: dust ? 950 : 680,
+          vx: dx * speed, vy: dy * speed,
+          rot: Math.random() * 6.283, spin: (Math.random() - 0.5) * 0.018,
+          r: cs * (dust ? 0.10 + Math.random() * 0.10 : 0.055 + Math.random() * 0.07),
+          dust, shade: Math.random()
+        };
+      },
+      draw: (c, q, t, cs) => {
+        const age = t * q.life;
+        // Friction, not gravity: clods skid outward and settle.
+        const damp = 1 - Math.exp(-age / 160);
+        const x = q.x + q.vx * 160 * damp, y = q.y + q.vy * 160 * damp;
+        if (q.dust) {
+          c.globalAlpha = (1 - t) * 0.26;
+          c.fillStyle = '#d6c3a5';
+          c.beginPath(); c.arc(x, y, q.r * (1 + t * 1.8), 0, 6.283); c.fill();
+        } else {
+          c.globalAlpha = Math.min(1, (1 - t) * 1.6) * 0.9;
+          c.fillStyle = q.shade > 0.6 ? '#78350f' : (q.shade > 0.3 ? '#92400e' : '#b45309');
+          c.save();
+          c.translate(x, y);
+          c.rotate(q.rot + q.spin * age);
+          c.beginPath();                       // an irregular clod, not a neat square
+          c.moveTo(-q.r, -q.r * 0.7); c.lineTo(q.r * 0.8, -q.r);
+          c.lineTo(q.r, q.r * 0.6);   c.lineTo(-q.r * 0.6, q.r);
+          c.closePath(); c.fill();
+          c.restore();
+        }
+      } },
+
+    // Legendary. Streams of code shed from the tail, each glyph re-rolling as
+    // it fades — the constant character churn is what sells the effect.
+    // Key is 'hackertrail', not 'hacker' — the Hacker SKIN already owns that
+    // key, and two rewards sharing one id is a bug waiting to happen.
+    { key: 'hackertrail', name: 'Hacker Trail', unlockAt: 2750, emoji: '💻', legendary: true,
+      every: 55, count: 2, swatch: 'linear-gradient(90deg,#052e16,#39ff14)',
+      spawn: (pt, now, cs, dir) => ({
+        x: pt.x + (Math.random() - 0.5) * cs * 0.85,
+        y: pt.y + (Math.random() - 0.5) * cs * 0.85,
+        born: now, life: 800 + Math.random() * 500,
+        vx: -dir.x * cs * 0.0004 + (Math.random() - 0.5) * cs * 0.0003,
+        vy: -dir.y * cs * 0.0004 + (Math.random() - 0.5) * cs * 0.0003,
+        ci: Math.floor(Math.random() * HACK_CHARS.length),
+        lead: Math.random() < 0.25          // a few bright leading glyphs
+      }),
+      draw: (c, q, t, cs) => {
+        const age = t * q.life;
+        const ch = HACK_CHARS[(q.ci + Math.floor(age / 70)) % HACK_CHARS.length];
+        const x = q.x + q.vx * age, y = q.y + q.vy * age;
+        c.font = `bold ${cs * (q.lead ? 0.72 : 0.58)}px "Courier New", monospace`;
+        c.textAlign = 'center';
+        c.textBaseline = 'middle';
+        c.globalAlpha = (1 - t) * (q.lead ? 1 : 0.7);
+        if (q.lead) { c.shadowColor = '#39ff14'; c.shadowBlur = cs * 0.5; c.fillStyle = '#e6ffe9'; }
+        else        { c.shadowBlur = 0;          c.fillStyle = '#22c55e'; }
+        c.fillText(ch, x, y);
+        c.shadowBlur = 0;
+      } }
+  ];
+  const trailByKey = k => TRAILS.find(t => t.key === k) || TRAILS[0];
+
+  // The path is both tracks merged and sorted — one reward per 100 points.
+  const PATH = [...SKINS.filter(s => s.unlockAt > 0).map(s => ({ kind: 'skin', item: s })),
+                ...TRAILS.filter(t => t.unlockAt > 0).map(t => ({ kind: 'trail', item: t }))]
+               .sort((a, b) => a.item.unlockAt - b.item.unlockAt);
+
+  // Counted from the real thresholds, NOT floor(points/100): the legendary
+  // tier sits at 2750 and 3000, which aren't on the 100-point grid.
+  const rewardsEarned = pts => PATH.filter(r => r.item.unlockAt <= pts).length;
+  const isSkinUnlocked = (s, pts) => pts >= s.unlockAt;
+  const nextLockedReward = pts => PATH.find(r => r.item.unlockAt > pts) || null;
+  const lastUnlockedAt = pts => {
+    let at = 0;
+    for (const r of PATH) { if (r.item.unlockAt <= pts) at = r.item.unlockAt; else break; }
+    return at;
+  };
+  const nextLockedSkin = pts => SKINS.find(s => !isSkinUnlocked(s, pts)) || null;
+
+  // ============================================================
+  //  DOM
+  // ============================================================
+  const $ = id => document.getElementById(id);
+  const canvas = $('board');
+  const ctx = canvas.getContext('2d');
+  const menuEl = $('menu'), wrapEl = $('wrap'), playAreaEl = $('playArea');
+  const gameOverEl = $('gameOver'), goText = $('goText'), standingsEl = $('standings');
+  const hudEl = $('hud');
+
+  // ============================================================
+  //  Game state
+  // ============================================================
+  let CELLS = 30;
+  let cellSize = canvas.width / CELLS;
+
+  let players = [];      // every snake in the match
+  let fruits = [];
+  let running = false, paused = false, roundOver = false;
+  let rafId = null, broadcastTimer = null;
+  let mode = 'solo';     // 'solo' | 'local2' | 'online'
+  let matchFormat = 'ffa';
+  let botCount = 0;
+  let botLevel = 'medium';
+  let myIndex = 0;       // which player this device controls
+
+  let tickMs = 230, difficultyName = 'Easy', difficultyEmoji = '🐌';
+  let myColorKey = 'green';
+  let myName = '';
+  let mySkinKey = 'classic';
+  let myTrailKey = 'none';
+  let pathPoints = 0;     // every point you've ever scored, across all games
+
+  // Networking
+  let netRole = null;    // null | 'host' | 'guest'
+  let peer = null;
+  let conns = [];        // host: one per guest.  guest: [hostConn]
+  let lobby = [];        // host's view: [{name, colorKey, conn|null}]
+  // Frozen copy of the lobby's connections taken when a match starts. Steering
+  // is routed by position in THIS list, so a player leaving mid-match can't
+  // shuffle everyone else's inputs onto the wrong snakes.
+  let matchConns = null;
+
+  function setBoardSize(n) {
+    CELLS = n;
+    cellSize = canvas.width / CELLS;
+  }
+
+  // ============================================================
+  //  Difficulty / colour / name pickers
+  // ============================================================
+  const diffButtons = Array.from(document.querySelectorAll('.diff-btn'));
+
+  function selectDifficulty(btn, persist) {
+    tickMs = Number(btn.dataset.ms);
+    difficultyName = btn.dataset.name;
+    difficultyEmoji = btn.querySelector('.emoji').textContent;
+    diffButtons.forEach(b => b.classList.toggle('active', b === btn));
+    if (persist) { try { localStorage.setItem('scDifficulty', difficultyName); } catch (e) {} }
+  }
+  diffButtons.forEach(b => b.addEventListener('click', () => selectDifficulty(b, true)));
+  (function () {
+    let saved = null;
+    try { saved = localStorage.getItem('scDifficulty'); } catch (e) {}
+    selectDifficulty(diffButtons.find(b => b.dataset.name === saved) || diffButtons[0], false);
+  })();
+
+  const colorRow = $('colorRow');
+  PALETTE.forEach(c => {
+    const b = document.createElement('button');
+    b.dataset.key = c.key;
+    b.title = c.name;
+    b.style.background = `linear-gradient(135deg, ${c.light}, ${c.dark})`;
+    b.addEventListener('click', () => {
+      if (b.classList.contains('taken')) return;
+      selectColor(c.key, true);
+    });
+    colorRow.appendChild(b);
+  });
+  function selectColor(key, persist) {
+    myColorKey = key;
+    Array.from(colorRow.children).forEach(b => b.classList.toggle('active', b.dataset.key === key));
+    if (persist) { try { localStorage.setItem('scColor', key); } catch (e) {} }
+  }
+  (function () {
+    let saved = null;
+    try { saved = localStorage.getItem('scColor'); } catch (e) {}
+    selectColor(PALETTE.some(c => c.key === saved) ? saved : 'green', false);
+  })();
+
+  // ---- format / bot pickers ----
+  function buildPicker(rowId, items, getActive, onPick) {
+    const row = $(rowId);
+    row.innerHTML = '';
+    items.forEach(it => {
+      const b = document.createElement('button');
+      b.innerHTML = it.label;
+      b.dataset.key = it.key;
+      b.addEventListener('click', () => { onPick(it.key); refreshPickers(); });
+      row.appendChild(b);
+    });
+  }
+
+  function refreshPickers() {
+    const fmt = FORMATS[matchFormat];
+    Array.from($('formatRow').children).forEach(b =>
+      b.classList.toggle('active', b.dataset.key === matchFormat));
+    $('formatNote').textContent = fmt.size
+      ? `${fmt.size} snakes, two teams. Empty slots are filled with bots.`
+      : 'Everyone for themselves. Last snake alive wins.';
+
+    // Team modes have a fixed size, so the bot count isn't yours to choose.
+    const locked = !!fmt.size;
+    Array.from($('botRow').children).forEach(b => {
+      b.classList.toggle('active', !locked && Number(b.dataset.key) === botCount);
+      b.disabled = locked;
+    });
+    Array.from($('botDiffRow').children).forEach(b =>
+      b.classList.toggle('active', b.dataset.key === botLevel));
+    $('botNote').textContent = locked
+      ? 'Bots fill whatever seats are left over.'
+      : (botCount ? `${botCount} bot${botCount > 1 ? 's' : ''} will join you.`
+                  : 'No bots — just you (and anyone online).');
+  }
+
+  buildPicker('formatRow', Object.entries(FORMATS).map(([k, v]) =>
+    ({ key: k, label: v.label.replace(/ /g, '<br>') })), null, k => { matchFormat = k; try { localStorage.setItem('scFormat', k); } catch (e) {} });
+  buildPicker('botRow', [0,1,2,3,4,5].map(i => ({ key: String(i), label: String(i) })),
+    null, k => { botCount = Number(k); try { localStorage.setItem('scBots', k); } catch (e) {} });
+  buildPicker('botDiffRow', Object.entries(BOT_LEVELS).map(([k, v]) =>
+    ({ key: k, label: v.label })), null, k => { botLevel = k; try { localStorage.setItem('scBotLevel', k); } catch (e) {} });
+  (function () {
+    try {
+      const f = localStorage.getItem('scFormat'); if (FORMATS[f]) matchFormat = f;
+      const b = parseInt(localStorage.getItem('scBots') || '0', 10);
+      if (b >= 0 && b <= 5) botCount = b;
+      const d = localStorage.getItem('scBotLevel'); if (BOT_LEVELS[d]) botLevel = d;
+    } catch (e) {}
+  })();
+  refreshPickers();
+
+  const nameInput = $('nameInput');
+  (function () {
+    let saved = null;
+    try { saved = localStorage.getItem('scName'); } catch (e) {}
+    if (saved) nameInput.value = saved;
+  })();
+  nameInput.addEventListener('input', () => {
+    myName = nameInput.value.trim();
+    try { localStorage.setItem('scName', myName); } catch (e) {}
+    refreshProfile();
+  });
+  function myDisplayName() { return (nameInput.value.trim() || 'Player'); }
+
+  // ============================================================
+  //  Path of Prey
+  // ============================================================
+  (function loadPath() {
+    let p = 0, s = null, t = null;
+    try {
+      p = parseInt(localStorage.getItem('scPathPoints') || '0', 10);
+      s = localStorage.getItem('scSkin');
+      t = localStorage.getItem('scTrail');
+    } catch (e) {}
+    pathPoints = Number.isFinite(p) && p > 0 ? p : 0;
+    // Never leave someone wearing something they haven't earned (e.g. if
+    // progress was cleared but the equipment choice survived).
+    const wantSkin = skinByKey(s);
+    mySkinKey = isSkinUnlocked(wantSkin, pathPoints) ? wantSkin.key : 'classic';
+    const wantTrail = trailByKey(t);
+    myTrailKey = isSkinUnlocked(wantTrail, pathPoints) ? wantTrail.key : 'none';
+  })();
+
+  function savePath() {
+    try {
+      localStorage.setItem('scPathPoints', String(pathPoints));
+      localStorage.setItem('scSkin', mySkinKey);
+      localStorage.setItem('scTrail', myTrailKey);
+    } catch (e) {}
+  }
+
+  // Returns the skins crossed by going from `before` to `after` points.
+  function newlyUnlocked(before, after) {
+    return PATH.filter(r => r.item.unlockAt > before && r.item.unlockAt <= after)
+               .map(r => r.item);
+  }
+
+  function awardPoints(pts) {
+    if (!Number.isFinite(pts) || pts <= 0) return [];
+    const before = pathPoints;
+    pathPoints = before + pts;
+    const gained = newlyUnlocked(before, pathPoints);
+    savePath();
+    renderPath();
+    return gained;
+  }
+
+  function renderPath() {
+    const earned = rewardsEarned(pathPoints);
+    const next = nextLockedReward(pathPoints);
+
+    $('pathMini').textContent = `· ${pathPoints} pts`;
+    $('pathTotal').textContent = `${pathPoints} points · ${earned} reward${earned === 1 ? '' : 's'}`;
+
+    // Bar spans from the last reward you passed to the next one. The gaps
+    // aren't equal (1000 -> 2750), so a fixed 100-point block would either
+    // sit full for ages or jump backwards.
+    if (next) {
+      const from = lastUnlockedAt(pathPoints);
+      const span = next.item.unlockAt - from;
+      const pct = span > 0 ? ((pathPoints - from) / span) * 100 : 0;
+      $('pathBarFill').style.width = Math.max(0, Math.min(100, pct)) + '%';
+      $('pathNext').textContent =
+        `${next.item.unlockAt - pathPoints} more points to unlock ${next.item.name}`;
+    } else {
+      $('pathBarFill').style.width = '100%';
+      $('pathNext').textContent = 'Every reward unlocked! 🎉';
+    }
+
+    const me = colorByKey(myColorKey);
+    const grid = $('skinGrid');
+    grid.innerHTML = '';
+
+    // The two free options first, then the ten rewards in path order.
+    const entries = [{ kind: 'skin', item: SKINS[0] }, { kind: 'trail', item: TRAILS[0] }, ...PATH];
+
+    entries.forEach(({ kind, item }) => {
+      const unlocked = isSkinUnlocked(item, pathPoints);
+      const equipped = kind === 'skin' ? item.key === mySkinKey : item.key === myTrailKey;
+      const tile = document.createElement('div');
+      tile.className = 'skinTile' + (unlocked ? '' : ' locked') +
+                       (equipped ? ' equipped' : '') + (item.legendary ? ' legendary' : '');
+
+      let sw;
+      if (kind === 'trail') sw = item.swatch || 'repeating-linear-gradient(90deg,#3d2255 0 6px,transparent 6px 12px)';
+      else sw = item.dark ? `linear-gradient(90deg, ${item.light}, ${item.dark})`
+                          : `linear-gradient(90deg, ${me.light}, ${me.dark})`;
+
+      tile.innerHTML =
+        `<div class="swatch" style="background:${sw}"></div>` +
+        `<div class="kindTag">${kind === 'trail' ? 'TRAIL' : 'SKIN'}</div>` +
+        `<div class="sname">${unlocked ? (item.emoji || '🐍') + ' ' : '🔒 '}${escapeHtml(item.name)}</div>` +
+        `<div class="sreq">${item.unlockAt === 0 ? 'Free' : item.unlockAt + ' pts'}</div>` +
+        (equipped ? '<div class="equippedTag">EQUIPPED</div>' : '');
+
+      if (unlocked) {
+        tile.addEventListener('click', () => {
+          // Skins and trails are separate slots — equipping one keeps the other.
+          if (kind === 'skin') mySkinKey = item.key; else myTrailKey = item.key;
+          savePath();
+          renderPath();
+          refreshProfile();
+        });
+      }
+      grid.appendChild(tile);
+    });
+  }
+
+  renderPath();
+  refreshProfile();
+  $('btnPath').addEventListener('click', () => { renderPath(); goTo('pathPanel'); });
+  $('btnPathBack').addEventListener('click', () => { refreshProfile(); goBack(); });
+
+  // ============================================================
+  //  Building players
+  // ============================================================
+  function makePlayer(idx, name, colorKey, skinKey, trailKey) {
+    const s = SPAWNS[idx % SPAWNS.length];
+    const hx = Math.max(MIN_LEN, Math.min(CELLS - 1 - MIN_LEN, Math.round(s.fx * CELLS)));
+    const hy = Math.max(MIN_LEN, Math.min(CELLS - 1 - MIN_LEN, Math.round(s.fy * CELLS)));
+    const cells = [];
+    for (let i = 0; i < START_LEN; i++) cells.push({ x: hx - s.dir.x * i, y: hy - s.dir.y * i });
+    return {
+      idx, name, colorKey, skinKey: skinByKey(skinKey).key,
+      team: null, isBot: false,
+      trailKey: trailByKey(trailKey).key, particles: [], lastParticleAt: 0,
+      cells, dir: { ...s.dir }, nextDir: { ...s.dir },
+      score: 0, alive: true, tailFrom: null,
+      boostUntil: 0, slowUntil: 0,
+      abReadyAt: 0, abCount: 0, abKind: null, abUntil: 0, abData: null, abFlash: null,
+      hackFlash: null, webSaves: 0,
+      moveMs: tickMs, lastMoveAt: 0, prevHeadKey: -1
+    };
+  }
+
+  // Nobody should share a colour. First come, first served.
+  function assignColors(list) {
+    const used = new Set();
+    return list.map(p => {
+      let k = p.colorKey;
+      if (!PALETTE.some(c => c.key === k) || used.has(k)) {
+        k = (PALETTE.find(c => !used.has(c.key)) || PALETTE[0]).key;
+      }
+      used.add(k);
+      return { ...p, colorKey: k };
+    });
+  }
+
+  const BOT_NAMES = ['Nibbles', 'Fang', 'Rex', 'Zip', 'Coil', 'Slick'];
+
+  // Fills a roster out with bots and stamps team numbers on it.
+  function buildRoster(humans) {
+    const fmt = FORMATS[matchFormat];
+    const roster = humans.map(h => ({ ...h, isBot: false }));
+    const target = Math.min(MAX_PLAYERS, fmt.size || (humans.length + botCount));
+
+    const skinKeys = SKINS.map(s => s.key);
+    let b = 0;
+    while (roster.length < target) {
+      roster.push({
+        name: '🤖 ' + BOT_NAMES[b % BOT_NAMES.length],
+        colorKey: null,                                  // assignColors picks a free one
+        skinKey: skinKeys[Math.floor(Math.random() * skinKeys.length)],
+        trailKey: 'none',
+        isBot: true
+      });
+      b++;
+    }
+
+    // Alternating, so humans end up split across the two teams rather than
+    // all bunched on one side.
+    roster.forEach((p, i) => { p.team = fmt.teams ? (i % 2) : null; });
+    return roster.slice(0, MAX_PLAYERS);
+  }
+
+  function startRound(roster) {
+    const withColors = assignColors(roster);
+    setBoardSize(cellsForPlayers(withColors.length));
+    players = withColors.map((p, i) => {
+      const pl = makePlayer(i, p.name, p.colorKey, p.skinKey, p.trailKey);
+      pl.team = (p.team === 0 || p.team === 1) ? p.team : null;
+      pl.isBot = !!p.isBot;
+      return pl;
+    });
+    const now = nowMs();
+    players.forEach(p => { p.lastMoveAt = now - tickMs; p.moveMs = tickMs; });
+    fruits = [];
+    refillFruits();
+    running = true; paused = false; roundOver = false;
+    showGameScreen();
+    startRenderLoop();
+    if (netRole === 'host') startBroadcasting();
+  }
+
+  // ============================================================
+  //  Fruit
+  // ============================================================
+  function randomFruitType() {
+    let r = Math.random() * FRUIT_TOTAL_WEIGHT;
+    for (const k of FRUIT_KEYS) {
+      r -= FRUITS[k].weight;
+      if (r <= 0) return k;
+    }
+    return FRUIT_KEYS[0];
+  }
+
+  function occupied(x, y) {
+    for (const p of players) {
+      for (const c of p.cells) if (c.x === x && c.y === y) return true;
+    }
+    for (const f of fruits) if (f.x === x && f.y === y) return true;
+    return false;
+  }
+
+  function refillFruits() {
+    const target = fruitCountFor(players.length);
+    let guard = 0;
+    while (fruits.length < target && guard++ < 800) {
+      const x = Math.floor(Math.random() * CELLS);
+      const y = Math.floor(Math.random() * CELLS);
+      if (!occupied(x, y)) fruits.push({ x, y, type: randomFruitType() });
+    }
+  }
+
+  // ============================================================
+  //  Simulation (host / local only)
+  // ============================================================
+  function nowMs() {
+    return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+  }
+
+  function speedMultFor(p, now) {
+    let m = 1;
+    if (p.boostUntil > now) m *= BOOST_MULT;
+    if (p.slowUntil > now) m *= SLOW_MULT;
+    return m;
+  }
+
+  function movePlayer(p, now) {
+    p.dir = p.nextDir;
+    const head = { x: p.cells[0].x + p.dir.x, y: p.cells[0].y + p.dir.y };
+    p.cells.unshift(head);
+
+    const fi = fruits.findIndex(f => f.x === head.x && f.y === head.y);
+    let pops = 1;
+    if (fi >= 0) {
+      const def = FRUITS[fruits[fi].type];
+      fruits.splice(fi, 1);
+      p.score += def.points;
+      pops = 1 - def.grow;                 // grow<=1 always, so pops >= 0
+      if (def.effect === 'fast') p.boostUntil = now + EFFECT_MS;
+      if (def.effect === 'slowOthers') {
+        players.forEach(o => { if (o !== p && o.alive) o.slowUntil = now + EFFECT_MS; });
+      }
+    }
+
+    p.tailFrom = null;
+    let popped = 0;
+    while (popped < pops && p.cells.length > MIN_LEN) { p.tailFrom = p.cells.pop(); popped++; }
+    // A multi-pop (banana) teleports the tail, so don't try to glide it.
+    if (popped > 1) p.tailFrom = null;
+  }
+
+  // Checked every frame for every snake, not just the ones that moved — that
+  // way a snake growing into a stationary one still counts as a crash.
+  function resolveCollisions(now) {
+    if (now === undefined) now = nowMs();
+    const doomed = [];
+    for (const p of players) {
+      if (!p.alive) continue;
+      let h = p.cells[0];
+
+      if (h.x < 0 || h.x >= CELLS || h.y < 0 || h.y >= CELLS) {
+        // Spider-Man's web saves him off the wall; everyone else crashes.
+        if (webActive(p, now) && deflectOffWall(p)) {
+          h = p.cells[0];
+        } else {
+          doomed.push(p);
+          continue;
+        }
+      }
+
+      let hit = false;
+      const pTiny = isTiny(p, now);
+      for (const q of players) {
+        if (!q.alive) continue;
+        // While Ant-Man is shrunk he passes through others, and others pass
+        // through him — intangibility has to work both ways or it's unfair.
+        if (q !== p && (pTiny || isTiny(q, now))) continue;
+        // Skip our own head (index 0); everything else, including another
+        // snake's head, is lethal. Two heads meeting kills both.
+        for (let i = (q === p ? 1 : 0); i < q.cells.length; i++) {
+          if (q.cells[i].x === h.x && q.cells[i].y === h.y) { hit = true; break; }
+        }
+        if (hit) break;
+      }
+      if (hit) doomed.push(p);
+    }
+    doomed.forEach(p => { p.alive = false; });
+    return doomed.length > 0;
+  }
+
+  // Authoritative: only ever called on the host or in a local game, so a guest
+  // spamming the button can't do anything the host doesn't allow.
+  function useAbility(p, now) {
+    const ab = abilityFor(p);
+    if (!ab) return false;
+    if (!p.alive || !running || paused || roundOver) return false;
+    if (now < (p.abReadyAt || 0)) return false;
+
+    p.abReadyAt = now + ABILITY_COOLDOWN_MS;
+    p.abCount = (p.abCount || 0) + 1;
+    p.abKind = ab.key;
+    p.abUntil = ab.duration > 0 ? now + ab.duration : 0;
+    p.abData = null;
+
+    if (ab.key === 'hack') {
+      const gain = HACK_MIN + Math.floor(Math.random() * (HACK_MAX - HACK_MIN + 1));
+      p.score += gain;
+      p.hackFlash = { at: now, gain };
+      p.abData = { gain };
+    } else if (ab.key === 'laser') {
+      fireLaser(p, now);
+    } else if (ab.key === 'smash') {
+      hulkSmash(p, now);
+    }
+    // hammer / web / tiny are ongoing — handled in update() and collisions.
+    p.abFlash = { at: now, kind: ab.key, data: p.abData };
+    return true;
+  }
+
+  // Kept so older callers and tests still read clearly.
+  function tryHack(p, now) {
+    if (!p || p.skinKey !== 'hacker') return false;
+    return useAbility(p, now);
+  }
+
+  // Iron Man: a straight beam that stops at the FIRST thing it hits, so it
+  // can't sweep a whole row of players in one shot.
+  function fireLaser(p, now) {
+    const d = p.dir, h = p.cells[0];
+    let x = h.x, y = h.y, end = { x: h.x, y: h.y }, hit = null;
+    for (let i = 1; i <= LASER_RANGE; i++) {
+      x += d.x; y += d.y;
+      if (x < 0 || x >= CELLS || y < 0 || y >= CELLS) break;
+      end = { x, y };
+      for (const q of players) {
+        if (q === p || !q.alive || isTiny(q, now)) continue;
+        if (sameTeam(p, q)) continue;                 // the beam passes through teammates
+        if (q.cells.some(c => c.x === x && c.y === y)) { hit = q; break; }
+      }
+      if (hit) break;
+    }
+    if (hit) hit.alive = false;
+    p.abData = { x1: h.x, y1: h.y, x2: end.x, y2: end.y, killed: hit ? 1 : 0 };
+  }
+
+  // Hulk: leaps on every fruit within SMASH_RADIUS at once.
+  function hulkSmash(p, now) {
+    const h = p.cells[0];
+    let got = 0;
+    for (let i = fruits.length - 1; i >= 0; i--) {
+      const f = fruits[i];
+      if (Math.abs(f.x - h.x) > SMASH_RADIUS || Math.abs(f.y - h.y) > SMASH_RADIUS) continue;
+      const def = FRUITS[f.type] || FRUITS.candy;
+      p.score += def.points;
+      if (def.effect === 'fast') p.boostUntil = now + EFFECT_MS;
+      if (def.effect === 'slowOthers') {
+        players.forEach(o => { if (o !== p && o.alive) o.slowUntil = now + EFFECT_MS; });
+      }
+      if (def.grow > 0) {
+        const tail = p.cells[p.cells.length - 1];
+        for (let k = 0; k < def.grow; k++) p.cells.push({ x: tail.x, y: tail.y });
+      } else if (def.grow < 0) {
+        let rm = -def.grow;
+        while (rm-- > 0 && p.cells.length > MIN_LEN) p.cells.pop();
+      }
+      fruits.splice(i, 1);
+      got++;
+    }
+    p.abData = { x: h.x, y: h.y, r: SMASH_RADIUS, got };
+    refillFruits();
+  }
+
+  // Thor's hammer orbits the head; this is the square it currently occupies.
+  // Derived from abUntil so the host and every guest agree without extra data.
+  function hammerCell(p, now) {
+    const startedAt = (p.abUntil || 0) - ABILITIES.thor.duration;
+    const ang = ((now - startedAt) / HAMMER_SPIN_MS) * Math.PI * 2;
+    const h = p.cells[0];
+    return { x: Math.round(h.x + Math.cos(ang) * HAMMER_RADIUS),
+             y: Math.round(h.y + Math.sin(ang) * HAMMER_RADIUS),
+             fx: h.x + Math.cos(ang) * HAMMER_RADIUS,
+             fy: h.y + Math.sin(ang) * HAMMER_RADIUS };
+  }
+
+  function applyHammers(now) {
+    for (const p of players) {
+      if (!p.alive || !hammerActive(p, now)) continue;
+      const c = hammerCell(p, now);
+      for (const q of players) {
+        if (q === p || !q.alive || isTiny(q, now)) continue;
+        if (sameTeam(p, q)) continue;                 // no friendly fire
+        const h = q.cells[0];
+        // 3x3 kill zone around the hammer — landable, but you have to aim.
+        if (Math.abs(h.x - c.x) <= 1 && Math.abs(h.y - c.y) <= 1) q.alive = false;
+      }
+    }
+  }
+
+  // Spider-Man: webs the wall and slings along it instead of dying. Turns 90
+  // degrees, because reversing would drive the head straight into its own neck.
+  function deflectOffWall(p) {
+    p.cells.shift();                       // undo the out-of-bounds head
+    const head = p.cells[0];
+    const opts = (p.dir.x !== 0)
+      ? [{ x: 0, y: 1 }, { x: 0, y: -1 }]
+      : [{ x: 1, y: 0 }, { x: -1, y: 0 }];
+    if (Math.random() < 0.5) opts.reverse();
+    for (const d of opts) {
+      const nh = { x: head.x + d.x, y: head.y + d.y };
+      if (nh.x < 0 || nh.x >= CELLS || nh.y < 0 || nh.y >= CELLS) continue;
+      if (p.cells.some(c => c.x === nh.x && c.y === nh.y)) continue;
+      p.dir = d; p.nextDir = d;
+      p.cells.unshift(nh);
+      p.webSaves = (p.webSaves || 0) + 1;
+      return true;
+    }
+    p.cells.unshift(head);                 // cornered - put it back and die
+    return false;
+  }
+
+  // ============================================================
+  //  Bots  (host / local only — guests just watch them move)
+  // ============================================================
+  const BOT_DIRS = [DIRS.up, DIRS.down, DIRS.left, DIRS.right];
+
+  function occupancySet() {
+    const occ = new Set();
+    for (const q of players) {
+      if (!q.alive) continue;
+      for (const c of q.cells) occ.add(c.y * CELLS + c.x);
+    }
+    return occ;
+  }
+
+  const inBounds = (x, y) => x >= 0 && x < CELLS && y >= 0 && y < CELLS;
+
+  // How much open space can this square reach? Stops bots cheerfully sealing
+  // themselves into a pocket, which is the number one way a naive bot dies.
+  function openSpace(startX, startY, occ, limit) {
+    if (limit <= 0) return 0;
+    const seen = new Set([startY * CELLS + startX]);
+    const queue = [[startX, startY]];
+    let count = 0;
+    while (queue.length && count < limit) {
+      const [x, y] = queue.shift();
+      count++;
+      for (const d of BOT_DIRS) {
+        const nx = x + d.x, ny = y + d.y, k = ny * CELLS + nx;
+        if (!inBounds(nx, ny) || occ.has(k) || seen.has(k)) continue;
+        seen.add(k);
+        queue.push([nx, ny]);
+      }
+    }
+    return count;
+  }
+
+  function botThink(p, now) {
+    const lvl = BOT_LEVELS[botLevel] || BOT_LEVELS.medium;
+    const h = p.cells[0];
+    const occ = occupancySet();
+    // Our own tail is about to move out of the way, so it isn't really solid.
+    const tail = p.cells[p.cells.length - 1];
+    occ.delete(tail.y * CELLS + tail.x);
+
+    const safe = BOT_DIRS.filter(d => {
+      if (d.x === -p.dir.x && d.y === -p.dir.y) return false;      // no suicide reversal
+      const nx = h.x + d.x, ny = h.y + d.y;
+      if (!inBounds(nx, ny)) return webActive(p, now);             // Spidey may risk it
+      return !occ.has(ny * CELLS + nx);
+    });
+
+    if (!safe.length) return;                                      // doomed anyway
+
+    if (Math.random() < lvl.mistake) {
+      applyDirTo(p, safe[Math.floor(Math.random() * safe.length)]);
+      botMaybeAbility(p, now, lvl);
+      return;
+    }
+
+    // Nearest fruit, ignoring bananas unless we're long enough to want one.
+    let target = null, bestD = 1e9;
+    for (const f of fruits) {
+      if (f.type === 'banana' && p.cells.length < 8) continue;
+      const d = Math.abs(f.x - h.x) + Math.abs(f.y - h.y);
+      if (d < bestD) { bestD = d; target = f; }
+    }
+
+    let best = safe[0], bestScore = -1e9;
+    for (const d of safe) {
+      const nx = h.x + d.x, ny = h.y + d.y;
+      let score = 0;
+      if (target) score -= (Math.abs(target.x - nx) + Math.abs(target.y - ny));
+      if (lvl.lookahead > 0) score += openSpace(nx, ny, occ, lvl.lookahead) * 0.55;
+      // Give hostile snakes' heads a wide berth.
+      for (const q of players) {
+        if (q === p || !q.alive || sameTeam(p, q)) continue;
+        const qh = q.cells[0];
+        const dist = Math.abs(qh.x - nx) + Math.abs(qh.y - ny);
+        if (dist <= 2) score -= (3 - dist) * 6;
+      }
+      if (score > bestScore) { bestScore = score; best = d; }
+    }
+    applyDirTo(p, best);
+    botMaybeAbility(p, now, lvl);
+  }
+
+  function enemyInLine(p) {
+    const d = p.dir, h = p.cells[0];
+    let x = h.x, y = h.y;
+    for (let i = 1; i <= LASER_RANGE; i++) {
+      x += d.x; y += d.y;
+      if (!inBounds(x, y)) return false;
+      for (const q of players) {
+        if (q === p || !q.alive || sameTeam(p, q)) continue;
+        if (q.cells.some(c => c.x === x && c.y === y)) return true;
+      }
+    }
+    return false;
+  }
+
+  function botMaybeAbility(p, now, lvl) {
+    const ab = abilityFor(p);
+    if (!ab || now < (p.abReadyAt || 0)) return;
+    const h = p.cells[0];
+    const enemyNear = players.some(q => q !== p && q.alive && !sameTeam(p, q) &&
+      Math.abs(q.cells[0].x - h.x) <= 5 && Math.abs(q.cells[0].y - h.y) <= 5);
+    const fruitNear = fruits.some(f =>
+      Math.abs(f.x - h.x) <= SMASH_RADIUS && Math.abs(f.y - h.y) <= SMASH_RADIUS);
+    const wallNear = h.x < 3 || h.x >= CELLS - 3 || h.y < 3 || h.y >= CELLS - 3;
+
+    let want = false;
+    if (ab.key === 'hammer') want = enemyNear;
+    else if (ab.key === 'laser') want = enemyInLine(p);
+    else if (ab.key === 'web') want = wallNear;
+    else if (ab.key === 'smash') want = fruitNear;
+    else if (ab.key === 'tiny') want = enemyNear;
+    else if (ab.key === 'hack') want = true;
+
+    if (want && Math.random() < lvl.aggression) useAbility(p, now);
+  }
+
+  // The snake this device is actually steering.
+  function myPlayer() {
+    if (!players.length) return null;
+    if (mode === 'local2') return players[0];   // only P1 wears your skin
+    return players[myIndex] || null;
+  }
+
+  function aliveCount() { return players.filter(p => p.alive).length; }
+
+  function roundShouldEnd() {
+    if (teamPlay()) {
+      // A team is out when every one of its snakes has crashed.
+      const red = players.some(p => p.alive && p.team === 0);
+      const blue = players.some(p => p.alive && p.team === 1);
+      return !(red && blue);
+    }
+    if (players.length <= 1) return aliveCount() === 0;
+    return aliveCount() <= 1;
+  }
+
+  const teamScore = t => players.filter(p => p.team === t)
+                                .reduce((sum, p) => sum + p.score, 0);
+
+  function update(now) {
+    if (!running || paused || roundOver) return;
+
+    for (const p of players) {
+      if (!p.alive) continue;
+      p.moveMs = tickMs / speedMultFor(p, now);
+      if (now - p.lastMoveAt >= p.moveMs) {
+        // Think only when about to move — once per bot per move, not per frame.
+        if (p.isBot) botThink(p, now);
+        p.lastMoveAt += p.moveMs;
+        // If the tab was backgrounded, don't try to replay a hundred moves.
+        if (now - p.lastMoveAt > p.moveMs * 3) p.lastMoveAt = now;
+        movePlayer(p, now);
+      }
+    }
+
+    applyHammers(now);          // before collisions, so a hammer kill lands first
+    resolveCollisions(now);
+    refillFruits();
+
+    if (roundShouldEnd()) endRound();
+  }
+
+  // ============================================================
+  //  Rendering
+  // ============================================================
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const centerOf = c => ({ x: c.x * cellSize + cellSize / 2, y: c.y * cellSize + cellSize / 2 });
+
+  function render() {
+    const now = nowMs();
+
+    ctx.fillStyle = '#241533';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+    ctx.lineWidth = 1;
+    for (let i = 1; i < CELLS; i++) {
+      ctx.beginPath(); ctx.moveTo(i * cellSize, 0); ctx.lineTo(i * cellSize, canvas.height); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, i * cellSize); ctx.lineTo(canvas.width, i * cellSize); ctx.stroke();
+    }
+
+    drawFruits(now);
+    // Dead snakes first so living ones sit on top.
+    players.filter(p => !p.alive).forEach(p => drawSnake(p, now));
+    players.filter(p => p.alive).forEach(p => drawSnake(p, now));
+
+    if (paused) {
+      ctx.fillStyle = 'rgba(18,10,28,0.65)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#f5f0ff';
+      ctx.font = `bold ${cellSize * 2}px 'Trebuchet MS', sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('PAUSED', canvas.width / 2, canvas.height / 2);
+      ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
+    }
+  }
+
+  function drawFruits(now) {
+    const pulse = 1 + Math.sin(now / 260) * 0.07;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = `${cellSize * 1.25 * pulse}px system-ui, 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif`;
+    for (const f of fruits) {
+      const c = centerOf(f);
+      const def = FRUITS[f.type] || FRUITS.candy;
+      ctx.fillText(def.emoji, c.x, c.y);
+    }
+    ctx.textAlign = 'start';
+    ctx.textBaseline = 'alphabetic';
+  }
+
+  function drawSnake(p, now) {
+    const cells = p.cells;
+    if (!cells || cells.length === 0) return;
+    const n = cells.length;
+    const col = colorByKey(p.colorKey);
+
+    let t = p.moveMs > 0 ? (now - p.lastMoveAt) / p.moveMs : 1;
+    if (!p.alive || paused) t = 1;
+    if (t < 0) t = 0;
+    if (t > 1) t = 1;
+
+    const pts = cells.map(centerOf);
+    if (n >= 2) {
+      const to = centerOf(cells[0]);
+      pts[0] = { x: lerp(pts[1].x, to.x, t), y: lerp(pts[1].y, to.y, t) };
+    }
+    // Appended, not overwritten: replacing the last point would make the final
+    // segment span two cells and visibly cut the corner on a bend.
+    const tailTo = centerOf(cells[n - 1]);
+    const tailBase = p.tailFrom ? centerOf(p.tailFrom) : tailTo;
+    pts.push({ x: lerp(tailBase.x, tailTo.x, t), y: lerp(tailBase.y, tailTo.y, t) });
+    const m = pts.length;
+
+    // Which way the tail tip is travelling — dirt needs it so clods spray
+    // backwards instead of in an arbitrary direction.
+    let tdx = 0, tdy = 0;
+    if (m >= 2) {
+      tdx = pts[m - 2].x - pts[m - 1].x;
+      tdy = pts[m - 2].y - pts[m - 1].y;
+      const tl = Math.hypot(tdx, tdy);
+      if (tl > 0.0001) { tdx /= tl; tdy /= tl; } else { tdx = 0; tdy = 0; }
+    }
+
+    // Trail first, so the snake is drawn on top of its own sparks.
+    drawTrail(p, pts[m - 1], { x: tdx, y: tdy }, now);
+
+    ctx.save();
+    if (!p.alive) ctx.globalAlpha = 0.3;
+
+    // Glow while a power-up is running so everyone can see who's affected.
+    const boosted = p.boostUntil > now, slowed = p.slowUntil > now;
+    if (p.alive && (boosted || slowed)) {
+      ctx.shadowColor = boosted ? '#fde047' : '#7dd3fc';
+      ctx.shadowBlur = cellSize * 0.9;
+    }
+
+    // A skin overrides the body colours. The player's chosen colour then
+    // becomes an aura drawn underneath, so six people all wearing Iron Man
+    // can still tell which snake is theirs.
+    const skin = skinByKey(p.skinKey);
+    const bodyDark  = skin.dark  || col.dark;
+    const bodyLight = skin.light || col.light;
+    // In team games the aura shows your TEAM, not your personal colour — which
+    // side someone is on matters far more than which colour they picked.
+    const teamCol = (p.team === 0 || p.team === 1) ? TEAMS[p.team] : null;
+    const auraCol = teamCol ? teamCol.light : col.light;
+    const showAura = !!skin.dark || !!teamCol;
+
+    // Ant-Man shrinks further while intangible, so you can SEE he's phasing.
+    const tinyNow = isTiny(p, now);
+    const base = cellSize * 0.82 * (skin.width || 1) * (tinyNow ? 0.55 : 1);
+    if (tinyNow) ctx.globalAlpha *= 0.6;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    for (let i = m - 1; i >= 1; i--) {
+      const fromTail = m - 1 - i;
+      const w = base * Math.min(1, 0.38 + 0.62 * (fromTail / 3));
+      if (showAura) {
+        ctx.strokeStyle = auraCol;
+        ctx.lineWidth = w + cellSize * 0.16;
+        ctx.beginPath();
+        ctx.moveTo(pts[i].x, pts[i].y);
+        ctx.lineTo(pts[i - 1].x, pts[i - 1].y);
+        ctx.stroke();
+      }
+      // Accent bands every third segment give each skin its stripe pattern.
+      ctx.strokeStyle = (skin.accent && i % 3 === 0) ? skin.accent : bodyDark;
+      ctx.lineWidth = w;
+      ctx.beginPath();
+      ctx.moveTo(pts[i].x, pts[i].y);
+      ctx.lineTo(pts[i - 1].x, pts[i - 1].y);
+      ctx.stroke();
+    }
+
+    // Spider-Man gets webbing drawn across the body.
+    if (skin.badge === 'web') {
+      ctx.strokeStyle = skin.accent;
+      ctx.lineWidth = Math.max(0.8, cellSize * 0.07);
+      for (let i = 1; i < m; i++) {
+        const a = pts[i], b2 = pts[i - 1];
+        const mx = (a.x + b2.x) / 2, my = (a.y + b2.y) / 2;
+        const ang = Math.atan2(b2.y - a.y, b2.x - a.x) + Math.PI / 2;
+        const r = base * 0.42;
+        ctx.beginPath();
+        ctx.moveTo(mx - Math.cos(ang) * r, my - Math.sin(ang) * r);
+        ctx.lineTo(mx + Math.cos(ang) * r, my + Math.sin(ang) * r);
+        ctx.stroke();
+      }
+    }
+    ctx.shadowBlur = 0;
+
+    // ---- Head ----
+    let dx = 1, dy = 0;
+    if (n >= 2) {
+      dx = cells[0].x - cells[1].x;
+      dy = cells[0].y - cells[1].y;
+      const len = Math.hypot(dx, dy) || 1;
+      dx /= len; dy /= len;
+    }
+    const px = -dy, py = dx;
+    const head = pts[0];
+
+    if (showAura) {
+      ctx.fillStyle = auraCol;
+      ctx.beginPath();
+      ctx.arc(head.x, head.y, base * 0.56 + cellSize * 0.09, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = bodyLight;
+    ctx.beginPath();
+    ctx.arc(head.x, head.y, base * 0.56, 0, Math.PI * 2);
+    ctx.fill();
+
+    drawBadge(skin, head, dx, dy, px, py, base, now);
+
+    if (p.alive && (now % 1600) < 260) {
+      ctx.strokeStyle = '#ff5da2';
+      ctx.lineWidth = Math.max(1.5, base * 0.11);
+      const sx = head.x + dx * base * 0.5, sy = head.y + dy * base * 0.5;
+      const ex = head.x + dx * base, ey = head.y + dy * base;
+      ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
+      const fx = px * base * 0.17, fy = py * base * 0.17;
+      ctx.beginPath(); ctx.moveTo(ex, ey);
+      ctx.lineTo(ex + dx * base * 0.16 + fx, ey + dy * base * 0.16 + fy); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(ex, ey);
+      ctx.lineTo(ex + dx * base * 0.16 - fx, ey + dy * base * 0.16 - fy); ctx.stroke();
+    }
+
+    const eyeR = base * 0.16;
+    for (const side of [1, -1]) {
+      const ex = head.x + dx * base * 0.16 + px * side * base * 0.26;
+      const ey = head.y + dy * base * 0.16 + py * side * base * 0.26;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(ex, ey, eyeR, 0, Math.PI * 2); ctx.fill();
+      if (p.alive) {
+        ctx.fillStyle = '#12101a';
+        ctx.beginPath();
+        ctx.arc(ex + dx * eyeR * 0.38, ey + dy * eyeR * 0.38, eyeR * 0.52, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.strokeStyle = '#12101a';
+        ctx.lineWidth = Math.max(1.2, eyeR * 0.4);
+        const r = eyeR * 0.62;
+        ctx.beginPath();
+        ctx.moveTo(ex - r, ey - r); ctx.lineTo(ex + r, ey + r);
+        ctx.moveTo(ex + r, ey - r); ctx.lineTo(ex - r, ey + r);
+        ctx.stroke();
+      }
+    }
+    drawAbility(p, head, now, base);
+
+    // "+N" popping off the head when a hack lands. Everyone sees it, so the
+    // power never feels like invisible cheating.
+    if (p.hackFlash && now - p.hackFlash.at < 1100) {
+      const ft = (now - p.hackFlash.at) / 1100;
+      ctx.save();
+      ctx.globalAlpha = 1 - ft;
+      ctx.font = `bold ${cellSize * 0.95}px "Courier New", monospace`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.shadowColor = '#39ff14';
+      ctx.shadowBlur = cellSize * 0.6;
+      ctx.fillStyle = '#d9ffe0';
+      ctx.fillText('+' + p.hackFlash.gain, head.x, head.y - cellSize * (1 + ft * 1.4));
+      ctx.restore();
+    }
+
+    ctx.restore();
+  }
+
+  // Everything the abilities look like. Guests run this too, driven by the
+  // ability state the host sends, so all six screens show the same thing.
+  function drawAbility(p, head, now, base) {
+    const cs = cellSize;
+
+    // --- Thor: orbiting hammer ---
+    if (hammerActive(p, now)) {
+      const c = hammerCell(p, now);
+      const hx = c.fx * cs + cs / 2, hy = c.fy * cs + cs / 2;
+      ctx.save();
+      ctx.globalAlpha = 0.22;
+      ctx.strokeStyle = '#93c5fd';
+      ctx.lineWidth = cs * 0.25;
+      ctx.beginPath();
+      ctx.arc(head.x, head.y, HAMMER_RADIUS * cs, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.shadowColor = '#bfdbfe';
+      ctx.shadowBlur = cs * 0.8;
+      ctx.translate(hx, hy);
+      ctx.rotate((now / 90) % (Math.PI * 2));
+      ctx.fillStyle = '#cbd5e1';
+      ctx.fillRect(-cs * 0.55, -cs * 0.38, cs * 1.1, cs * 0.76);   // head of the hammer
+      ctx.fillStyle = '#78350f';
+      ctx.fillRect(-cs * 0.12, cs * 0.3, cs * 0.24, cs * 1.0);     // handle
+      ctx.restore();
+    }
+
+    // --- Spider-Man: web bubble ---
+    if (webActive(p, now)) {
+      ctx.save();
+      const r = base * 1.5;
+      ctx.globalAlpha = 0.75;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = Math.max(1, cs * 0.06);
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.moveTo(head.x, head.y);
+        ctx.lineTo(head.x + Math.cos(a) * r, head.y + Math.sin(a) * r);
+        ctx.stroke();
+      }
+      for (const f of [0.45, 0.75, 1]) {
+        ctx.beginPath();
+        for (let i = 0; i <= 6; i++) {
+          const a = (i / 6) * Math.PI * 2;
+          const x = head.x + Math.cos(a) * r * f, y = head.y + Math.sin(a) * r * f;
+          i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+        }
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // --- one-shot flashes: laser and smash ---
+    const fl = p.abFlash;
+    if (!fl) return;
+    const age = now - fl.at;
+
+    if (fl.kind === 'laser' && age < 380 && fl.data) {
+      const t = age / 380;
+      ctx.save();
+      ctx.lineCap = 'round';
+      const x1 = fl.data.x1 * cs + cs / 2, y1 = fl.data.y1 * cs + cs / 2;
+      const x2 = fl.data.x2 * cs + cs / 2, y2 = fl.data.y2 * cs + cs / 2;
+      ctx.globalAlpha = (1 - t) * 0.5;
+      ctx.strokeStyle = '#fbbf24'; ctx.lineWidth = cs * 0.9;
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      ctx.globalAlpha = 1 - t;
+      ctx.strokeStyle = '#fffbeb'; ctx.lineWidth = cs * 0.3;
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      if (fl.data.killed) {
+        ctx.fillStyle = '#fff';
+        ctx.globalAlpha = 1 - t;
+        ctx.beginPath(); ctx.arc(x2, y2, cs * (0.5 + t * 1.2), 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    if (fl.kind === 'smash' && age < 520 && fl.data) {
+      const t = age / 520;
+      ctx.save();
+      ctx.globalAlpha = 1 - t;
+      ctx.strokeStyle = '#4ade80';
+      ctx.lineWidth = cs * 0.4 * (1 - t);
+      ctx.beginPath();
+      ctx.arc(fl.data.x * cs + cs / 2, fl.data.y * cs + cs / 2,
+              fl.data.r * cs * (0.3 + t), 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  // Sparks dropped behind the tail. Spawned on a timer rather than per move, so
+  // they look the same whether the snake is crawling on Easy or flying on Insane.
+  function drawTrail(p, tailPt, tailDir, now) {
+    const tr = trailByKey(p.trailKey);
+    if (!p.particles) p.particles = [];
+
+    if (!tr.spawn) { p.particles.length = 0; return; }
+
+    if (p.alive && !paused && now - (p.lastParticleAt || 0) >= tr.every) {
+      p.lastParticleAt = now;
+      for (let i = 0; i < tr.count; i++) {
+        p.particles.push(tr.spawn(tailPt, now, cellSize, tailDir));
+      }
+      // Hard cap: six snakes must not be able to flood the frame.
+      if (p.particles.length > TRAIL_CAP) {
+        p.particles.splice(0, p.particles.length - TRAIL_CAP);
+      }
+    }
+
+    // Cull expired first, so ribbon mode gets a clean oldest-to-newest list.
+    const alive = [];
+    for (const q of p.particles) {
+      const age = now - q.born;
+      if (age < 0 || age >= q.life) continue;
+      alive.push(q);
+    }
+    p.particles = alive;
+
+    ctx.save();
+    if (tr.drawAll) {
+      // Ribbon trails need to see their neighbours to join them up.
+      tr.drawAll(ctx, alive, now, cellSize);
+    } else {
+      for (const q of alive) tr.draw(ctx, q, (now - q.born) / q.life, cellSize);
+    }
+    ctx.restore();
+  }
+
+  // Little emblem on the head that gives each skin its character.
+  function drawBadge(skin, head, dx, dy, px, py, base, now) {
+    if (!skin.badge || skin.badge === 'none' || skin.badge === 'web') return;
+    ctx.save();
+
+    if (skin.badge === 'reactor') {
+      const glow = 0.75 + Math.sin(now / 220) * 0.25;
+      ctx.shadowColor = '#bae6fd';
+      ctx.shadowBlur = base * 0.5 * glow;
+      ctx.fillStyle = '#e0f2fe';
+      ctx.beginPath(); ctx.arc(head.x, head.y, base * 0.2, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = skin.accent;
+      ctx.lineWidth = Math.max(1, base * 0.06);
+      ctx.beginPath(); ctx.arc(head.x, head.y, base * 0.3, 0, Math.PI * 2); ctx.stroke();
+
+    } else if (skin.badge === 'bolt') {
+      ctx.strokeStyle = '#fef08a';
+      ctx.lineWidth = Math.max(1.4, base * 0.1);
+      ctx.lineCap = 'round';
+      const s = base * 0.26;
+      // Zigzag drawn in the snake's own frame so it turns with the head.
+      const at = (f, r) => ({ x: head.x + dx * f * s + px * r * s,
+                              y: head.y + dy * f * s + py * r * s });
+      const a = at(0.9, -0.5), b2 = at(0, 0.15), c2 = at(0.15, -0.15), d2 = at(-0.9, 0.5);
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y); ctx.lineTo(b2.x, b2.y);
+      ctx.lineTo(c2.x, c2.y); ctx.lineTo(d2.x, d2.y);
+      ctx.stroke();
+
+    } else if (skin.badge === 'matrix') {
+      // A little terminal screen with a blinking cursor. Deliberately NOT
+      // rotated with the snake, so it always reads the right way up.
+      const w = base * 0.72, h = base * 0.54;
+      ctx.fillStyle = '#04240f';
+      ctx.fillRect(head.x - w / 2, head.y - h / 2, w, h);
+      ctx.strokeStyle = skin.accent;
+      ctx.lineWidth = Math.max(1, base * 0.055);
+      ctx.strokeRect(head.x - w / 2, head.y - h / 2, w, h);
+      // two lines of "code"
+      ctx.globalAlpha = 0.55;
+      ctx.lineWidth = Math.max(0.6, base * 0.035);
+      ctx.beginPath();
+      ctx.moveTo(head.x - w * 0.32, head.y - h * 0.18);
+      ctx.lineTo(head.x + w * 0.02, head.y - h * 0.18);
+      ctx.moveTo(head.x - w * 0.32, head.y + h * 0.08);
+      ctx.lineTo(head.x - w * 0.06, head.y + h * 0.08);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      if ((now % 900) < 550) {            // blinking cursor
+        ctx.fillStyle = '#39ff14';
+        ctx.fillRect(head.x + w * 0.10, head.y + h * 0.00, w * 0.16, h * 0.30);
+      }
+
+    } else if (skin.badge === 'diamond') {
+      ctx.fillStyle = skin.accent;
+      const r = base * 0.3;
+      ctx.beginPath();
+      ctx.moveTo(head.x + dx * r, head.y + dy * r);
+      ctx.lineTo(head.x + px * r * 0.8, head.y + py * r * 0.8);
+      ctx.lineTo(head.x - dx * r, head.y - dy * r);
+      ctx.lineTo(head.x - px * r * 0.8, head.y - py * r * 0.8);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function updateHud() {
+    const now = nowMs();
+    hudEl.innerHTML = '';
+    if (teamPlay()) {
+      [0, 1].forEach(t => {
+        const tag = document.createElement('div');
+        tag.className = 'hudPlayer';
+        tag.style.background = 'rgba(0,0,0,0.45)';
+        tag.innerHTML = `<span>${TEAMS[t].emoji}</span>` +
+          `<span style="color:${TEAMS[t].light}">${TEAMS[t].name}</span> ${teamScore(t)}`;
+        hudEl.appendChild(tag);
+      });
+    }
+    players.forEach(p => {
+      const col = colorByKey(p.colorKey);
+      const d = document.createElement('div');
+      d.className = 'hudPlayer' + (p.alive ? '' : ' dead');
+      let fx = '';
+      if (p.alive && p.boostUntil > now) fx = ' ⚡';
+      else if (p.alive && p.slowUntil > now) fx = ' ❄️';
+      const ring = (p.team === 0 || p.team === 1)
+        ? `box-shadow:0 0 0 2px ${TEAMS[p.team].colour}` : '';
+      d.innerHTML = `<span class="dot" style="background:${col.light};${ring}"></span>` +
+                    `<span style="color:${col.light}">${escapeHtml(p.name)}</span> ${p.score}${fx}`;
+      hudEl.appendChild(d);
+    });
+    updateAbilityButton(now);
+    updateQuitButton(now);
+
+    const badge = document.createElement('div');
+    badge.id = 'speedBadge';
+    badge.textContent = `${difficultyEmoji} ${difficultyName}`;
+    hudEl.appendChild(badge);
+  }
+
+  const abilityBtn = $('btnAbility');
+  function updateAbilityButton(now) {
+    const me = myPlayer();
+    const ab = abilityFor(me);
+    const show = !!ab && me.alive && running && !roundOver;
+    abilityBtn.classList.toggle('hidden', !show);
+    if (!show) return;
+
+    const left = Math.max(0, (me.abReadyAt || 0) - now);
+    const activeLeft = Math.max(0, (me.abUntil || 0) - now);
+    abilityBtn.style.borderColor = ab.colour;
+    abilityBtn.style.color = ab.colour;
+    // Waiting on the host to answer — show something, so a press never looks
+    // like it was ignored.
+    if (netRole === 'guest' && left === 0 && activeLeft === 0 &&
+        now - guestPressedAt < 500) {
+      abilityBtn.classList.add('cooling');
+      abilityBtn.textContent = '⏳ …';
+      return;
+    }
+    if (activeLeft > 0) {
+      abilityBtn.classList.add('cooling');
+      abilityBtn.textContent = `${ab.emoji} ${Math.ceil(activeLeft / 1000)}s ACTIVE`;
+    } else if (left > 0) {
+      abilityBtn.classList.add('cooling');
+      abilityBtn.textContent = `🔒 ${Math.ceil(left / 1000)}s`;
+    } else {
+      abilityBtn.classList.remove('cooling');
+      abilityBtn.textContent = `${ab.emoji} ${ab.label}`;
+    }
+  }
+
+  // One entry point for the button and the H key.
+  let guestPressedAt = 0;
+  function requestAbility() {
+    if (netRole === 'guest') {
+      // ALWAYS ask, even if our local copy thinks we can't. The host is the
+      // authority and re-checks everything; refusing here just meant a dead
+      // button whenever the guest's own view of itself was stale or wrong.
+      const c = conns[0];
+      if (c && c.open) {
+        try { c.send({ type: 'ability' }); guestPressedAt = nowMs(); } catch (e) {}
+      }
+      return;
+    }
+    const me = myPlayer();
+    if (!abilityFor(me)) return;
+    useAbility(me, nowMs());
+    updateAbilityButton(nowMs());
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, ch =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+  }
+
+  let hudTick = 0;
+  function startRenderLoop() {
+    if (rafId !== null) return;
+    const loop = () => {
+      const now = nowMs();
+      if (netRole !== 'guest') update(now);
+      render();
+      if (hudTick++ % 6 === 0) updateHud();   // HUD doesn't need 60fps
+      rafId = requestAnimationFrame(loop);
+    };
+    rafId = requestAnimationFrame(loop);
+  }
+  function stopRenderLoop() {
+    if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null; }
+  }
+
+  // ============================================================
+  //  Round end
+  // ============================================================
+  function standingsText() {
+    const sorted = players.slice().sort((a, b) =>
+      (b.alive - a.alive) || (b.score - a.score));
+    return sorted.map((p, i) => {
+      const col = colorByKey(p.colorKey);
+      const tm = (p.team === 0 || p.team === 1) ? TEAMS[p.team].emoji + ' ' : '';
+      return `<div style="display:flex;gap:8px;justify-content:center;align-items:center;padding:3px;">
+        <span>${i + 1}.</span><span>${tm}</span>
+        <span class="dot" style="background:${col.light}"></span>
+        <span style="color:${col.light}">${escapeHtml(p.name)}</span>
+        <span>${p.score}</span>${p.alive ? ' <span>👑</span>' : ''}</div>`;
+    }).join('');
+  }
+
+  function endRound() {
+    roundOver = true;
+    running = false;
+    stopBroadcasting();
+    render();
+    stopRenderLoop();
+
+    let msg;
+    if (teamPlay()) {
+      const red = players.some(p => p.alive && p.team === 0);
+      const blue = players.some(p => p.alive && p.team === 1);
+      if (red && !blue)      msg = `${TEAMS[0].emoji} Team Red wins!`;
+      else if (blue && !red) msg = `${TEAMS[1].emoji} Team Blue wins!`;
+      else {
+        const r = teamScore(0), b = teamScore(1);
+        msg = r === b ? `Draw! ${r} each`
+            : (r > b ? `${TEAMS[0].emoji} Team Red wins on points ${r}-${b}`
+                     : `${TEAMS[1].emoji} Team Blue wins on points ${b}-${r}`);
+      }
+    } else if (players.length === 1) {
+      msg = `Game over! Score: ${players[0].score}`;
+    } else {
+      const survivors = players.filter(p => p.alive);
+      const best = players.slice().sort((a, b) => (b.alive - a.alive) || (b.score - a.score))[0];
+      msg = survivors.length === 1
+        ? `${survivors[0].name} wins!`
+        : `Everyone crashed — ${best.name} scored most!`;
+    }
+    showEndScreen(msg, pathResultHtml() + standingsText());
+    if (netRole === 'host') broadcast({ type: 'over', msg, standings: standingsText() });
+  }
+
+  // What this device earned toward the Path this round. In same-device 2P the
+  // better of the two counts, since it's one person's save file either way.
+  function myRoundScore() {
+    if (!players.length) return 0;
+    if (mode === 'local2') return Math.max(...players.map(p => p.score));
+    const me = players[myIndex];
+    return me ? me.score : 0;
+  }
+
+  // Awards the round's points and returns the HTML to sit above the standings.
+  function pathResultHtml() {
+    const earned = myRoundScore();
+    const gained = awardPoints(earned);
+    let html = '';
+    if (gained.length) {
+      html += `<div id="unlockBanner">🏆 REWARD UNLOCKED!<br>` +
+              gained.map(s => `${s.emoji || ''} ${escapeHtml(s.name)}`).join('<br>') +
+              `<br><span style="font-weight:normal;font-size:0.8rem;">` +
+              `Equip it from 🏆 Path of Prey</span></div>`;
+    }
+    const next = nextLockedSkin(pathPoints);
+    html += `<p class="note" style="margin:6px 0 !important;">+${earned} to your Path · ` +
+            `${pathPoints} total` +
+            (next ? ` · ${next.unlockAt - pathPoints} more for ${escapeHtml(next.name)}` : '') +
+            `</p>`;
+    return html;
+  }
+
+  function showEndScreen(msg, html, hideAgain) {
+    goText.textContent = msg;
+    standingsEl.innerHTML = html;
+    gameOverEl.classList.remove('hidden');
+    wrapEl.style.display = 'none';
+    document.body.classList.remove('playing');
+    $('btnAgain').classList.toggle('hidden', hideAgain === true || netRole === 'guest');
+  }
+
+  // Leaving mid-game. You keep whatever you scored — you earned it — and
+  // anyone playing with you is told, rather than being left staring at a
+  // snake that has quietly stopped moving.
+  function quitGame() {
+    if (!running) return;
+    const pathHtml = pathResultHtml();     // banks the points before we tear down
+    const finalStandings = standingsText();
+
+    running = false;
+    roundOver = true;
+    stopBroadcasting();
+    stopRenderLoop();
+
+    if (netRole === 'host') {
+      broadcast({ type: 'over', msg: 'The host ended the game.',
+                  standings: finalStandings });
+    }
+    if (netRole) teardownPeer();
+    mode = 'solo';
+    myIndex = 0;
+    showEndScreen('You left the game', pathHtml + finalStandings, true);
+    renderPath();
+  }
+
+  const quitBtn = $('btnQuit');
+  // An explicit flag, NOT just a timestamp: a clock reading of exactly 0 is
+  // falsy, which silently threw the armed state away.
+  let quitArmed = false, quitArmedAt = 0;
+
+  function disarmQuit() {
+    quitArmed = false;
+    quitArmedAt = 0;
+    quitBtn.textContent = '✕ Quit';
+    quitBtn.classList.remove('armed');
+  }
+
+  function updateQuitButton(now) {
+    if (quitArmed && now - quitArmedAt > 3000) disarmQuit();
+  }
+
+  function pressQuit() {
+    if (!running) return;
+    const now = nowMs();
+    // Two taps, so a stray thumb mid-game doesn't end it.
+    if (quitArmed && now - quitArmedAt <= 3000) {
+      disarmQuit();
+      quitGame();
+      return;
+    }
+    quitArmed = true;
+    quitArmedAt = now;
+    quitBtn.textContent = '✕ Really quit?';
+    quitBtn.classList.add('armed');
+  }
+  quitBtn.addEventListener('click', e => { e.preventDefault(); pressQuit(); });
+
+  function showGameScreen() {
+    menuEl.classList.add('hidden');
+    gameOverEl.classList.add('hidden');
+    wrapEl.style.display = 'flex';
+    document.body.classList.add('playing');
+    disarmQuit();
+    updateControlsForMode();
+    updateHud();
+  }
+
+  // ============================================================
+  //  Local games
+  // ============================================================
+  function startLocal(n) {
+    netRole = null;
+    matchConns = null;
+    mode = n === 2 ? 'local2' : 'solo';
+    myIndex = 0;
+    const humans = [{ name: myDisplayName(), colorKey: myColorKey,
+                      skinKey: mySkinKey, trailKey: myTrailKey }];
+    if (n === 2) {
+      const other = PALETTE.find(c => c.key !== myColorKey) || PALETTE[1];
+      humans.push({ name: 'Player 2', colorKey: other.key,
+                    skinKey: 'classic', trailKey: 'none' });
+    }
+    startRound(buildRoster(humans));
+  }
+
+  $('btn1p').addEventListener('click', () => startLocal(1));
+  $('btn2p').addEventListener('click', () => startLocal(2));
+
+  $('btnAgain').addEventListener('click', () => {
+    if (netRole === 'guest') return;
+    // Host must tell everyone else to restart too, not just restart locally.
+    if (netRole === 'host') hostBeginMatch();
+    else startLocal(mode === 'local2' ? 2 : 1);
+  });
+
+  $('btnMenu').addEventListener('click', () => {
+    stopRenderLoop(); stopBroadcasting();
+    running = false; roundOver = false;
+    gameOverEl.classList.add('hidden');
+    wrapEl.style.display = 'none';
+    document.body.classList.remove('playing');
+    if (netRole) teardownPeer();
+    refreshColorAvailability([]);
+    goHome();
+    menuEl.classList.remove('hidden');
+  });
+
+  // ============================================================
+  //  Online
+  // ============================================================
+  // ---- Screens ----
+  // One visible at a time, with a back stack, so every screen knows where it
+  // came from instead of always dumping you at the home screen.
+  const SCREENS = ['mainMenu', 'playPanel', 'customizePanel', 'settingsPanel',
+                   'pathPanel', 'onlineChoice', 'onlineStatus'];
+  let screenStack = ['mainMenu'];
+
+  function showPanel(id) {
+    SCREENS.forEach(p => {
+      const el = $(p);
+      const on = (p === id);
+      el.classList.toggle('hidden', !on);
+      if (on) {                       // restart the slide-in each time
+        el.classList.remove('screen');
+        void el.offsetWidth;
+        el.classList.add('screen');
+      }
+    });
+  }
+
+  function goTo(id) {
+    if (screenStack[screenStack.length - 1] !== id) screenStack.push(id);
+    showPanel(id);
+  }
+
+  function goBack() {
+    screenStack.pop();
+    const to = screenStack[screenStack.length - 1] || 'mainMenu';
+    showPanel(to);
+  }
+
+  function goHome() {
+    screenStack = ['mainMenu'];
+    showPanel('mainMenu');
+  }
+
+  function refreshProfile() {
+    $('profileName').textContent = myDisplayName();
+    const earned = rewardsEarned(pathPoints);
+    $('profileRank').textContent =
+      `${pathPoints} pts · ${earned}/${PATH.length} rewards · ${skinByKey(mySkinKey).name}`;
+  }
+
+  function setStatus(txt) { $('onlineStatusText').textContent = txt; }
+
+  $('btnGoPlay').addEventListener('click', () => { refreshPickers(); goTo('playPanel'); });
+  $('btnGoOnline').addEventListener('click', () => goTo('onlineChoice'));
+  $('btnGoCustomize').addEventListener('click', () => { renderPath(); goTo('customizePanel'); });
+  $('btnGoSettings').addEventListener('click', () => goTo('settingsPanel'));
+
+  $('btnPlayBack').addEventListener('click', goBack);
+  $('btnCustomizeBack').addEventListener('click', () => { refreshProfile(); goBack(); });
+  $('btnSettingsBack').addEventListener('click', goBack);
+  $('btnOnlineBack').addEventListener('click', goBack);
+  $('btnOnlineCancel').addEventListener('click', () => {
+    teardownPeer();
+    refreshColorAvailability([]);
+    goHome();
+  });
+  $('btnCopyCode').addEventListener('click', () => {
+    if (navigator.clipboard) navigator.clipboard.writeText($('roomCode').textContent).catch(() => {});
+  });
+  $('btnHost').addEventListener('click', () => hostRoom());
+  $('btnJoin').addEventListener('click', joinRoom);
+  $('btnStartMatch').addEventListener('click', () => {
+    if (netRole !== 'host' || lobby.length < 2) return;
+    hostBeginMatch();
+  });
+
+  function lobbyRoster() {
+    return lobby.map(l => ({ name: l.name, colorKey: l.colorKey,
+      skinKey: l.skinKey || 'classic', trailKey: l.trailKey || 'none' }));
+  }
+
+  // The single place a host starts or restarts an online match, so the
+  // broadcast and the local start can never drift apart.
+  function hostBeginMatch() {
+    if (netRole !== 'host') return;
+    mode = 'online';
+    myIndex = 0;
+    matchConns = lobby.map(l => l.conn);
+    // Colours must be resolved BEFORE broadcasting. Bots join with colorKey
+    // null, so sending the raw roster left every guest drawing them green
+    // while the host drew them properly — six screens, six different pictures.
+    const roster = assignColors(buildRoster(lobbyRoster()));
+    broadcast({ type: 'begin', ms: tickMs, name: difficultyName,
+                emoji: difficultyEmoji, roster, fmt: matchFormat });
+    startRound(roster);
+  }
+
+  function teardownPeer() {
+    stopBroadcasting();
+    stopRenderLoop();
+    running = false;
+    conns.forEach(c => { try { c.close(); } catch (e) {} });
+    conns = [];
+    if (peer) { try { peer.destroy(); } catch (e) {} peer = null; }
+    netRole = null;
+    lobby = [];
+    matchConns = null;
+  }
+
+  const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  function generateRoomCode() {
+    let s = '';
+    for (let i = 0; i < 4; i++) s += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+    return s;
+  }
+
+  function renderLobby() {
+    const list = $('lobbyList');
+    list.innerHTML = '';
+    lobby.forEach((l, i) => {
+      const col = colorByKey(l.colorKey);
+      const li = document.createElement('li');
+      li.innerHTML = `<span class="dot" style="background:${col.light}"></span>` +
+                     `<span style="color:${col.light}">${escapeHtml(l.name)}</span>` +
+                     (i === 0 ? ' <span style="opacity:.5">(host)</span>' : '');
+      list.appendChild(li);
+    });
+    if (netRole === 'host') {
+      const btn = $('btnStartMatch');
+      btn.classList.remove('hidden');
+      btn.disabled = lobby.length < 2;
+      btn.textContent = lobby.length < 2 ? 'Waiting for players...' :
+        `Start Game (${lobby.length} players)`;
+    }
+    refreshColorAvailability(lobby.map(l => l.colorKey));
+  }
+
+  function refreshColorAvailability(takenKeys) {
+    Array.from(colorRow.children).forEach(b => {
+      const taken = takenKeys.includes(b.dataset.key) && b.dataset.key !== myColorKey;
+      b.classList.toggle('taken', taken);
+    });
+  }
+
+  function hostRoom(attemptsLeft) {
+    if (attemptsLeft === undefined) attemptsLeft = 5;
+    netRole = 'host';
+    myIndex = 0;
+    goTo('onlineStatus');
+    $('roomCodeBox').classList.add('hidden');
+    setStatus('Setting up room...');
+    lobby = [{ name: myDisplayName(), colorKey: myColorKey, skinKey: mySkinKey,
+               trailKey: myTrailKey, conn: null }];
+
+    peer = new Peer(generateRoomCode());
+
+    peer.on('open', id => {
+      $('roomCode').textContent = id;
+      $('roomCodeBox').classList.remove('hidden');
+      setStatus(`Share the code. Up to ${MAX_PLAYERS} players.`);
+      renderLobby();
+    });
+
+    peer.on('connection', c => {
+      if (lobby.length >= MAX_PLAYERS || running) {
+        c.on('open', () => { try { c.send({ type: 'full' }); c.close(); } catch (e) {} });
+        return;
+      }
+      conns.push(c);
+      c.on('open', () => {
+        // The guest sends its name/colour in 'hello'; placeholder until then.
+        if (!lobby.some(l => l.conn === c)) {
+          lobby.push({ name: 'Player ' + (lobby.length + 1), colorKey: freeColor(),
+                       skinKey: 'classic', trailKey: 'none', conn: c });
+        }
+        c.send({ type: 'lobby', you: lobby.findIndex(l => l.conn === c), list: lobbyRoster() });
+        renderLobby();
+        pushLobby();
+      });
+      c.on('data', d => handleHostData(c, d));
+      c.on('close', () => {
+        conns = conns.filter(x => x !== c);
+        if (running) {
+          // Mid-match drop: keep their slot so the remaining players' inputs
+          // stay pointed at the right snakes. Their snake just stops steering.
+          const gone = lobby.find(l => l.conn === c);
+          if (gone) gone.left = true;
+        } else {
+          lobby = lobby.filter(l => l.conn !== c);
+          renderLobby();
+          pushLobby();
+        }
+      });
+    });
+
+    peer.on('error', err => {
+      if (err.type === 'unavailable-id' && attemptsLeft > 0) {
+        if (peer) { try { peer.destroy(); } catch (e) {} peer = null; }
+        hostRoom(attemptsLeft - 1);
+      } else {
+        setStatus('Connection error: ' + err.type + '. Try again.');
+      }
+    });
+  }
+
+  function freeColor() {
+    const used = lobby.map(l => l.colorKey);
+    return (PALETTE.find(c => !used.includes(c.key)) || PALETTE[0]).key;
+  }
+
+  function pushLobby() {
+    conns.forEach(c => {
+      if (!c.open) return;
+      const you = lobby.findIndex(l => l.conn === c);
+      if (you < 0) return;          // no seat yet — telling them "player -1"
+                                    // permanently broke their controls
+      try { c.send({ type: 'lobby', you, list: lobbyRoster() }); } catch (e) {}
+    });
+  }
+
+  function joinRoom() {
+    const code = $('joinCodeInput').value.trim().toUpperCase();
+    if (!code) { alert('Enter a room code first.'); return; }
+    netRole = 'guest';
+    goTo('onlineStatus');
+    $('roomCodeBox').classList.add('hidden');
+    setStatus('Connecting...');
+
+    peer = new Peer();
+    peer.on('open', () => {
+      const c = peer.connect(code, { reliable: true });
+      conns = [c];
+      c.on('open', () => {
+        setStatus('Connected! Waiting for the host to start...');
+        c.send({ type: 'hello', name: myDisplayName(), colorKey: myColorKey,
+                 skinKey: mySkinKey, trailKey: myTrailKey });
+      });
+      c.on('data', handleGuestData);
+      c.on('close', handleHostGone);
+    });
+    peer.on('error', err =>
+      setStatus('Connection error: ' + err.type + '. Check the code and try again.'));
+  }
+
+  function handleHostGone() {
+    if (running || !roundOver) {
+      running = false;
+      stopRenderLoop();
+      showEndScreen('The host left the game.', '');
+    }
+  }
+
+  // ---- Host receives ----
+  function handleHostData(c, msg) {
+    const entry = lobby.find(l => l.conn === c);
+    if (!msg || !entry) return;
+
+    if (msg.type === 'hello') {
+      entry.name = String(msg.name || 'Player').slice(0, 12);
+      const used = lobby.filter(l => l !== entry).map(l => l.colorKey);
+      entry.colorKey = used.includes(msg.colorKey) ? freeColor() : (msg.colorKey || freeColor());
+      // Skins aren't deduped - several people can wear Iron Man. The coloured
+      // aura round each snake is what keeps them apart.
+      entry.skinKey = skinByKey(msg.skinKey).key;
+      entry.trailKey = trailByKey(msg.trailKey).key;
+      renderLobby();
+      pushLobby();
+    } else if (msg.type === 'input') {
+      // Routed by the frozen match list, NOT the live lobby — otherwise a
+      // player leaving would slide everyone below them onto the wrong snake.
+      const idx = matchConns ? matchConns.indexOf(c) : lobby.indexOf(entry);
+      const p = idx >= 0 ? players[idx] : null;
+      if (p && p.alive && msg.dir) applyDirTo(p, msg.dir);
+
+    } else if (msg.type === 'hack' || msg.type === 'ability') {
+      const idx = matchConns ? matchConns.indexOf(c) : lobby.indexOf(entry);
+      if (idx >= 0) useAbility(players[idx], nowMs());
+    }
+  }
+
+  // ---- Guest receives ----
+  function handleGuestData(msg) {
+    if (!msg) return;
+
+    if (msg.type === 'full') {
+      setStatus('That room is full or already playing.');
+    } else if (msg.type === 'lobby') {
+      if (typeof msg.you !== 'number' || msg.you < 0) return;   // ignore nonsense
+      myIndex = msg.you;
+      lobby = msg.list.map(p => ({ ...p, conn: null }));
+      renderLobby();
+      $('btnStartMatch').classList.add('hidden');
+      setStatus('Waiting for the host to start...');
+    } else if (msg.type === 'begin') {
+      tickMs = msg.ms; difficultyName = msg.name; difficultyEmoji = msg.emoji;
+      mode = 'online';
+      if (FORMATS[msg.fmt]) matchFormat = msg.fmt;    // host picks the format
+      setBoardSize(cellsForPlayers(msg.roster.length));
+      players = msg.roster.map((p, i) => {
+        const pl = makePlayer(i, p.name, p.colorKey, p.skinKey, p.trailKey);
+        pl.team = (p.team === 0 || p.team === 1) ? p.team : null;
+        pl.isBot = !!p.isBot;
+        return pl;
+      });
+      const now = nowMs();
+      players.forEach(p => { p.lastMoveAt = now; p.moveMs = tickMs; });
+      fruits = [];
+      running = true; paused = false; roundOver = false;
+      showGameScreen();
+      startRenderLoop();
+    } else if (msg.type === 'state') {
+      applyState(msg);
+    } else if (msg.type === 'over') {
+      running = false;
+      roundOver = true;      // so a later disconnect doesn't overwrite the result
+      stopRenderLoop();
+      showEndScreen(msg.msg, pathResultHtml() + (msg.standings || ''));
+    }
+  }
+
+  // ---- State sync ----
+  // Cells travel as single integers (y * CELLS + x) instead of {x,y} objects.
+  // With six snakes at 25 updates a second that difference matters.
+  const encodeCell = c => c.y * CELLS + c.x;
+  const decodeCell = i => ({ x: i % CELLS, y: Math.floor(i / CELLS) });
+
+  function snapshot() {
+    const now = nowMs();
+    return {
+      type: 'state',
+      z: paused ? 1 : 0,
+      f: fruits.map(f => ({ i: encodeCell(f), t: f.type })),
+      p: players.map(p => ({
+        c: p.cells.map(encodeCell),
+        s: p.score,
+        a: p.alive ? 1 : 0,
+        t: p.tailFrom ? encodeCell(p.tailFrom) : -1,
+        m: p.moveMs,
+        b: p.boostUntil > now ? 1 : 0,
+        w: p.slowUntil > now ? 1 : 0,
+        k: p.abCount || 0,                                // rises once per use
+        kk: p.abKind || '',
+        kd: p.abData || null,
+        ku: Math.max(0, (p.abUntil || 0) - now),          // ongoing effect left
+        kr: Math.max(0, (p.abReadyAt || 0) - now)         // cooldown remaining
+      }))
+    };
+  }
+
+  function applyState(msg) {
+    const now = nowMs();
+    paused = !!msg.z;      // so guests see the PAUSED overlay too
+    fruits = msg.f.map(f => ({ ...decodeCell(f.i), type: f.t }));
+    msg.p.forEach((sp, i) => {
+      const p = players[i];
+      if (!p) return;
+      const headKey = sp.c[0];
+      // Restart the glide only when the snake actually moved a square.
+      if (headKey !== p.prevHeadKey) {
+        p.prevHeadKey = headKey;
+        p.lastMoveAt = now;
+      }
+      p.cells = sp.c.map(decodeCell);
+      p.score = sp.s;
+      p.alive = !!sp.a;
+      p.tailFrom = sp.t >= 0 ? decodeCell(sp.t) : null;
+      p.moveMs = sp.m || tickMs;
+      p.boostUntil = sp.b ? now + 200 : 0;   // just for the glow/HUD icon
+      p.slowUntil = sp.w ? now + 200 : 0;
+      // Fire the one-shot visuals only when the counter actually moves —
+      // otherwise 22 updates a second would re-trigger them constantly.
+      p.abKind = sp.kk || null;
+      p.abData = sp.kd || null;
+      if ((sp.k || 0) !== (p.abCount || 0)) {
+        p.abCount = sp.k || 0;
+        p.abFlash = { at: now, kind: sp.kk || '', data: sp.kd || null };
+        if (sp.kk === 'hack' && sp.kd) p.hackFlash = { at: now, gain: sp.kd.gain || 0 };
+      }
+      p.abUntil = now + (sp.ku || 0);
+      p.abReadyAt = now + (sp.kr || 0);
+    });
+  }
+
+  function broadcast(msg) {
+    conns.forEach(c => { if (c.open) { try { c.send(msg); } catch (e) {} } });
+  }
+  function startBroadcasting() {
+    stopBroadcasting();
+    if (netRole !== 'host') return;
+    // Sent even while paused, so guests learn about the pause and unpause.
+    broadcastTimer = setInterval(() => {
+      if (running) broadcast(snapshot());
+    }, BROADCAST_MS);
+  }
+  function stopBroadcasting() {
+    if (broadcastTimer !== null) { clearInterval(broadcastTimer); broadcastTimer = null; }
+  }
+
+  // ============================================================
+  //  Input
+  // ============================================================
+  function applyDirTo(p, d) {
+    if (!p || !p.alive || !d) return;
+    // Reversing straight back into yourself is instant death, so ignore it.
+    if (d.x === -p.dir.x && d.y === -p.dir.y) return;
+    p.nextDir = d;
+  }
+
+  function applyDirection(d, localSlot) {
+    if (!running || roundOver || !d) return;
+    if (netRole === 'guest') {
+      const c = conns[0];
+      if (c && c.open) { try { c.send({ type: 'input', dir: d }); } catch (e) {} }
+      return;
+    }
+    const idx = (mode === 'local2') ? localSlot : myIndex;
+    applyDirTo(players[idx], d);
+  }
+
+  function updateControlsForMode() {
+    const two = (mode === 'local2');
+    $('dpad2Wrap').classList.toggle('hidden', !two);
+    playAreaEl.classList.toggle('local2p', two);
+    $('dpad1Label').textContent = two ? 'Player 1' : 'Move';
+    $('hint').innerHTML = two
+      ? 'P1 swipes the <b>left</b> half, P2 the <b>right</b> half. <b>Space</b> pauses.'
+      : (netRole === 'guest'
+          ? 'Swipe anywhere to steer.'
+          : 'Swipe anywhere to steer. <b>Space</b> pauses, <b>R</b> restarts.');
+  }
+
+  // ---- Swipe ----
+  const SWIPE_THRESHOLD = 22;
+  let touchState = null;
+
+  function swipeSlotFor(clientX) {
+    if (mode === 'local2') return clientX < window.innerWidth / 2 ? 0 : 1;
+    return 0;
+  }
+
+  wrapEl.addEventListener('touchstart', e => {
+    if (!running) return;
+    if (e.target.closest('.dpad-btn') || e.target.closest('#btnToggleDpad') ||
+        e.target.closest('#btnAbility') || e.target.closest('#btnQuit')) return;
+    const t = e.changedTouches[0];
+    touchState = { id: t.identifier, x: t.clientX, y: t.clientY,
+                   slot: swipeSlotFor(t.clientX), fired: false };
+  }, { passive: true });
+
+  wrapEl.addEventListener('touchmove', e => {
+    if (!touchState || touchState.fired || !running) return;
+    let t = null;
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      if (e.changedTouches[i].identifier === touchState.id) { t = e.changedTouches[i]; break; }
+    }
+    if (!t) return;
+    const dx = t.clientX - touchState.x, dy = t.clientY - touchState.y;
+    if (Math.abs(dx) < SWIPE_THRESHOLD && Math.abs(dy) < SWIPE_THRESHOLD) return;
+    const dir = Math.abs(dx) > Math.abs(dy)
+      ? (dx > 0 ? DIRS.right : DIRS.left)
+      : (dy > 0 ? DIRS.down : DIRS.up);
+    applyDirection(dir, touchState.slot);
+    touchState.fired = true;
+  }, { passive: true });
+
+  const clearTouch = () => { touchState = null; };
+  wrapEl.addEventListener('touchend', clearTouch, { passive: true });
+  wrapEl.addEventListener('touchcancel', clearTouch, { passive: true });
+
+  // ---- D-pads ----
+  document.querySelectorAll('.dpad-btn').forEach(btn => {
+    btn.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      if (!running) return;
+      applyDirection(DIRS[btn.dataset.dir], Number(btn.closest('.dpad').dataset.player));
+    });
+  });
+
+  abilityBtn.addEventListener('click', e => { e.preventDefault(); requestAbility(); });
+
+  const toggleBtn = $('btnToggleDpad');
+  toggleBtn.addEventListener('click', () => {
+    const off = playAreaEl.classList.toggle('dpads-off');
+    toggleBtn.textContent = off ? 'Show buttons' : 'Hide buttons';
+    try { localStorage.setItem('scHideDpad', off ? '1' : '0'); } catch (e) {}
+  });
+  (function () {
+    let v = null;
+    try { v = localStorage.getItem('scHideDpad'); } catch (e) {}
+    if (v === '1') { playAreaEl.classList.add('dpads-off'); toggleBtn.textContent = 'Show buttons'; }
+  })();
+
+  // ---- Keyboard ----
+  window.addEventListener('keydown', e => {
+    const key = e.key;
+    if (key === ' ') {
+      if (running && netRole !== 'guest') {
+        paused = !paused;
+        // Don't let the paused time count as glide progress.
+        if (!paused) { const n = nowMs(); players.forEach(p => { p.lastMoveAt = n; }); }
+      }
+      e.preventDefault();
+      return;
+    }
+    if (key.toLowerCase() === 'r' && running && netRole !== 'guest') {
+      if (netRole === 'host') hostBeginMatch();
+      else startLocal(mode === 'local2' ? 2 : 1);
+      return;
+    }
+    if (key === 'Escape' && running) { pressQuit(); e.preventDefault(); return; }
+    if (key.toLowerCase() === 'h' && running) { requestAbility(); return; }
+
+    const isWASD = ['w', 'a', 's', 'd'].includes(key.toLowerCase());
+    const isArrow = key.startsWith('Arrow');
+    if (!isWASD && !isArrow) return;
+
+    let d = null;
+    if (key === 'ArrowUp' || key.toLowerCase() === 'w') d = DIRS.up;
+    else if (key === 'ArrowDown' || key.toLowerCase() === 's') d = DIRS.down;
+    else if (key === 'ArrowLeft' || key.toLowerCase() === 'a') d = DIRS.left;
+    else if (key === 'ArrowRight' || key.toLowerCase() === 'd') d = DIRS.right;
+
+    if (d) applyDirection(d, (mode === 'local2') ? (isWASD ? 0 : 1) : 0);
+    if (isArrow) e.preventDefault();
+  });
+
+  // Opening screen set from code rather than trusting the `hidden` classes in
+  // the markup. Runs last, because SCREENS is declared further up the file and
+  // calling showPanel any earlier hits the temporal dead zone.
+  showPanel('mainMenu');
+
+  // Exposed purely so the logic can be exercised in tests.
+  window.__snake = {
+    get players() { return players; },
+    set players(v) { players = v; },
+    get fruits() { return fruits; },
+    set fruits(v) { fruits = v; },
+    get CELLS() { return CELLS; },
+    FRUITS, PALETTE, MIN_LEN, MAX_PLAYERS,
+    setBoardSize, makePlayer, movePlayer, resolveCollisions, refillFruits,
+    useAbility, abilityFor, ABILITIES, isTiny, webActive, hammerActive,
+    hammerCell, fireLaser, hulkSmash, applyHammers, deflectOffWall,
+    ABILITY_COOLDOWN_MS, LASER_RANGE, SMASH_RADIUS, HAMMER_RADIUS,
+    roundShouldEnd, aliveCount, assignColors, cellsForPlayers, fruitCountFor,
+    buildRoster, botThink, botMaybeAbility, openSpace, teamScore, sameTeam,
+    teamPlay, FORMATS, TEAMS, BOT_LEVELS,
+    setFormat(f) { matchFormat = f; }, getFormat() { return matchFormat; },
+    setBots(n) { botCount = n; }, setBotLevel(l) { botLevel = l; },
+    applyDirTo, tryHack, myPlayer, quitGame, HACK_MIN, HACK_MAX, HACK_COOLDOWN_MS,
+    setRunning(v) { running = v; }, setRoundOver(v) { roundOver = v; },
+    setPaused(v) { paused = v; },
+    encodeCell: c => c.y * CELLS + c.x,
+    decodeCell: i => ({ x: i % CELLS, y: Math.floor(i / CELLS) }),
+    SKINS, skinByKey, TRAILS, trailByKey, PATH, nextLockedReward,
+    rewardsEarned, isSkinUnlocked, nextLockedSkin, newlyUnlocked, lastUnlockedAt,
+    get myTrailKey() { return myTrailKey; },
+    set myTrailKey(v) { myTrailKey = v; },
+    POINTS_PER_REWARD,
+    get pathPoints() { return pathPoints; },
+    set pathPoints(v) { pathPoints = v; },
+    awardPoints, myRoundScore,
+    setMode(m) { mode = m; },
+    setMyIndex(i) { myIndex = i; },
+    setTick(ms) { tickMs = ms; },
+    startRoundWith(roster) { startRound(roster); }
+  };
+})();
+
+</script>
+
+</body>
+</html>

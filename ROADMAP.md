@@ -1,6 +1,17 @@
-# Snake & Candy — Roadmap
+# KanDe Bros — Roadmap
 
-**Every idea on the original list is now built.** Nothing is uploaded yet.
+**Two games now.** Nothing is uploaded yet.
+
+## 📁 The site is now three files
+
+| File | What it is |
+|---|---|
+| `index.html` | **KanDe Bros hub** — the front page listing both games |
+| `snake.html` | Snake & Candy (this used to be `index.html`) |
+| `wuzzle.html` | Wuzzle, the word game |
+
+⚠️ **Upload all three together.** Snake has *moved* — if you upload the new
+`index.html` without `snake.html`, the hub's Play button will 404.
 
 > 📌 **Upload this file to your GitHub repo** (same place as `index.html`).
 > Then it lives with the project forever, and next time we work together I can
@@ -277,6 +288,75 @@ the top of the file — that one number is most of the difficulty.
 
 ---
 
+# 🔤 WUZZLE
+
+A Boggle-style word game. Trace words through a 4×4 grid of letters before the
+clock runs out.
+
+**Rules** (real Boggle)
+
+- Drag through **touching** letters — sideways, up, down or diagonally
+- No square twice in the same word · 3 letters minimum
+- **Qu** is one square but counts as two letters
+- 3–4 letters = 1 point · 5 = 2 · 6 = 3 · 7 = 5 · 8+ = 11
+- **If two players find the same word, nobody scores it.** That's the real rule,
+  and it's what makes the game about finding words others won't
+
+**Modes**
+
+- **Solo** — 1, 1½ or 3 minutes, then it shows you every word you missed and
+  what percentage of the board's points you got
+- **Online** — up to 8 players on the **identical board**, racing the same
+  clock. Live "words found" counts while you play, full scores at the end
+
+**The dictionary**
+
+- **36,635 words.** Built from a 234,000-word source, then cut to words with a
+  real-world frequency (Zipf ≥ 2.0) so the "missed words" list is useful rather
+  than full of things nobody has heard of
+- Rude words filtered out
+- Stored **front-coded**: an uppercase letter says how many characters this word
+  shares with the previous one, then the rest. 306 KB → 135 KB, and 69 KB
+  gzipped over the wire
+
+**Fitting on one screen**
+
+Nothing in Wuzzle or the hub ever scrolls. Two things make that true:
+
+1. **Everything is sized in `vh`/`clamp()`** — text, padding, the board and the
+   word list all shrink on a short screen before anything else happens.
+2. **A measured fit-to-screen scale as a safety net.** After layout, the page
+   measures its own content and applies a CSS `scale()` if it still doesn't fit.
+   It never scales *up* (that would blur things), only down.
+
+`html,body{overflow:hidden}` means a mistake shows up as clipped content rather
+than a silent scrollbar — much easier to notice and fix.
+
+> ⚠️ On a **phone held sideways** there's very little height, so the scale can
+> get small. If that reads badly, the fix is a two-column landscape layout
+> rather than loosening the no-scroll rule.
+
+**Who's playing, and who's winning**
+
+- In the lobby and during the game, everyone sees **the list of players' names**
+  — so you know who you're up against.
+- **Nobody sees anyone else's score or word count until the round ends.** The
+  host doesn't get a peek either. An earlier version broadcast live counts;
+  that's now removed and `pushLive()` is a deliberate no-op with a comment
+  saying why.
+
+**Things worth knowing**
+
+- Boards use the **real 16 Boggle dice**, not random letters. Random letters
+  give unplayable consonant soup; these average ~86 findable words per board,
+  and the worst of 50 test boards still had 23.
+- The **host re-checks every word** a guest claims — that it's real, and that it
+  can actually be traced on that board. A guest can send anything.
+- During play only *counts* go over the wire, never the words themselves —
+  otherwise you could read your opponents' answers off the network.
+
+---
+
 ## ⚠️ What still needs doing### 🤖 Bots and team modes
 
 **Game mode** and **Computer players** pickers sit on the main menu.
@@ -333,6 +413,75 @@ the top of the file — that one number is most of the difficulty.
 
 ---
 
+# 🔤 WUZZLE
+
+A Boggle-style word game. Trace words through a 4×4 grid of letters before the
+clock runs out.
+
+**Rules** (real Boggle)
+
+- Drag through **touching** letters — sideways, up, down or diagonally
+- No square twice in the same word · 3 letters minimum
+- **Qu** is one square but counts as two letters
+- 3–4 letters = 1 point · 5 = 2 · 6 = 3 · 7 = 5 · 8+ = 11
+- **If two players find the same word, nobody scores it.** That's the real rule,
+  and it's what makes the game about finding words others won't
+
+**Modes**
+
+- **Solo** — 1, 1½ or 3 minutes, then it shows you every word you missed and
+  what percentage of the board's points you got
+- **Online** — up to 8 players on the **identical board**, racing the same
+  clock. Live "words found" counts while you play, full scores at the end
+
+**The dictionary**
+
+- **36,635 words.** Built from a 234,000-word source, then cut to words with a
+  real-world frequency (Zipf ≥ 2.0) so the "missed words" list is useful rather
+  than full of things nobody has heard of
+- Rude words filtered out
+- Stored **front-coded**: an uppercase letter says how many characters this word
+  shares with the previous one, then the rest. 306 KB → 135 KB, and 69 KB
+  gzipped over the wire
+
+**Fitting on one screen**
+
+Nothing in Wuzzle or the hub ever scrolls. Two things make that true:
+
+1. **Everything is sized in `vh`/`clamp()`** — text, padding, the board and the
+   word list all shrink on a short screen before anything else happens.
+2. **A measured fit-to-screen scale as a safety net.** After layout, the page
+   measures its own content and applies a CSS `scale()` if it still doesn't fit.
+   It never scales *up* (that would blur things), only down.
+
+`html,body{overflow:hidden}` means a mistake shows up as clipped content rather
+than a silent scrollbar — much easier to notice and fix.
+
+> ⚠️ On a **phone held sideways** there's very little height, so the scale can
+> get small. If that reads badly, the fix is a two-column landscape layout
+> rather than loosening the no-scroll rule.
+
+**Who's playing, and who's winning**
+
+- In the lobby and during the game, everyone sees **the list of players' names**
+  — so you know who you're up against.
+- **Nobody sees anyone else's score or word count until the round ends.** The
+  host doesn't get a peek either. An earlier version broadcast live counts;
+  that's now removed and `pushLive()` is a deliberate no-op with a comment
+  saying why.
+
+**Things worth knowing**
+
+- Boards use the **real 16 Boggle dice**, not random letters. Random letters
+  give unplayable consonant soup; these average ~86 findable words per board,
+  and the worst of 50 test boards still had 23.
+- The **host re-checks every word** a guest claims — that it's real, and that it
+  can actually be traced on that board. A guest can send anything.
+- During play only *counts* go over the wire, never the words themselves —
+  otherwise you could read your opponents' answers off the network.
+
+---
+
 ## ⚠️ What still needs doing
 
 **Upload it, then play it with real people.** Everything above passed automated
@@ -350,6 +499,15 @@ watching for:
 - Does the ability button get in the way on a phone?
 - Do the new menu screens feel better, or is it now too many taps to start a
   game? (Home → Play → 1 Player is 3 taps, where it used to be 1.)
+
+**Wuzzle specifically:**
+
+- Is tracing accurate on a phone, or do fingers slip between squares?
+- Is 1½ minutes the right default round?
+- Does the dictionary reject words kids think are real? That's the most likely
+  complaint. The fix is to lower the frequency cutoff from 2.0 and rebuild.
+- Are 8 players too many for one board?
+- On a phone in landscape, does the fit-to-screen scale get too small to read?
 - Are Easy bots actually beatable for a real beginner, and is Medium too big a
   jump? The simulation says easy→medium is a cliff.
 - In team modes, is it obvious at a glance who's on your side?
