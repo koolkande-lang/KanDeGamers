@@ -26,14 +26,70 @@
   body.playing #subtitle { display: none; }
 
   #menu, #gameOver {
-    background: rgba(20,10,30,0.88); border: 2px solid var(--panel);
-    border-radius: 16px; padding: 22px 26px; text-align: center;
-    box-shadow: 0 0 30px rgba(0,0,0,0.5); max-width: 380px;
+    background: linear-gradient(160deg, rgba(28,14,42,0.94), rgba(14,8,22,0.96));
+    border: 1px solid #4a2c66;
+    border-radius: 4px;                     /* squarer = more console-like */
+    padding: 20px 22px; text-align: center;
+    box-shadow: 0 0 60px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.06);
+    width: min(94vw, 430px);
     max-height: 92vh; overflow-y: auto;
+    position: relative;
   }
+  /* thin accent rule along the top, like a console menu frame */
+  #menu::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, transparent, var(--candy), transparent);
+  }
+
+  /* ---- screens ---- */
+  .screen { animation: screenIn 0.20s ease both; }
+  @keyframes screenIn {
+    from { opacity: 0; transform: translateX(20px); }
+    to   { opacity: 1; transform: none; }
+  }
+  .screenTitle {
+    margin: 2px 0 16px; font-size: 1.05rem; letter-spacing: 3px;
+    text-transform: uppercase; color: #e9d5ff; font-weight: bold;
+    border-bottom: 1px solid #4a2c66; padding-bottom: 10px;
+  }
+
+  /* ---- home screen buttons ---- */
+  #menu .menuBtn {
+    display: block; width: 100%; margin: 0 0 8px; padding: 13px 14px 13px 18px;
+    text-align: left; border: none; border-left: 4px solid var(--candy);
+    border-radius: 0 4px 4px 0; cursor: pointer; color: var(--text);
+    background: linear-gradient(90deg, rgba(255,93,162,0.20), rgba(255,93,162,0.02));
+    transition: background 0.14s ease, transform 0.14s ease;
+  }
+  #menu .menuBtn:hover, #menu .menuBtn:focus {
+    background: linear-gradient(90deg, rgba(255,93,162,0.48), rgba(255,93,162,0.05));
+    transform: translateX(5px);
+  }
+  .menuBtn .mIcon { font-size: 1rem; margin-right: 9px; }
+  .menuBtn .mLabel { font-size: 1.05rem; font-weight: bold; letter-spacing: 2px; }
+  .menuBtn .mSub {
+    display: block; font-size: 0.7rem; opacity: 0.55; letter-spacing: 0.4px;
+    margin-top: 3px; margin-left: 25px; font-weight: normal;
+  }
+
+  /* ---- profile strip ---- */
+  #profileCard {
+    text-align: left; padding: 10px 14px; margin-bottom: 16px;
+    background: rgba(0,0,0,0.35); border-left: 3px solid #6b21a8; border-radius: 0 4px 4px 0;
+  }
+  #profileName { font-weight: bold; font-size: 1rem; letter-spacing: 1px; }
+  #profileRank { font-size: 0.7rem; opacity: 0.55; margin-top: 2px; }
+
+  /* ---- back button ---- */
+  #menu .backBtn {
+    background: transparent; border: 1px solid #4a2c66; color: var(--text);
+    opacity: 0.7; font-size: 0.78rem; letter-spacing: 2px; width: 150px;
+    margin-top: 16px; padding: 9px;
+  }
+  #menu .backBtn:hover { opacity: 1; background: rgba(255,255,255,0.05); }
   #menu button, #gameOver button {
-    display: block; width: 230px; margin: 9px auto; padding: 12px;
-    font-size: 1.05rem; border: none; border-radius: 10px;
+    display: block; width: 250px; margin: 9px auto; padding: 12px;
+    font-size: 0.95rem; letter-spacing: 1.5px; border: none; border-radius: 4px;
     background: linear-gradient(135deg, var(--candy), #b23b6f);
     color: white; cursor: pointer; font-weight: bold; transition: transform 0.1s ease;
   }
@@ -41,7 +97,11 @@
   #menu button:hover, #gameOver button:hover { transform: scale(1.04); }
   #menu button:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
   #menu p, #gameOver p { opacity: 0.8; font-size: 0.85rem; line-height: 1.5; }
-  .fieldLabel { margin: 0 0 6px !important; font-weight: bold; opacity: 1 !important; font-size: 0.88rem !important; }
+  .fieldLabel {
+    margin: 14px 0 7px !important; font-weight: bold; opacity: 0.75 !important;
+    font-size: 0.72rem !important; letter-spacing: 2px; text-transform: uppercase;
+    text-align: left; border-bottom: 1px solid rgba(255,255,255,0.07); padding-bottom: 5px;
+  }
   .note { font-size: 0.74rem !important; opacity: 0.5 !important; margin: 4px 0 14px !important; }
 
   #difficultyRow { display: flex; gap: 5px; justify-content: center; margin: 0 0 4px; }
@@ -86,7 +146,7 @@
   #joinCodeInput { letter-spacing: 3px; text-transform: uppercase; font-weight: bold; }
 
   #roomCode {
-    font-size: 2rem; font-weight: bold; letter-spacing: 4px; margin: 8px 0;
+    font-size: 2.4rem; font-weight: bold; letter-spacing: 4px; margin: 8px 0;
     padding: 10px; background: #120a1c; border-radius: 8px;
   }
   #lobbyList { list-style: none; padding: 0; margin: 10px 0; }
@@ -272,54 +332,89 @@
 <p id="subtitle">Slither around, gobble fruit, don't bite anyone.</p>
 
 <div id="menu">
-  <!-- ---------- Main menu ---------- -->
-  <div id="modeChoice">
-    <p class="fieldLabel">Choose your speed:</p>
+
+  <!-- ======================= HOME ======================= -->
+  <div id="mainMenu" class="screen">
+    <div id="profileCard">
+      <div id="profileName">Player</div>
+      <div id="profileRank"></div>
+    </div>
+
+    <button class="menuBtn" id="btnGoPlay">
+      <span class="mIcon">▶</span><span class="mLabel">PLAY</span>
+      <span class="mSub">Solo, split screen and bots</span></button>
+    <button class="menuBtn" id="btnGoOnline">
+      <span class="mIcon">🌐</span><span class="mLabel">ONLINE</span>
+      <span class="mSub">Up to 6 players with a room code</span></button>
+    <button class="menuBtn" id="btnGoCustomize">
+      <span class="mIcon">🎨</span><span class="mLabel">CUSTOMISE</span>
+      <span class="mSub">Name, colour, skins and trails</span></button>
+    <button class="menuBtn" id="btnGoSettings">
+      <span class="mIcon">⚙️</span><span class="mLabel">SETTINGS</span>
+      <span class="mSub">Speed and controls</span></button>
+  </div>
+
+  <!-- ======================= PLAY ======================= -->
+  <div id="playPanel" class="screen hidden">
+    <h2 class="screenTitle">▶ PLAY</h2>
+
+    <p class="fieldLabel">Game mode</p>
+    <div id="formatRow"></div>
+    <p id="formatNote" class="note"></p>
+
+    <p class="fieldLabel">Computer players</p>
+    <div id="botRow"></div>
+    <div id="botDiffRow"></div>
+    <p id="botNote" class="note"></p>
+
+    <button id="btn1p">1 PLAYER</button>
+    <button id="btn2p">2 PLAYERS — same device</button>
+    <p class="note">Swipe to steer, or arrow keys / WASD.<br>
+       Same device: P1 = left half or WASD, P2 = right half or Arrows.</p>
+
+    <button class="backBtn" id="btnPlayBack">◀ BACK</button>
+  </div>
+
+  <!-- ===================== CUSTOMISE ==================== -->
+  <div id="customizePanel" class="screen hidden">
+    <h2 class="screenTitle">🎨 CUSTOMISE</h2>
+
+    <p class="fieldLabel">Your name</p>
+    <input id="nameInput" maxlength="12" placeholder="Player">
+
+    <p class="fieldLabel">Your colour</p>
+    <div id="colorRow"></div>
+    <p class="note">In team games your team colour is shown instead.</p>
+
+    <button id="btnPath">🏆 PATH OF PREY <span id="pathMini"></span></button>
+
+    <button class="backBtn" id="btnCustomizeBack">◀ BACK</button>
+  </div>
+
+  <!-- ====================== SETTINGS ==================== -->
+  <div id="settingsPanel" class="screen hidden">
+    <h2 class="screenTitle">⚙️ SETTINGS</h2>
+
+    <p class="fieldLabel">Snake speed</p>
     <div id="difficultyRow">
       <button class="diff-btn" data-ms="230" data-name="Easy"><span class="emoji">🐌</span>Easy</button>
       <button class="diff-btn" data-ms="160" data-name="Medium"><span class="emoji">🙂</span>Medium</button>
       <button class="diff-btn" data-ms="110" data-name="Hard"><span class="emoji">🔥</span>Hard</button>
       <button class="diff-btn" data-ms="75" data-name="Insane"><span class="emoji">💀</span>Insane</button>
     </div>
-    <p class="note">Changeable any time from the menu.</p>
+    <p class="note">Easy is the gentlest. You can change this any time.</p>
 
-    <p class="fieldLabel">Your snake colour:</p>
-    <div id="colorRow"></div>
-    <p class="note">Used online and in 1 player.</p>
+    <p class="fieldLabel">In-game keys</p>
+    <p class="note" style="line-height:1.8 !important;">
+      <b>Space</b> pause &nbsp;·&nbsp; <b>R</b> restart<br>
+      <b>H</b> use ability &nbsp;·&nbsp; <b>Esc</b> quit</p>
 
-    <p class="fieldLabel">Your name:</p>
-    <input id="nameInput" maxlength="12" placeholder="Player">
-
-    <p class="fieldLabel">Game mode:</p>
-    <div id="formatRow"></div>
-    <p id="formatNote" class="note"></p>
-
-    <p class="fieldLabel">Computer players:</p>
-    <div id="botRow"></div>
-    <div id="botDiffRow"></div>
-    <p id="botNote" class="note"></p>
-
-    <button id="btnPath" class="secondary">🏆 Path of Prey <span id="pathMini"></span></button>
-
-    <button id="btn1p">1 Player</button>
-    <button id="btn2p">2 Player — Same Device</button>
-    <button id="btnOnline">Online — up to 6 players</button>
-    <p><b>Swipe</b> to steer, or arrow keys / WASD.<br>Same device: P1 = left half or WASD, P2 = right half or Arrows.</p>
+    <button class="backBtn" id="btnSettingsBack">◀ BACK</button>
   </div>
 
-  <!-- ---------- Online: host or join ---------- -->
-  <div id="onlineChoice" class="hidden">
-    <p>Play with friends on other devices:</p>
-    <button id="btnHost">Create Room</button>
-    <p style="margin:6px 0;">— or —</p>
-    <input id="joinCodeInput" maxlength="4" placeholder="CODE">
-    <button id="btnJoin">Join Room</button>
-    <button id="btnOnlineBack" class="secondary">Back</button>
-  </div>
-
-  <!-- ---------- Path of Prey ---------- -->
-  <div id="pathPanel" class="hidden">
-    <p class="fieldLabel">🏆 Path of Prey</p>
+  <!-- ================== PATH OF PREY ==================== -->
+  <div id="pathPanel" class="screen hidden">
+    <h2 class="screenTitle">🏆 PATH OF PREY</h2>
     <p class="note" style="margin-bottom:8px !important;">
       Rewards unlock as your <b>total score across every game ever</b> climbs.<br>
       Skins and trails are separate slots, so you can wear one of each.<br>
@@ -331,21 +426,37 @@
 
     <div id="skinGrid"></div>
 
-    <button id="btnPathBack" class="secondary">Back</button>
+    <button class="backBtn" id="btnPathBack">◀ BACK</button>
   </div>
 
-  <!-- ---------- Online: lobby ---------- -->
-  <div id="onlineStatus" class="hidden">
+  <!-- ================= ONLINE: host/join ================ -->
+  <div id="onlineChoice" class="screen hidden">
+    <h2 class="screenTitle">🌐 ONLINE</h2>
+    <p class="note">Play with friends on other devices. The host picks the game
+       mode and speed for everyone.</p>
+
+    <button id="btnHost">CREATE ROOM</button>
+    <p class="note" style="margin:8px 0 !important;">— or join one —</p>
+    <input id="joinCodeInput" maxlength="4" placeholder="CODE">
+    <button id="btnJoin">JOIN ROOM</button>
+
+    <button class="backBtn" id="btnOnlineBack">◀ BACK</button>
+  </div>
+
+  <!-- ==================== ONLINE: lobby ================= -->
+  <div id="onlineStatus" class="screen hidden">
+    <h2 class="screenTitle">🌐 LOBBY</h2>
     <p id="onlineStatusText">Connecting...</p>
     <div id="roomCodeBox" class="hidden">
-      <p style="margin-bottom:0;">Room code:</p>
+      <p style="margin-bottom:0;">Room code</p>
       <div id="roomCode"></div>
-      <button id="btnCopyCode" class="secondary">Copy Code</button>
+      <button id="btnCopyCode" class="secondary">Copy code</button>
     </div>
     <ul id="lobbyList"></ul>
-    <button id="btnStartMatch" class="hidden">Start Game</button>
-    <button id="btnOnlineCancel" class="secondary">Leave</button>
+    <button id="btnStartMatch" class="hidden">START GAME</button>
+    <button class="backBtn" id="btnOnlineCancel">◀ LEAVE</button>
   </div>
+
 </div>
 
 <div id="wrap">
@@ -868,6 +979,7 @@
   nameInput.addEventListener('input', () => {
     myName = nameInput.value.trim();
     try { localStorage.setItem('scName', myName); } catch (e) {}
+    refreshProfile();
   });
   function myDisplayName() { return (nameInput.value.trim() || 'Player'); }
 
@@ -968,6 +1080,7 @@
           if (kind === 'skin') mySkinKey = item.key; else myTrailKey = item.key;
           savePath();
           renderPath();
+          refreshProfile();
         });
       }
       grid.appendChild(tile);
@@ -975,8 +1088,9 @@
   }
 
   renderPath();
-  $('btnPath').addEventListener('click', () => { renderPath(); showPanel('pathPanel'); });
-  $('btnPathBack').addEventListener('click', () => showPanel('modeChoice'));
+  refreshProfile();
+  $('btnPath').addEventListener('click', () => { renderPath(); goTo('pathPanel'); });
+  $('btnPathBack').addEventListener('click', () => { refreshProfile(); goBack(); });
 
   // ============================================================
   //  Building players
@@ -2187,25 +2301,71 @@
     document.body.classList.remove('playing');
     if (netRole) teardownPeer();
     refreshColorAvailability([]);
-    showPanel('modeChoice');
+    goHome();
     menuEl.classList.remove('hidden');
   });
 
   // ============================================================
   //  Online
   // ============================================================
+  // ---- Screens ----
+  // One visible at a time, with a back stack, so every screen knows where it
+  // came from instead of always dumping you at the home screen.
+  const SCREENS = ['mainMenu', 'playPanel', 'customizePanel', 'settingsPanel',
+                   'pathPanel', 'onlineChoice', 'onlineStatus'];
+  let screenStack = ['mainMenu'];
+
   function showPanel(id) {
-    ['modeChoice', 'onlineChoice', 'onlineStatus', 'pathPanel'].forEach(p =>
-      $(p).classList.toggle('hidden', p !== id));
+    SCREENS.forEach(p => {
+      const el = $(p);
+      const on = (p === id);
+      el.classList.toggle('hidden', !on);
+      if (on) {                       // restart the slide-in each time
+        el.classList.remove('screen');
+        void el.offsetWidth;
+        el.classList.add('screen');
+      }
+    });
   }
+
+  function goTo(id) {
+    if (screenStack[screenStack.length - 1] !== id) screenStack.push(id);
+    showPanel(id);
+  }
+
+  function goBack() {
+    screenStack.pop();
+    const to = screenStack[screenStack.length - 1] || 'mainMenu';
+    showPanel(to);
+  }
+
+  function goHome() {
+    screenStack = ['mainMenu'];
+    showPanel('mainMenu');
+  }
+
+  function refreshProfile() {
+    $('profileName').textContent = myDisplayName();
+    const earned = rewardsEarned(pathPoints);
+    $('profileRank').textContent =
+      `${pathPoints} pts · ${earned}/${PATH.length} rewards · ${skinByKey(mySkinKey).name}`;
+  }
+
   function setStatus(txt) { $('onlineStatusText').textContent = txt; }
 
-  $('btnOnline').addEventListener('click', () => showPanel('onlineChoice'));
-  $('btnOnlineBack').addEventListener('click', () => showPanel('modeChoice'));
+  $('btnGoPlay').addEventListener('click', () => { refreshPickers(); goTo('playPanel'); });
+  $('btnGoOnline').addEventListener('click', () => goTo('onlineChoice'));
+  $('btnGoCustomize').addEventListener('click', () => { renderPath(); goTo('customizePanel'); });
+  $('btnGoSettings').addEventListener('click', () => goTo('settingsPanel'));
+
+  $('btnPlayBack').addEventListener('click', goBack);
+  $('btnCustomizeBack').addEventListener('click', () => { refreshProfile(); goBack(); });
+  $('btnSettingsBack').addEventListener('click', goBack);
+  $('btnOnlineBack').addEventListener('click', goBack);
   $('btnOnlineCancel').addEventListener('click', () => {
     teardownPeer();
     refreshColorAvailability([]);
-    showPanel('modeChoice');
+    goHome();
   });
   $('btnCopyCode').addEventListener('click', () => {
     if (navigator.clipboard) navigator.clipboard.writeText($('roomCode').textContent).catch(() => {});
@@ -2289,7 +2449,7 @@
     if (attemptsLeft === undefined) attemptsLeft = 5;
     netRole = 'host';
     myIndex = 0;
-    showPanel('onlineStatus');
+    goTo('onlineStatus');
     $('roomCodeBox').classList.add('hidden');
     setStatus('Setting up room...');
     lobby = [{ name: myDisplayName(), colorKey: myColorKey, skinKey: mySkinKey,
@@ -2365,7 +2525,7 @@
     const code = $('joinCodeInput').value.trim().toUpperCase();
     if (!code) { alert('Enter a room code first.'); return; }
     netRole = 'guest';
-    showPanel('onlineStatus');
+    goTo('onlineStatus');
     $('roomCodeBox').classList.add('hidden');
     setStatus('Connecting...');
 
@@ -2666,6 +2826,11 @@
     if (d) applyDirection(d, (mode === 'local2') ? (isWASD ? 0 : 1) : 0);
     if (isArrow) e.preventDefault();
   });
+
+  // Opening screen set from code rather than trusting the `hidden` classes in
+  // the markup. Runs last, because SCREENS is declared further up the file and
+  // calling showPanel any earlier hits the temporal dead zone.
+  showPanel('mainMenu');
 
   // Exposed purely so the logic can be exercised in tests.
   window.__snake = {

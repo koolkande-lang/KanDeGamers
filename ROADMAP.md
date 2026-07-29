@@ -113,6 +113,32 @@ Notes:
   project. To change them, edit the `name` fields in the `SKINS` list near the
   top of the file — nothing else depends on them.
 
+### 🎮 Console-style menus
+
+The menu used to be one long panel with everything stacked on it — speed,
+colour, name, mode, bots, rewards, play buttons. It's now **seven separate
+screens**, the way a console game does it.
+
+```
+HOME  ─┬─ ▶ PLAY        game mode · bots · 1P / 2P
+       ├─ 🌐 ONLINE      create or join a room ─→ LOBBY
+       ├─ 🎨 CUSTOMISE   name · colour ─→ 🏆 PATH OF PREY
+       └─ ⚙️ SETTINGS    speed · key list
+```
+
+- Home shows a **profile strip**: your name, total points, how many of the 12
+  rewards you have, and your equipped skin.
+- Every sub-screen has a **◀ BACK** button and slides in from the right.
+- **Back uses a stack**, so Home → Customise → Path → Back lands you on
+  Customise, not Home. Getting that wrong is the classic menu bug.
+- Squarer panels, uppercase spaced lettering, and a left accent bar that lights
+  up on hover.
+
+> ⚠️ The opening screen is set by calling `showPanel('mainMenu')` in code, not
+> by trusting the `hidden` classes in the markup. That call has to be the **last
+> line of setup** — `SCREENS` is declared further up, so calling it any earlier
+> hits the temporal dead zone and the whole game fails to start.
+
 ### ✕ Quitting
 
 There's a **✕ Quit** button under the board in every mode (or press **Escape**).
@@ -322,6 +348,8 @@ watching for:
 - Do the abilities feel fun or frustrating? Especially Thor's hammer, which the
   simulation says is the strongest against good players.
 - Does the ability button get in the way on a phone?
+- Do the new menu screens feel better, or is it now too many taps to start a
+  game? (Home → Play → 1 Player is 3 taps, where it used to be 1.)
 - Are Easy bots actually beatable for a real beginner, and is Medium too big a
   jump? The simulation says easy→medium is a cliff.
 - In team modes, is it obvious at a glance who's on your side?
