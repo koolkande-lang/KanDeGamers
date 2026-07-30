@@ -123,6 +123,36 @@
   }
   body.nokeys #touch{display:block}
 
+  /* ---------- big-screen mode ----------
+     Toggled by the Fullscreen button. This is pure CSS, so it fills the screen
+     even on iPad Safari, which has no Fullscreen API for web pages at all.  */
+  body.big{background:#000}
+  body.big #stage{
+    transform:none !important;
+    width:100vw;height:100vh;height:100dvh;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+  }
+  body.big.playing #game{width:100%;height:100%;justify-content:center;gap:0}
+  body.big.playing #viewWrap{width:100%;height:100%}
+  body.big.playing #view{
+    width:100%;height:100%;max-width:none;aspect-ratio:auto;
+    border:none;border-radius:0;
+  }
+  /* the quit / fullscreen buttons move out of the way, over the picture */
+  body.big.playing #gameBottom{
+    position:absolute;top:10px;right:12px;margin:0;z-index:20;gap:8px;
+  }
+  body.big.playing #gameBottom button{background:rgba(0,0,0,.55);opacity:.75}
+
+  /* only ever seen on a phone held upright in big-screen mode */
+  #rotate{
+    display:none;position:absolute;left:50%;bottom:38%;transform:translateX(-50%);
+    background:rgba(0,0,0,.7);border:1px solid var(--amber);border-radius:20px;
+    padding:7px 14px;font-size:.68rem;letter-spacing:.08em;color:var(--amber);
+    z-index:21;pointer-events:none;white-space:nowrap;
+  }
+  body.big.playing.portrait #rotate{display:block}
+
   #gameBottom{display:flex;gap:10px;justify-content:center;margin-top:8px}
   #gameBottom button{padding:6px 16px;font-size:clamp(.6rem,1.4vh,.7rem);border-radius:20px;
     border:1px solid var(--line);background:transparent;color:var(--ink);opacity:.6;letter-spacing:.1em}
@@ -223,7 +253,7 @@
   </div>
 
   <div id="game">
-    <div style="position:relative">
+    <div id="viewWrap" style="position:relative">
       <canvas id="view" width="480" height="300"></canvas>
       <div id="hud">
         <div id="hudTop">
@@ -235,6 +265,7 @@
           <div id="fear"><div id="fearFill"></div></div>
         </div>
       </div>
+      <div id="rotate">↻ Turn your phone sideways for a wider view</div>
       <div id="touch">
         <div id="stick"><div id="stickNub"></div></div>
         <button id="btnRun">RUN</button>
@@ -567,6 +598,48 @@
     buf = new Uint32Array(img.data.buffer);
   }
 
+  // The canvas is stretched by CSS to whatever shape the screen is, so the
+  // buffer behind it has to be reshaped to match or the picture comes out
+  // squashed. We also cap how many pixels we draw: filling a 1920x1080 screen
+  // one pixel at a time would be fourteen times the work of the little window.
+  const BASE_ASPECT = 1.6;        // the shape the game was designed around
+  const MAX_PIXELS = 240000;      // measured at about 12ms a frame
+  let resScale = 1;               // dropped automatically on a slow device
+  let planeScale = 1;             // how wide the view is, for this screen shape
+
+  function sizeView() {
+    const r = view.getBoundingClientRect();
+    const cssW = Math.max(160, Math.round(r.width || 480));
+    const cssH = Math.max(100, Math.round(r.height || 300));
+    // draw at most MAX_PIXELS, and never more than the screen actually shows
+    const k = Math.min(1, Math.sqrt((MAX_PIXELS * resScale) / (cssW * cssH)));
+    const w = Math.max(160, Math.round(cssW * k));
+    const h = Math.max(100, Math.round(cssH * k));
+    if (view.width !== w || view.height !== h) {
+      view.width = w; view.height = h;
+      allocBuffers();
+    }
+    // A wider screen should show MORE to the left and right, not stretch what
+    // was already there. Clamped, so a tall phone isn't reduced to a keyhole
+    // and an ultrawide monitor doesn't go fisheye.
+    planeScale = Math.max(1.15, Math.min(2.4, cssW / cssH)) / BASE_ASPECT;
+    // upright phone: the view has to be narrowed a lot, so say so
+    document.body.classList.toggle('portrait', cssW / cssH < 1.15);
+  }
+
+  // If frames start taking too long, quietly render fewer pixels rather than
+  // letting the game turn into a slideshow.
+  let ftAcc = 0, ftN = 0;
+  function noteFrameTime(ms) {
+    ftAcc += ms; ftN++;
+    if (ftN < 45) return;
+    const avg = ftAcc / ftN; ftAcc = 0; ftN = 0;
+    const before = resScale;
+    if (avg > 24) resScale = Math.max(0.30, resScale * 0.8);
+    else if (avg < 10) resScale = Math.min(1, resScale * 1.12);
+    if (resScale !== before) sizeView();
+  }
+
   // ---- procedural textures, 64x64, built once at startup ----
   const TEX = 64, TEXMASK = TEX - 1;
   const textures = {};
@@ -667,7 +740,8 @@
     const horizon = (RH / 2 + bob) | 0;
 
     const dirX = Math.cos(player.a), dirY = Math.sin(player.a);
-    const planeX = -dirY * Math.tan(FOV / 2), planeY = dirX * Math.tan(FOV / 2);
+    const pl = Math.tan(FOV / 2) * planeScale;
+    const planeX = -dirY * pl, planeY = dirX * pl;
 
     // The torch beam only depends on the column, so work it out once per frame
     // rather than once per pixel.
@@ -1275,7 +1349,9 @@
     updatePlayer(dt);
     updateMonster(dt, now);
     checkEscape();
+    const t0 = (performance && performance.now) ? performance.now() : Date.now();
     render(now);
+    noteFrameTime(((performance && performance.now) ? performance.now() : Date.now()) - t0);
     $('fearFill').style.width = (state.fear * 100).toFixed(0) + '%';
     const a = nearbyAction();
     const p = $('prompt');
@@ -1306,6 +1382,7 @@
     $('results').classList.add('hidden');
     $('game').style.display = 'flex';
     document.body.classList.add('playing');
+    sizeView();                        // match the buffer to the shape on screen
     disarmQuit();
     setObjective();
     scheduleFit();
@@ -1320,7 +1397,7 @@
     keys[k] = true;
     if (k === 'e' && running) doAction();
     if (k === 'escape' && running) pressQuit();
-    if (k === 'f' && !state.keypadOpen) toggleFullscreen();
+    if (k === 'f' && !state.keypadOpen) toggleBig();
     if (['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright',' '].includes(k)) e.preventDefault();
   });
   window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
@@ -1511,14 +1588,38 @@
       if (req) req.call(el);
     } catch (e) { /* not supported here — no harm done */ }
   }
-  function refreshFullBtn() {
-    const b = $('btnFull');
-    if (b) b.textContent = isFull() ? '⛶ Exit fullscreen' : '⛶ Fullscreen';
+  // Two separate things, deliberately:
+  //   bigMode  — our own CSS that makes the game fill the whole screen. Always
+  //              works, on every device.
+  //   isFull() — the browser's real fullscreen, which also hides the address
+  //              bar and tabs. Not available on iPad Safari.
+  // The button turns on big mode either way, and asks for real fullscreen as a
+  // bonus. That way it does something useful everywhere.
+  let bigMode = false;
+  function setBig(on) {
+    bigMode = !!on;
+    document.body.classList.toggle('big', bigMode);
+    refreshFullBtn();
     scheduleFit();
   }
-  $('btnFull').addEventListener('click', e => { e.preventDefault(); toggleFullscreen(); });
-  document.addEventListener('fullscreenchange', refreshFullBtn);
-  document.addEventListener('webkitfullscreenchange', refreshFullBtn);
+  function toggleBig() {
+    const goingBig = !bigMode;
+    setBig(goingBig);
+    if (goingBig) { if (!isFull()) toggleFullscreen(); }
+    else if (isFull()) toggleFullscreen();
+  }
+  function refreshFullBtn() {
+    const b = $('btnFull');
+    if (b) b.textContent = bigMode ? '⛶ Exit fullscreen' : '⛶ Fullscreen';
+  }
+  $('btnFull').addEventListener('click', e => { e.preventDefault(); toggleBig(); });
+  // Leaving real fullscreen (Esc, or a swipe on a phone) should drop big mode
+  // too, otherwise you're left with a giant view and no browser controls.
+  function onFsChange() {
+    if (!isFull() && bigMode) setBig(false); else { refreshFullBtn(); scheduleFit(); }
+  }
+  document.addEventListener('fullscreenchange', onFsChange);
+  document.addEventListener('webkitfullscreenchange', onFsChange);
 
   // ============================================================
   //  Fit to screen
@@ -1527,11 +1628,18 @@
   function fitScreen() {
     const s = $('stage');
     if (!s) return;
+    if (bigMode) {
+      // filling the screen is the whole point — don't scale it back down
+      s.style.transform = 'none';
+      sizeView();
+      return;
+    }
     s.style.transform = 'scale(1)';
     const r = s.getBoundingClientRect();
     if (!r.width || !r.height) return;
     const k = Math.min(1, (window.innerWidth - 12) / r.width, (window.innerHeight - 12) / r.height);
     s.style.transform = `scale(${k.toFixed(4)})`;
+    sizeView();
   }
   function scheduleFit() {
     cancelAnimationFrame(fitPending);
@@ -1557,6 +1665,9 @@
     MAP_SRC, W, H, SOLID, NOTES, CH,
     setCell, cellsNear, buildChunk, chunkAt, startEndless, huntSpeed,
     castRayDir, makeTextures, allocBuffers, buildShadeTables, shaded, LEVELS,
+    sizeView, noteFrameTime, setBig, toggleBig, fitScreen, MAX_PIXELS,
+    get bigMode() { return bigMode; }, get planeScale() { return planeScale; },
+    get resScale() { return resScale; },
     get textures() { return textures; },
     get worldMode() { return worldMode; },
     set worldMode(v) { worldMode = v; },

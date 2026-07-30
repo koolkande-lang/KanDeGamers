@@ -476,13 +476,40 @@ drag-to-look on a tablet.
 
 Three things you asked for, all in Hush.
 
-### ⛶ Fullscreen
+### ⛶ Fullscreen — the game actually fills the screen
 
-A **Fullscreen** button under the view, and the **F** key on a keyboard. It
-fills the whole screen so the room around you disappears — which matters more in
-a horror game than in the other two. On an iPad, Safari doesn't allow proper
-fullscreen for a page, so the button quietly does nothing there rather than
-breaking. Adding the game to your Home Screen gets you the same effect.
+A **Fullscreen** button under the view, and the **F** key on a keyboard.
+
+The first version had a real problem: it made the *browser* go fullscreen, but
+the game stayed a small 480×300 box floating in the middle of a big black
+screen. Not much use. It now does two separate things:
+
+1. **Big-screen mode** — our own layout that makes the game fill the entire
+   screen. This is just CSS, so it **works on every device**, including iPad
+   Safari, which has no fullscreen API for web pages at all.
+2. **Real fullscreen** — asked for as a bonus, to hide the address bar and tabs
+   on computers that support it.
+
+Press Esc and it drops out of both, so you're never left with a giant view and
+no way back.
+
+**The picture is reshaped to match your screen.** The canvas used to be locked
+to a 16:10 shape. It now measures the actual screen and rebuilds its buffer to
+the same proportions, so nothing is stretched on a widescreen laptop, an
+ultrawide monitor, an iPad or a phone. Tested at six different screen shapes:
+the picture is always within 2% of the screen's shape.
+
+A wider screen **shows more to the left and right** rather than stretching what
+was already there — and a wall the same distance away fills exactly the same
+share of the screen on every device, which is what stops the world looking
+warped. Held upright, a phone gets a gentle "turn your phone sideways" hint.
+
+**It doesn't get slower when it gets bigger.** Filling a 1080p screen the naive
+way would be fourteen times the drawing work. Instead the game draws at most
+240,000 pixels and lets the screen stretch them — and if frames still take too
+long (an older iPad), it **quietly drops the detail further and raises it again
+when there's room**. Measured filling a laptop, a 1080p screen and an ultrawide:
+7–9ms a frame, all well inside budget.
 
 ### 🧱 Everything is more realistic
 
@@ -839,7 +866,7 @@ drag-to-look on a tablet.
 
 ## ⚠️ What still needs doing
 
-**Upload it, then play it with real people.** All **19 test suites — 863 checks
+**Upload it, then play it with real people.** All **19 test suites — 895 checks
 — pass**, but no human has actually played any of this yet. Things worth
 watching for:
 
