@@ -164,12 +164,20 @@
     position:fixed;inset:0;display:none;align-items:center;justify-content:center;
     background:#000;z-index:50;
   }
-  #scare.on{display:flex;animation:shake .4s infinite}
+  #scare.on{display:flex;animation:shake .12s infinite}
   @keyframes shake{
-    0%,100%{transform:translate(0,0)} 25%{transform:translate(-6px,4px)}
-    50%{transform:translate(5px,-5px)} 75%{transform:translate(-4px,-3px)}
+    0%,100%{transform:translate(0,0) rotate(0deg)} 20%{transform:translate(-11px,7px) rotate(-.7deg)}
+    40%{transform:translate(9px,-9px) rotate(.6deg)} 60%{transform:translate(-7px,-6px) rotate(-.4deg)}
+    80%{transform:translate(8px,5px) rotate(.5deg)}
   }
-  #scareFace{width:min(90vw,90vh);height:min(90vw,90vh)}
+  /* the face fills the screen — it is meant to be the whole world for a moment */
+  #scareFace{width:100vw;height:100vh;display:block}
+  /* a white flash on the very first frame, like a camera going off */
+  #scareFlash{
+    position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:51;
+  }
+  #scare.on #scareFlash{animation:flash .5s ease-out}
+  @keyframes flash{ 0%{opacity:.95} 12%{opacity:.15} 22%{opacity:.6} 100%{opacity:0} }
 
   #keypad{
     position:fixed;inset:0;display:none;align-items:center;justify-content:center;
@@ -286,7 +294,7 @@
   </div>
 </div>
 
-<div id="scare"><canvas id="scareFace" width="400" height="400"></canvas></div>
+<div id="scare"><canvas id="scareFace" width="520" height="520"></canvas><div id="scareFlash"></div></div>
 
 <div id="keypad"><div id="keypadBox">
   <div id="kpDisplay">____</div>
@@ -510,7 +518,9 @@
     const mid = (CH - 1) / 2;
     player = { x: mid + 0.5, y: mid + 0.5, a: 0, speed: 0, bob: 0 };
     // drop it somewhere out of sight, but reachable
-    monster = { x: mid + 0.5, y: mid + 12.5, a: 0, path: [], think: 0, hunting: false, speed: 0 };
+    monster = { x: mid + 0.5, y: mid + 12.5, a: 0, path: [], think: 0, hunting: false, speed: 0,
+      mode: 'wander', lastKnown: null, modeSince: 0, listenUntil: 0,
+      stepPhase: 0, headTurn: 0, jaw: 0, lunge: 0, moved: 0, seenAt: 0 };
     if (isWall(player.x, player.y)) { player.x = mid + 0.5; player.y = 1.5; }
     beginRound();
   }
@@ -521,7 +531,9 @@
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) grid[y][x] = MAP_SRC[y][x];
     const s = findAll('@')[0], m = findAll('M')[0];
     player = { x: s.x + 0.5, y: s.y + 0.5, a: 0, speed: 0, bob: 0 };
-    monster = { x: m.x + 0.5, y: m.y + 0.5, a: 0, path: [], think: 0, hunting: false, speed: 0 };
+    monster = { x: m.x + 0.5, y: m.y + 0.5, a: 0, path: [], think: 0, hunting: false, speed: 0,
+      mode: 'wander', lastKnown: null, modeSince: 0, listenUntil: 0,
+      stepPhase: 0, headTurn: 0, jaw: 0, lunge: 0, moved: 0, seenAt: 0 };
     if (full) state = freshState();
     else { state.leverOrder = []; state.fear = 0; }
     // put already-solved things back the way they were
@@ -590,6 +602,7 @@
   let RW = view.width, RH = view.height;
   let zbuf = new Float32Array(RW);
   let img = null, buf = null, beamF = null;
+  let horizonY = 0;
 
   function allocBuffers() {
     RW = view.width; RH = view.height;
@@ -738,6 +751,7 @@
     const flicker = 0.93 + Math.sin(now / 70) * 0.03 + Math.sin(now / 13) * 0.02;
     const bob = Math.sin(player.bob) * RH * 0.008;
     const horizon = (RH / 2 + bob) | 0;
+    horizonY = horizon;
 
     const dirX = Math.cos(player.a), dirY = Math.sin(player.a);
     const pl = Math.tan(FOV / 2) * planeScale;
@@ -876,7 +890,7 @@
   }
 
   function drawSprite(kind, cx, size, shade, now) {
-    const cy = RH / 2;
+    const cy = horizonY || RH / 2;
     const S = (v) => size * v;
     ctx.save();
     if (kind === 'fuse') {
@@ -918,30 +932,165 @@
     ctx.restore();
   }
 
-  // A patchwork toy, far too tall, with long arms. Cartoonish rather than gory.
+  // ------------------------------------------------------------
+  //  The monster, drawn as a jointed figure rather than a stack of boxes.
+  //
+  //  It is a patchwork toy — burlap, mismatched buttons, stitched seams.
+  //  Deliberately cartoonish: no blood, nothing gory. What makes it work is
+  //  movement — it walks with a real gait, its head turns to follow you, and
+  //  it leans in when it charges.
+  // ------------------------------------------------------------
+  const MON = {
+    cloth: [116, 46, 58], clothDark: [74, 28, 38], patch: [96, 74, 52],
+    stitch: [222, 208, 176], eye: [255, 244, 206], maw: [16, 8, 10],
+  };
+  const sh = (c, k, boost) => `rgb(${Math.min(255,c[0]*k*(boost||1))|0},${Math.min(255,c[1]*k*(boost||1))|0},${Math.min(255,c[2]*k*(boost||1))|0})`;
+
+  // one tapered limb, hinged at (x,y) and swung by `ang`
+  function limb(x, y, len, wTop, wBot, ang, fill) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(ang);
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    ctx.moveTo(-wTop / 2, 0);
+    ctx.lineTo(wTop / 2, 0);
+    ctx.lineTo(wBot / 2, len);
+    ctx.lineTo(-wBot / 2, len);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
   function drawMonster(cx, cy, size, shade, now) {
     const S = v => size * v;
-    const sway = Math.sin(now / 180) * S(.03);
-    const body = `rgb(${120*shade|0},${45*shade|0},${60*shade|0})`;
-    const dark = `rgb(${70*shade|0},${25*shade|0},${35*shade|0})`;
-    ctx.fillStyle = body;
-    ctx.fillRect(cx - S(.16), cy - S(.30), S(.32), S(.62));           // torso
-    ctx.fillStyle = dark;
-    ctx.fillRect(cx - S(.16), cy + S(.02), S(.32), S(.04));            // stitching
-    ctx.fillStyle = body;
-    ctx.fillRect(cx - S(.34) + sway, cy - S(.24), S(.13), S(.60));     // arms
-    ctx.fillRect(cx + S(.21) - sway, cy - S(.24), S(.13), S(.60));
-    ctx.fillRect(cx - S(.11), cy + S(.30), S(.09), S(.24));            // legs
-    ctx.fillRect(cx + S(.02), cy + S(.30), S(.09), S(.24));
-    ctx.fillStyle = `rgb(${140*shade|0},${55*shade|0},${70*shade|0})`;
-    ctx.fillRect(cx - S(.19), cy - S(.56), S(.38), S(.28));            // head
-    // eyes — the only bright thing in the building
-    const glow = monster.hunting ? 1 : 0.65;
-    ctx.fillStyle = `rgb(255,${(235 * glow)|0},${(180 * glow)|0})`;
-    ctx.fillRect(cx - S(.12), cy - S(.47), S(.08), S(.07));
-    ctx.fillRect(cx + S(.04), cy - S(.47), S(.08), S(.07));
-    ctx.fillStyle = `rgb(${20*shade|0},${10*shade|0},${12*shade|0})`;
-    ctx.fillRect(cx - S(.10), cy - S(.36), S(.20), S(.05));            // mouth line
+    const m = monster;
+
+    // Your torch actually lights it: brighter in the middle of the beam.
+    const beam = Math.max(0, 1 - Math.abs(cx / RW * 2 - 1) * 1.1);
+    const lit = Math.max(0.05, Math.min(1, shade * (0.45 + beam * 0.85)));
+    // far away and out of the beam it is only a silhouette with two eyes
+    const ghost = lit < 0.20;
+
+    // gait: legs and arms swing opposite, body bobs, all driven by how fast
+    // it is really moving, so it doesn't march on the spot
+    const gait = Math.min(1, m.moved / 1.4);
+    const p = m.stepPhase;
+    const swing = Math.sin(p) * 0.55 * gait;
+    const bob = Math.abs(Math.cos(p)) * S(0.02) * gait;
+    const lean = (m.mode === 'hunt' ? 0.10 : 0.02) + m.lunge * 0.16;
+
+    const hipY  = cy + S(0.30) - bob;
+    const shldY = cy - S(0.26) - bob;
+    const headY = cy - S(0.44) - bob;
+
+    ctx.save();
+
+    // contact shadow, so it stands on the floor instead of floating
+    ctx.globalAlpha = 0.45 * Math.min(1, shade * 2);
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + S(0.55), S(0.26), S(0.06), 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    const cloth = ghost ? 'rgb(9,7,9)' : sh(MON.cloth, lit);
+    const dark  = ghost ? 'rgb(6,5,6)' : sh(MON.clothDark, lit);
+
+    // legs (back one first)
+    limb(cx + S(0.07), hipY, S(0.30), S(0.10), S(0.07), -swing, dark);
+    limb(cx - S(0.07), hipY, S(0.30), S(0.10), S(0.07),  swing, cloth);
+
+    // long arms, counter-swinging; they reach for you during a lunge
+    const reach = m.lunge * 0.5;
+    limb(cx - S(0.19), shldY, S(0.46), S(0.11), S(0.06), -swing * 0.8 - 0.15 - reach, cloth);
+    limb(cx + S(0.19), shldY, S(0.46), S(0.11), S(0.06),  swing * 0.8 + 0.15 + reach, cloth);
+
+    // torso — narrow shoulders, sagging middle
+    ctx.save();
+    ctx.translate(cx, shldY);
+    ctx.rotate(lean * 0.35);
+    ctx.fillStyle = cloth;
+    ctx.beginPath();
+    ctx.moveTo(-S(0.17), 0);
+    ctx.lineTo( S(0.17), 0);
+    ctx.lineTo( S(0.14), S(0.58));
+    ctx.lineTo(-S(0.14), S(0.58));
+    ctx.closePath();
+    ctx.fill();
+    if (!ghost) {
+      // a mismatched patch and the seams holding it together
+      ctx.fillStyle = sh(MON.patch, lit);
+      ctx.fillRect(-S(0.11), S(0.14), S(0.13), S(0.15));
+      ctx.strokeStyle = sh(MON.stitch, lit * 0.8);
+      ctx.lineWidth = Math.max(1, S(0.012));
+      ctx.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const y = S(0.06) + i * S(0.09);
+        ctx.moveTo(-S(0.15), y); ctx.lineTo(-S(0.15) + S(0.05), y + S(0.03));
+        ctx.moveTo( S(0.10), y); ctx.lineTo( S(0.15), y - S(0.03));
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // head — tilts toward you, and turns as it looks around
+    ctx.save();
+    ctx.translate(cx, headY);
+    ctx.rotate(lean + m.headTurn * 0.10);
+    const hw = S(0.21), hh = S(0.20);
+    ctx.fillStyle = ghost ? 'rgb(11,9,11)' : sh(MON.cloth, lit, 1.12);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, hw, hh, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // eyes: two mismatched buttons that catch the torchlight. Always visible —
+    // in the dark they are the only thing you see, which is the point.
+    const glow = m.mode === 'hunt' ? 1 : m.mode === 'wander' ? 0.55 : 0.8;
+    const ex = m.headTurn * S(0.035);
+    ctx.fillStyle = `rgb(${255 * glow | 0},${238 * glow | 0},${(150 + 60 * (1 - glow)) * glow | 0})`;
+    ctx.beginPath();
+    ctx.ellipse(-S(0.085) + ex, -S(0.045), S(0.055), S(0.048), 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();                                    // the other one is bigger
+    ctx.ellipse( S(0.085) + ex, -S(0.038), S(0.068), S(0.060), 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgb(14,7,9)';                       // button holes
+    ctx.beginPath();
+    ctx.ellipse(-S(0.085) + ex * 1.6, -S(0.045), S(0.020), S(0.024), 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse( S(0.085) + ex * 1.6, -S(0.038), S(0.024), S(0.028), 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // mouth: a stitched line that pulls open into a dark maw when it charges
+    const open = m.jaw;
+    ctx.fillStyle = ghost ? 'rgb(0,0,0)' : sh(MON.maw, Math.max(0.5, lit));
+    ctx.beginPath();
+    ctx.ellipse(0, S(0.085), S(0.105), S(0.012) + S(0.075) * open, 0, 0, Math.PI * 2);
+    ctx.fill();
+    if (!ghost && open > 0.25) {
+      ctx.fillStyle = sh(MON.stitch, lit);
+      const th = S(0.028) * open;
+      for (let i = 0; i < 5; i++) {
+        const tx = -S(0.075) + i * S(0.038);
+        ctx.fillRect(tx, S(0.085) - S(0.012) - S(0.075) * open, S(0.017), th);
+        ctx.fillRect(tx + S(0.019), S(0.085) + S(0.075) * open - th, S(0.017), th);
+      }
+    }
+    if (!ghost) {                                        // stitches at the corners
+      ctx.strokeStyle = sh(MON.stitch, lit * 0.9);
+      ctx.lineWidth = Math.max(1, S(0.012));
+      ctx.beginPath();
+      for (let i = 0; i < 3; i++) {
+        const o = S(0.10) + i * S(0.025);
+        ctx.moveTo(-o, S(0.085) - S(0.02)); ctx.lineTo(-o - S(0.015), S(0.085) + S(0.02));
+        ctx.moveTo( o, S(0.085) - S(0.02)); ctx.lineTo( o + S(0.015), S(0.085) + S(0.02));
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+    ctx.restore();
   }
 
   function drawGrain(now) {
@@ -1004,41 +1153,152 @@
   // ============================================================
   const HEAR_WALK = 3.5, HEAR_RUN = 9.0, SEE = 11;
 
+  // ------------------------------------------------------------
+  //  The monster
+  //
+  //  It used to walk straight at you the whole time, which reads as a machine
+  //  rather than a thing. It now has four moods:
+  //
+  //    wander  — hasn't noticed you. Slow, aimless, stops to listen.
+  //    alert   — heard something. Heads for where the noise came from.
+  //    hunt    — can actually see you. Fast, and it lunges when close.
+  //    search  — got to where you were and you'd gone. Circles, hunting nearby,
+  //              before giving up.
+  //
+  //  The nastiest part is `search`: it doesn't magically know you moved, so
+  //  hiding actually works — and it lingers, so you daren't come out.
+  // ------------------------------------------------------------
+  const HUNT_MEMORY = 2600;   // how long it keeps chasing after losing sight
+  const SEARCH_TIME = 9000;   // how long it pokes around before giving up
+  const LUNGE_RANGE = 3.2;
+
+  function setMode(m, now) {
+    if (monster.mode === m) return;
+    monster.mode = m;
+    monster.modeSince = now;
+    monster.path = [];
+    monster.think = 0;                       // re-plan immediately
+    if (m === 'hunt') roar();
+  }
+
   function updateMonster(dt, now) {
     const dist = Math.hypot(player.x - monster.x, player.y - monster.y);
     const hearRange = player.speed > 0.8 ? HEAR_RUN : (player.speed > 0.05 ? HEAR_WALK : 1.5);
     const sees = dist < SEE && lineOfSight(monster.x, monster.y, player.x, player.y);
     const hears = dist < hearRange;
 
-    if (sees || hears) { monster.hunting = true; monster.lastSeen = now; }
-    else if (monster.hunting && now - (monster.lastSeen || 0) > 6000) monster.hunting = false;
+    // ---- decide the mood ----
+    if (sees) {
+      monster.lastKnown = { x: player.x, y: player.y };
+      monster.seenAt = now;
+      setMode('hunt', now);
+    } else if (hears) {
+      monster.lastKnown = { x: player.x, y: player.y };
+      if (monster.mode !== 'hunt') setMode('alert', now);
+      else monster.seenAt = now;             // still on your trail by ear
+    } else if (monster.mode === 'hunt' && now - monster.seenAt > HUNT_MEMORY) {
+      setMode('search', now);                // lost you — go and look
+    } else if (monster.mode === 'search' && now - monster.modeSince > SEARCH_TIME) {
+      setMode('wander', now);                // given up
+    } else if (monster.mode === 'alert' && now - monster.modeSince > 5000) {
+      setMode('search', now);
+    }
+    monster.hunting = monster.mode === 'hunt' || monster.mode === 'alert';
 
-    if (now - monster.think > 380) {
+    // ---- stand still and listen now and then; much creepier than pacing ----
+    if (now < monster.listenUntil) {
+      monster.headTurn = Math.sin(now / 320) * 0.9;
+      monster.jaw += (0 - monster.jaw) * Math.min(1, dt * 5);
+      settleFear(dt, dist, sees);
+      if (dist < 0.55) caught();
+      return;
+    }
+    if ((monster.mode === 'wander' || monster.mode === 'search') && Math.random() < dt * 0.22) {
+      monster.listenUntil = now + 700 + Math.random() * 900;
+    }
+
+    // ---- pick somewhere to go ----
+    const rethink = monster.mode === 'hunt' ? 260 : 420;
+    if (now - monster.think > rethink) {
       monster.think = now;
       const from = { x: Math.floor(monster.x), y: Math.floor(monster.y) };
       let target;
-      if (monster.hunting) target = { x: Math.floor(player.x), y: Math.floor(player.y) };
-      else target = monster.wander || (monster.wander = randomFloor());
+      if (monster.mode === 'hunt') {
+        target = { x: Math.floor(player.x), y: Math.floor(player.y) };
+      } else if (monster.mode === 'alert' && monster.lastKnown) {
+        target = { x: Math.floor(monster.lastKnown.x), y: Math.floor(monster.lastKnown.y) };
+      } else if (monster.mode === 'search') {
+        // poke around near where it lost you, not at you
+        const c = monster.lastKnown || monster;
+        target = nearFloor(Math.floor(c.x), Math.floor(c.y), 6);
+      } else {
+        target = monster.wander || (monster.wander = randomFloor());
+      }
       monster.path = bfsPath(from, target);
-      if (!monster.hunting && monster.path.length === 0) monster.wander = randomFloor();
+      if (monster.mode === 'wander' && monster.path.length === 0) monster.wander = randomFloor();
+      if (monster.mode === 'search' && monster.path.length === 0) monster.lastKnown = { ...monster };
     }
 
-    const speed = (monster.hunting ? 1.45 * huntSpeed() : 0.75) * dt;
+    // ---- move ----
+    let mult = monster.mode === 'hunt' ? 1.5
+             : monster.mode === 'alert' ? 1.0
+             : monster.mode === 'search' ? 0.8 : 0.55;
+    // a last-moment burst when it's nearly on you
+    monster.lunge = (monster.mode === 'hunt' && dist < LUNGE_RANGE)
+      ? Math.min(1, monster.lunge + dt * 3) : Math.max(0, monster.lunge - dt * 2);
+    mult *= 1 + monster.lunge * 0.45;
+
+    const speed = mult * huntSpeed() * dt;
     const step = monster.path[0];
+    const px = monster.x, py = monster.y;
     if (step) {
       const tx = step.x + 0.5, ty = step.y + 0.5;
       const dx = tx - monster.x, dy = ty - monster.y;
       const d = Math.hypot(dx, dy);
       if (d < 0.12) monster.path.shift();
       else { monster.x += dx / d * speed; monster.y += dy / d * speed; }
-      monster.a = Math.atan2(dy, dx);
+      if (d > 1e-6) monster.a = Math.atan2(dy, dx);
     }
 
-    // fear rises when it's close and in view
-    const target = Math.max(0, Math.min(1, (10 - dist) / 10)) * (monster.hunting ? 1 : 0.5);
-    state.fear += (target - state.fear) * Math.min(1, dt * 2);
+    // ---- animation and sound driven by how far it actually moved ----
+    const walked = Math.hypot(monster.x - px, monster.y - py);
+    monster.moved = walked / Math.max(dt, 1e-4);
+    const before = monster.stepPhase;
+    monster.stepPhase += walked * 3.1;
+    if (Math.floor(before / Math.PI) !== Math.floor(monster.stepPhase / Math.PI)) footstep(dist, now);
 
+    // it turns to look at you once it knows where you are
+    const want = monster.mode === 'hunt' ? 0
+               : monster.mode === 'wander' ? Math.sin(now / 900) * 0.6
+               : Math.sin(now / 420) * 1.1;
+    monster.headTurn += (want - monster.headTurn) * Math.min(1, dt * 3);
+    const jawWant = monster.mode === 'hunt' ? 0.35 + monster.lunge * 0.65 : 0.05;
+    monster.jaw += (jawWant - monster.jaw) * Math.min(1, dt * 6);
+
+    settleFear(dt, dist, sees);
     if (dist < 0.55) caught();
+  }
+
+  // Dread is worst when it can see you and you can see it.
+  function settleFear(dt, dist, sees) {
+    let t = Math.max(0, Math.min(1, (11 - dist) / 11));
+    if (monster.mode === 'hunt') t = Math.min(1, t * 1.35 + 0.25);
+    else if (monster.mode === 'alert') t *= 0.8;
+    else if (monster.mode === 'search') t *= 0.65;
+    else t *= 0.35;
+    if (sees) t = Math.min(1, t + 0.15);
+    state.fear += (t - state.fear) * Math.min(1, dt * 1.8);
+    state.fear = Math.max(0, Math.min(1, state.fear));
+  }
+
+  // A free square within r of (x,y) — used for searching around, not at, you.
+  function nearFloor(x, y, r) {
+    for (let i = 0; i < 60; i++) {
+      const nx = x + Math.round((Math.random() - 0.5) * 2 * r);
+      const ny = y + Math.round((Math.random() - 0.5) * 2 * r);
+      if (!SOLID.has(at(nx, ny))) return { x: nx, y: ny };
+    }
+    return { x, y };
   }
 
   // In endless mode it gets steadily quicker — capped, so it stays beatable.
@@ -1180,6 +1440,116 @@
     if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } }
     return actx;
   };
+  // Short bursts of filtered noise make far better footsteps and breath than
+  // any oscillator. Built once and reused.
+  let noiseBuf = null;
+  function noise(a) {
+    if (!noiseBuf || noiseBuf.sampleRate !== a.sampleRate) {
+      noiseBuf = a.createBuffer(1, a.sampleRate * 1.2, a.sampleRate);
+      const d = noiseBuf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    const src = a.createBufferSource();
+    src.buffer = noiseBuf; src.loop = true;
+    return src;
+  }
+
+  // Where the monster is relative to the way you're facing: -1 hard left,
+  // +1 hard right. So you can hear it circling behind you.
+  function panOf() {
+    if (!monster) return 0;
+    let rel = Math.atan2(monster.y - player.y, monster.x - player.x) - player.a;
+    while (rel > Math.PI) rel -= 2 * Math.PI;
+    while (rel < -Math.PI) rel += 2 * Math.PI;
+    return Math.max(-1, Math.min(1, Math.sin(rel)));
+  }
+
+  function place(a, node, gainVal, pan) {
+    const g = a.createGain();
+    g.gain.value = gainVal;
+    if (a.createStereoPanner) {
+      const p = a.createStereoPanner();
+      p.pan.value = Math.max(-1, Math.min(1, pan));
+      node.connect(p); p.connect(g);
+    } else node.connect(g);
+    g.connect(a.destination);
+    return g;
+  }
+
+  // A soft thud, quieter the further away it is. Called once per stride.
+  let lastStepAt = 0;
+  function footstep(dist, now) {
+    const a = audio(); if (!a) return;
+    if (dist > 16 || now - lastStepAt < 90) return;
+    lastStepAt = now;
+    const vol = Math.max(0, 0.22 * (1 - dist / 16)) * (scareLevel === 'mild' ? 0.5 : 1);
+    if (vol < 0.004) return;
+    const src = noise(a), f = a.createBiquadFilter();
+    f.type = 'lowpass'; f.frequency.value = 220 + Math.random() * 90;
+    src.connect(f);
+    const g = place(a, f, 0, panOf());
+    const t = a.currentTime;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.20);
+    src.start(t); src.stop(t + 0.22);
+  }
+
+  // A low growl the moment it spots you — the cue that you are now being chased.
+  function roar() {
+    const a = audio(); if (!a) return;
+    if (scareLevel === 'mild') return;
+    const o = a.createOscillator(), o2 = a.createOscillator();
+    o.type = 'sawtooth'; o2.type = 'square';
+    const t = a.currentTime;
+    o.frequency.setValueAtTime(150, t);
+    o.frequency.exponentialRampToValueAtTime(52, t + 0.75);
+    o2.frequency.setValueAtTime(75, t);
+    o2.frequency.exponentialRampToValueAtTime(26, t + 0.75);
+    const f = a.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 900;
+    o.connect(f); o2.connect(f);
+    const g = place(a, f, 0, panOf() * 0.6);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(scareLevel === 'nightmare' ? 0.34 : 0.24, t + 0.06);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+    o.start(t); o2.start(t); o.stop(t + 0.9); o2.stop(t + 0.9);
+  }
+
+  // Breathing when it's close, and a heartbeat that climbs with your fear.
+  // Driven from the game loop, not a timer, so pausing really pauses it.
+  let nextBreath = 0, nextBeat = 0;
+  function ambientDread(now, dist) {
+    if (!soundOn || scareLevel === 'mild') return;
+    const a = audio(); if (!a) return;
+    const t = a.currentTime;
+
+    if (dist < 7 && now > nextBreath) {
+      nextBreath = now + (monster.mode === 'hunt' ? 900 : 1900) + Math.random() * 500;
+      const src = noise(a), f = a.createBiquadFilter();
+      f.type = 'bandpass'; f.frequency.value = 380; f.Q.value = 1.2;
+      src.connect(f);
+      const g = place(a, f, 0, panOf());
+      const v = 0.16 * (1 - dist / 7);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(Math.max(0.004, v), t + 0.18);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.65);
+      src.start(t); src.stop(t + 0.7);
+    }
+
+    if (state.fear > 0.35 && now > nextBeat) {
+      nextBeat = now + 900 - state.fear * 420;      // faster as it gets worse
+      const o = a.createOscillator(); o.type = 'sine';
+      o.frequency.setValueAtTime(62, t);
+      o.frequency.exponentialRampToValueAtTime(38, t + 0.14);
+      const g = a.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.05 + state.fear * 0.14, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.20);
+      o.connect(g); g.connect(a.destination);
+      o.start(t); o.stop(t + 0.22);
+    }
+  }
+
   function beep(freq, dur, type) {
     const a = audio(); if (!a) return;
     const o = a.createOscillator(), g = a.createGain();
@@ -1199,36 +1569,86 @@
     g.gain.exponentialRampToValueAtTime(0.001, a.currentTime + 0.6);
     o.connect(g); g.connect(a.destination); o.start(); o.stop(a.currentTime + 0.6);
   }
+  // The stinger. A shrieking downward sweep, a slam of noise underneath it,
+  // and a sub-bass drop you feel more than hear.
   function screech() {
     const a = audio(); if (!a) return;
-    const dur = scareLevel === 'mild' ? 0.25 : 0.7;
-    const o = a.createOscillator(), n = a.createOscillator(), g = a.createGain();
-    o.type = 'sawtooth'; o.frequency.setValueAtTime(880, a.currentTime);
-    o.frequency.exponentialRampToValueAtTime(90, a.currentTime + dur);
-    n.type = 'square'; n.frequency.setValueAtTime(220, a.currentTime);
-    g.gain.setValueAtTime(scareLevel === 'mild' ? 0.12 : 0.32, a.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001, a.currentTime + dur);
-    o.connect(g); n.connect(g); g.connect(a.destination);
-    o.start(); n.start(); o.stop(a.currentTime + dur); n.stop(a.currentTime + dur);
+    const c = cfg();
+    const dur = scareLevel === 'mild' ? 0.25 : 0.85;
+    const t = a.currentTime;
+    const o = a.createOscillator(), n2 = a.createOscillator(), sub = a.createOscillator();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(1400, t);
+    o.frequency.exponentialRampToValueAtTime(70, t + dur);
+    n2.type = 'square';
+    n2.frequency.setValueAtTime(233, t);
+    n2.frequency.exponentialRampToValueAtTime(41, t + dur);
+    sub.type = 'sine';
+    sub.frequency.setValueAtTime(90, t);
+    sub.frequency.exponentialRampToValueAtTime(28, t + dur * 0.8);
+
+    const g = a.createGain();
+    g.gain.setValueAtTime(c.vol, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.connect(g); n2.connect(g); sub.connect(g); g.connect(a.destination);
+    o.start(t); n2.start(t); sub.start(t);
+    o.stop(t + dur); n2.stop(t + dur); sub.stop(t + dur);
+
+    if (scareLevel === 'mild') return;
+    // a burst of noise on top, like something hitting the camera
+    const src = noise(a), f = a.createBiquadFilter();
+    f.type = 'highpass'; f.frequency.value = 700;
+    src.connect(f);
+    const g2 = a.createGain();
+    g2.gain.setValueAtTime(c.vol * 0.8, t);
+    g2.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+    f.connect(g2); g2.connect(a.destination);
+    src.start(t); src.stop(t + 0.5);
   }
 
   // ============================================================
   //  Getting caught
   // ============================================================
-  let scaring = false;
+  let scaring = false, scareRAF = 0;
+
+  // How hard each setting hits. Mild genuinely shows nothing at all.
+  const SCARE_CFG = {
+    mild:      { face: false, ms: 0,    vol: 0.10, lunge: 0,    variants: 0 },
+    spooky:    { face: true,  ms: 1100, vol: 0.30, lunge: 0.75, variants: 3 },
+    tense:     { face: true,  ms: 1500, vol: 0.40, lunge: 0.95, variants: 3 },
+    nightmare: { face: true,  ms: 2100, vol: 0.50, lunge: 1.20, variants: 3 },
+  };
+  const cfg = () => SCARE_CFG[scareLevel] || SCARE_CFG.spooky;
+
   function caught() {
     if (scaring) return;
     scaring = true;
     state.caught++;
     running = false;
     screech();
-    if (scareLevel === 'mild') { finishScare(); return; }
+    const c = cfg();
+    if (!c.face) { finishScare(); return; }        // Mild: straight to the result
     const el = $('scare');
     el.classList.add('on');
-    drawScareFace();
-    setTimeout(finishScare, scareLevel === 'tense' ? 1400 : 1000);
+    // match the canvas to the screen's shape so the face isn't stretched
+    sizeScareCanvas();
+    // pick a different face each time so it can't be shrugged off
+    const variant = (Math.random() * c.variants) | 0;
+    const t0 = performance.now();
+    // The face rushes at you over the first fifth of a second rather than
+    // simply appearing. That approach is what makes it land.
+    const step = () => {
+      const t = (performance.now() - t0) / c.ms;
+      if (!scaring) return;
+      drawScareFace(variant, Math.min(1, t / 0.18), t);
+      if (t >= 1) { finishScare(); return; }
+      scareRAF = requestAnimationFrame(step);
+    };
+    step();
   }
+
   function finishScare() {
+    cancelAnimationFrame(scareRAF);
     $('scare').classList.remove('on');
     scaring = false;
     if (state.endless) {
@@ -1249,21 +1669,117 @@
        <p class="note">Caught <b>${state.caught}</b> time${state.caught === 1 ? '' : 's'}.
        Your progress is kept — the doors you opened stay open.</p>`);
   }
-  function drawScareFace() {
-    const c = $('scareFace'), g = c.getContext('2d'), S = c.width;
-    g.fillStyle = '#5b1a26'; g.fillRect(0, 0, S, S);
-    g.fillStyle = '#7a2433';
-    g.fillRect(S*0.1, S*0.12, S*0.8, S*0.76);
-    g.fillStyle = '#fff3c4';
-    g.fillRect(S*0.22, S*0.3, S*0.2, S*0.16);
-    g.fillRect(S*0.58, S*0.3, S*0.2, S*0.16);
-    g.fillStyle = '#120608';
-    g.fillRect(S*0.29, S*0.34, S*0.07, S*0.09);
-    g.fillRect(S*0.65, S*0.34, S*0.07, S*0.09);
-    g.fillStyle = '#160709';
-    g.fillRect(S*0.28, S*0.6, S*0.44, S*0.16);
-    g.fillStyle = '#fff3c4';
-    for (let i = 0; i < 7; i++) g.fillRect(S*(0.30 + i*0.06), S*0.6, S*0.03, S*0.16);
+
+  // ------------------------------------------------------------
+  //  The face. Three of them, so it stays unpredictable.
+  //  A stitched-up toy: buttons, seams, a torn grin. Creepy, not gory —
+  //  no blood, no wounds, nothing realistic enough to be nasty.
+  //  `rush` runs 0 to 1 as it charges the screen; `t` runs 0 to 1 overall.
+  // ------------------------------------------------------------
+  function sizeScareCanvas() {
+    const c = $('scareFace');
+    const w = Math.max(240, Math.round(window.innerWidth || 520));
+    const h = Math.max(240, Math.round(window.innerHeight || 520));
+    const k = Math.min(1, Math.sqrt(360000 / (w * h)));
+    c.width = Math.max(240, Math.round(w * k));
+    c.height = Math.max(240, Math.round(h * k));
+  }
+
+  function drawScareFace(variant, rush, t) {
+    const c = $('scareFace'), g = c.getContext('2d');
+    const W = c.width, H = c.height;
+    // the face is laid out on a square and centred, so it never stretches
+    const S = Math.max(W, H);
+    const L = cfg().lunge;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.fillStyle = '#000';
+    g.fillRect(0, 0, W, H);
+
+    // charge at the camera, then judder
+    const scale = (0.30 + 0.70 * rush) * (1 + L * 0.35) + (rush >= 1 ? Math.sin(t * 90) * 0.02 : 0);
+    const jx = rush >= 1 ? Math.sin(t * 71) * S * 0.02 : 0;
+    const jy = rush >= 1 ? Math.cos(t * 63) * S * 0.02 : 0;
+    g.translate(W / 2 + jx, H / 2 + jy);
+    g.scale(scale, scale);
+    g.translate(-S / 2, -S / 2);
+
+    const skin  = ['#7a2433', '#5d4a2e', '#3f2a44'][variant] || '#7a2433';
+    const seam  = ['#c9b48a', '#d8c9a4', '#bfb0d0'][variant] || '#c9b48a';
+    const eyeC  = ['#fff3c4', '#ffe9a8', '#e8f0ff'][variant] || '#fff3c4';
+
+    // head
+    g.fillStyle = skin;
+    g.beginPath();
+    g.ellipse(S / 2, S * 0.52, S * 0.42, S * 0.47, 0, 0, Math.PI * 2);
+    g.fill();
+
+    // burlap weave, so it reads as cloth rather than a flat shape
+    g.globalAlpha = 0.10; g.fillStyle = '#000';
+    for (let y = S * 0.08; y < S * 0.98; y += 7) g.fillRect(S * 0.09, y, S * 0.82, 2);
+    g.globalAlpha = 1;
+
+    // eyes — huge, mismatched, and they cross as it gets closer
+    const drift = (1 - rush) * S * 0.05;
+    const eyes = [
+      [S * 0.33 + drift, S * 0.40, S * 0.135, S * 0.12],
+      [S * 0.68 - drift, S * 0.37, S * 0.165, S * 0.15],
+    ];
+    for (const [ex, ey, rx, ry] of eyes) {
+      g.fillStyle = eyeC;
+      g.beginPath(); g.ellipse(ex, ey, rx, ry, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#100608';
+      const px = ex + Math.sin(t * 24) * rx * 0.16;
+      g.beginPath(); g.ellipse(px, ey, rx * 0.34, ry * 0.40, 0, 0, Math.PI * 2); g.fill();
+      // the cross-stitch through each button
+      g.strokeStyle = '#100608'; g.lineWidth = Math.max(2, S * 0.008);
+      g.beginPath();
+      g.moveTo(px - rx * 0.20, ey - ry * 0.22); g.lineTo(px + rx * 0.20, ey + ry * 0.22);
+      g.moveTo(px + rx * 0.20, ey - ry * 0.22); g.lineTo(px - rx * 0.20, ey + ry * 0.22);
+      g.stroke();
+    }
+
+    // mouth — a torn grin that opens wider the closer it gets
+    const open = 0.35 + 0.65 * rush;
+    const mw = S * 0.30, mh = S * 0.055 + S * 0.16 * open;
+    g.fillStyle = '#140609';
+    g.beginPath(); g.ellipse(S / 2, S * 0.72, mw, mh, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = eyeC;
+    const n = 8;
+    for (let i = 0; i < n; i++) {
+      const tx = S / 2 - mw * 0.88 + i * (mw * 1.76 / n);
+      const th = mh * (0.34 + (i % 2) * 0.16);
+      g.beginPath();                                   // pointed, like torn felt
+      g.moveTo(tx, S * 0.72 - mh);
+      g.lineTo(tx + mw * 0.16, S * 0.72 - mh);
+      g.lineTo(tx + mw * 0.08, S * 0.72 - mh + th);
+      g.closePath(); g.fill();
+      g.beginPath();
+      g.moveTo(tx + mw * 0.08, S * 0.72 + mh);
+      g.lineTo(tx + mw * 0.24, S * 0.72 + mh);
+      g.lineTo(tx + mw * 0.16, S * 0.72 + mh - th);
+      g.closePath(); g.fill();
+    }
+
+    // seams holding the face together
+    g.strokeStyle = seam; g.lineWidth = Math.max(2, S * 0.009);
+    g.beginPath();
+    for (let i = 0; i < 9; i++) {
+      const y = S * 0.14 + i * S * 0.085;
+      g.moveTo(S * 0.50 - S * 0.03, y); g.lineTo(S * 0.50 + S * 0.03, y + S * 0.02);
+    }
+    for (let i = 0; i < 4; i++) {                       // corner-of-mouth stitches
+      const o = S * 0.30 + i * S * 0.035;
+      g.moveTo(S / 2 - o, S * 0.70); g.lineTo(S / 2 - o - S * 0.025, S * 0.745);
+      g.moveTo(S / 2 + o, S * 0.70); g.lineTo(S / 2 + o + S * 0.025, S * 0.745);
+    }
+    g.stroke();
+
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    // a red pulse over the top at the highest setting
+    if (scareLevel === 'nightmare') {
+      g.fillStyle = `rgba(120,0,0,${0.12 + Math.abs(Math.sin(t * 40)) * 0.16})`;
+      g.fillRect(0, 0, W, H);
+    }
   }
 
   // ============================================================
@@ -1349,6 +1865,7 @@
     updatePlayer(dt);
     updateMonster(dt, now);
     checkEscape();
+    ambientDread(now, Math.hypot(player.x - monster.x, player.y - monster.y));
     const t0 = (performance && performance.now) ? performance.now() : Date.now();
     render(now);
     noteFrameTime(((performance && performance.now) ? performance.now() : Date.now()) - t0);
@@ -1507,7 +2024,8 @@
   const SCARES = [
     ['mild',   '😌 Mild',   'Atmosphere and chases, but no sudden scares.'],
     ['spooky', '😨 Spooky', 'Tense chases and sudden reveals. Creepy, never gory.'],
-    ['tense',  '😱 Tense',  'Darker, louder, and it lingers longer.']
+    ['tense',  '😱 Tense',  'Darker, louder, and it lingers longer.'],
+    ['nightmare', '💀 Nightmare', 'The hardest setting. Loud, long and it charges the screen.']
   ];
   function buildSettings() {
     const r = $('scareRow'); r.innerHTML = '';
@@ -1680,7 +2198,12 @@
     get state() { return state; }, set state(v) { state = v; },
     updateMonster, updatePlayer, tryMove, fitScreen, kpPress,
     get kpEntry() { return kpEntry; },
-    HEAR_WALK, HEAR_RUN, SEE
+    HEAR_WALK, HEAR_RUN, SEE, SCARE_CFG, sizeScareCanvas, drawScareFace, drawMonster, ambientDread,
+    footstep, roar, screech, panOf, setMode, nearFloor, caught, finishScare, cfg,
+    get scareLevel() { return scareLevel; }, set scareLevel(v) { scareLevel = v; },
+    get scaring() { return scaring; }, SCARES,
+    get soundOn() { return soundOn; }, set soundOn(v) { soundOn = !!v; },
+    HUNT_MEMORY, SEARCH_TIME, LUNGE_RANGE
   };
 })();
 </script>

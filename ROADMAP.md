@@ -462,10 +462,10 @@ perfect maze carved inside each zone so everything within is guaranteed
 reachable. A test walks the whole building at every stage and checks both that
 you *can* reach what you need, and that you *can't* reach the next puzzle early.
 
-**Scares.** Default is "Spooky" — tense chases, a cartoonish patchwork toy, a
-sudden loud reveal when it catches you. **No blood, no gore.** Settings has
-**Mild** (no jumpscares at all) and **Tense**, plus a sound toggle. Getting
-caught keeps your progress: doors you opened stay open.
+**Scares.** Four settings: **Mild** (no jumpscares at all), **Spooky** (the
+default), **Tense**, and **Nightmare**. No blood, no gore at any of them — the
+monster is a patchwork toy, not a person. Getting caught keeps your progress:
+doors you opened stay open.
 
 **Controls** work both ways — WASD + mouse-look on a laptop, on-screen stick and
 drag-to-look on a tablet.
@@ -533,6 +533,57 @@ image files at all, so it loads just as fast.
 > a single lookup instead of a pile of multiplications. That took it from
 > **141ms a frame to 12ms** — about **11× faster**, comfortably smooth. There's
 > now a test that fails if a frame ever creeps back over 40ms.
+
+### 👹 Round 5 — the monster
+
+The old monster walked in a dead straight line at you from the moment the round
+started, and it was drawn as six rectangles. Both are fixed.
+
+**It has four moods now:**
+
+| Mood | What it's doing |
+|---|---|
+| **Wander** | Hasn't noticed you. Slow, aimless, stops to listen. |
+| **Alert** | Heard something. Heads for where the noise came from. |
+| **Hunt** | Can actually see you. Fast, and it growls when it spots you. |
+| **Search** | Got to where you were and you'd gone. Circles nearby, then gives up. |
+
+The important one is **Search**. It doesn't magically know you moved — so
+**hiding genuinely works** — and it lingers for nine seconds, so you daren't
+come straight back out. A test proves it: while searching, it does *not* close
+the distance to you most of the time. It casts about instead.
+
+It also **stops and listens** at random, standing perfectly still with its head
+turning. And a **closed door really does stop it** — 75 of the far rooms are
+unreachable until you open the way, so it can't walk through a wall at you.
+
+**It's drawn as a jointed figure**, not boxes. Arms and legs swing on a real
+walk cycle driven by how far it has actually moved — stand it still and the legs
+stop, which the old one never did. It leans in as it charges, its head turns to
+follow you, its jaw opens, and its arms reach out during the last few steps.
+Your torch lights it: in the middle of the beam you see burlap, seams and
+mismatched button eyes; out at the edge it's just a silhouette and two glowing
+eyes, which is worse.
+
+**You can hear it coming.** Footsteps are bursts of filtered noise, one per
+stride, quieter with distance and **panned left or right** so you can tell which
+side it's circling. Close up you hear it breathing. As your fear climbs, a
+heartbeat comes in and speeds up. All generated in code — still no sound files.
+
+### 😱 The jumpscare
+
+It used to just appear. Now the face **charges at the screen** over the first
+fifth of a second, then juddering and shaking with a white flash on the first
+frame. The stinger is a shrieking downward sweep with a noise slam and a
+sub-bass drop under it.
+
+There are **three different faces**, picked at random, so it can't be shrugged
+off after the first time. The face is sized to your screen so it isn't
+stretched, and it fills the whole display.
+
+> **Nothing gory.** Every face is a stitched-up cloth toy — buttons, seams, a
+> torn felt grin. No blood, no wounds. **Mild still shows no face at all**, and
+> there's a test that fails if a single pixel is ever drawn on that setting.
 
 ### ♾️ The endless map
 
@@ -866,7 +917,7 @@ drag-to-look on a tablet.
 
 ## ⚠️ What still needs doing
 
-**Upload it, then play it with real people.** All **19 test suites — 895 checks
+**Upload it, then play it with real people.** All **19 test suites — 951 checks
 — pass**, but no human has actually played any of this yet. Things worth
 watching for:
 
