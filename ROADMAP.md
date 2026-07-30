@@ -327,16 +327,15 @@ If a strong player getting everything in three rounds feels too quick, raise the
 
 | Size | Squares | Words hiding on it | Feel |
 |---|---|---|---|
-| 3 × 3 | 9 | ~35 | Quick. Extra vowels in the dice, or a small board starves |
-| 4 × 4 | 16 | ~88 | Classic Boggle |
-| 5 × 5 | 25 | ~198 | Big Boggle — far more to find |
+| 3 × 3 | 9 | ~69 | Quick. Extra vowels in the dice, or a small board starves |
+| 4 × 4 | 16 | ~187 | Classic Boggle |
+| 5 × 5 | 25 | ~413 | Big Boggle — far more to find |
 
 - Each size uses a **real dice set**: the standard 16 for 4×4, the Big Boggle 25
   for 5×5, and a 9-dice set picked from the 4×4 dice with the vowel share
   raised to 46%.
 - **Duds are rejected.** A raw random roll produced a 3×3 board with a *single
-  word* in testing. Boards are now re-rolled until they clear a minimum (12 / 30
-  / 60 words). Solving costs under 5ms, so it's free.
+  word* in testing. Boards are now re-rolled until they clear a minimum (25 / 70 / 150 words). Solving costs under 5ms, so it's free.
 - Online, the **host's size applies to everyone**. Guests are only sent the
   letters and work the size out from how many there are, so the two can never
   disagree.
@@ -354,100 +353,32 @@ If a strong player getting everything in three rounds feels too quick, raise the
 - **Online** — up to 8 players on the **identical board**, racing the same
   clock. Live "words found" counts while you play, full scores at the end
 
-**The dictionary**
+**The dictionary — 64,783 words**
 
-- **36,635 words.** Built from a 234,000-word source, then cut to words with a
-  real-world frequency (Zipf ≥ 2.0) so the "missed words" list is useful rather
-  than full of things nobody has heard of
-- Rude words filtered out
-- Stored **front-coded**: an uppercase letter says how many characters this word
-  shares with the previous one, then the rest. 306 KB → 135 KB, and 69 KB
-  gzipped over the wire
+Two sources merged:
 
-**🎨 Texture packs** (Settings → Texture pack)
+1. A classic English word list, trimmed to words with real-world usage
+2. The **most common 60,000 words from modern sources** — web, subtitles, news
 
-Seven board looks, **earned with points**. Every point you score in any Wuzzle
-game, ever, adds to a running total saved on your device.
+> ⚠️ **Why the second source exists.** The first version used only the classic
+> list, which is built from a **1934 dictionary**. It rejected `YAY`. And `YUP`,
+> `OOPS`, `DUH`, `MEH`, `YIKES`, `HMM`, `OKAY`, `NAH` — plus `EMAIL`, `ONLINE`,
+> `WEBSITE`, `BLOG`, `APP`, `EMOJI`, `SELFIE`, `TACO` and `SUSHI`. None of them
+> existed in 1934. Lowering the frequency cutoff would not have helped: the
+> words simply weren't in the book. It needed a modern source, not a looser
+> filter.
 
-| Cost | Pack | Look |
-|---|---|---|
-| free | 🌑 Midnight | Dark slate with a fine grain. You start with this. |
-| 15 | 🌊 Ocean | Deep water — ripple bands and a light shaft from above |
-| 30 | ☀️ Sunny | Sun-bleached cream and amber, warm highlight top-left |
-| 45 | 🍃 Windy | Soft cloud shapes drifting over pale mint |
-| 60 | ⛈️ Stormy | Near-black storm bands with a violet glow behind the letters |
-| 75 | ❄️ Frosty | Pale ice with crystalline crack lines across each tile |
-| 90 | 🪵 Sturdy | Wood grain with a dark knot, on a speckled stone board |
+**Keeping it clean.** Rude words are blocked by **generating inflections from
+stems** rather than listing spellings by hand. The hand-written list missed
+`SHITE` (stem + "e") and `CRAPPY` (doubled consonant) — English doubles the final
+consonant before a vowel suffix, so the generator does too. 2,088 forms blocked
+from 56 stems.
 
-**They're real textures, not flat colour.** Each tile layers 2–5 CSS gradients:
-`repeating-linear-gradient` for wood grain and rain, `radial-gradient` for
-cloud and shading, angled slivers for ice cracks — all as translucent overlays
-on a solid base. No image files, so it costs nothing to download.
+Matching is **exact-word, never substring**, so CLASS, GRASS, ASSIST, TITLE,
+COCKPIT, PEACH and PUPPY are all untouched — verified by test.
 
-**Pacing** (simulated): a beginner scoring ~4 points a round gets Ocean by
-round 4 and everything by round 22. A good player has all seven in about 6
-rounds. Quick enough to feel generous, slow enough to be worth something.
-
-Notes:
-
-- A pack is **11 CSS variables**. Adding one is a row of colours in `THEMES` —
-  no new CSS, no new markup.
-- **Points are banked from your own words** at the end of every round, solo or
-  online, so it doesn't depend on the host's final tally arriving.
-- You can't wear a locked pack. If progress is ever cleared, anyone wearing an
-  earned pack drops back to the free one rather than breaking.
-- Packs are **cosmetic only** — verified by solving the same board under every
-  pack and confirming identical words and scores.
-- **Every pack is contrast-tested**, both resting and selected. An early version
-  looked fine at rest but had barely-readable letters *while selected* — which
-  is exactly when you're staring at them mid-drag. All seven now clear 4.5:1 in
-  both states, measured rather than eyeballed.
-
-**Fitting on one screen**
-
-Nothing in Wuzzle or the hub ever scrolls. Two things make that true:
-
-1. **Everything is sized in `vh`/`clamp()`** — text, padding, the board and the
-   word list all shrink on a short screen before anything else happens.
-2. **A measured fit-to-screen scale as a safety net.** After layout, the page
-   measures its own content and applies a CSS `scale()` if it still doesn't fit.
-   It never scales *up* (that would blur things), only down.
-
-`html,body{overflow:hidden}` means a mistake shows up as clipped content rather
-than a silent scrollbar — much easier to notice and fix.
-
-> ⚠️ On a **phone held sideways** there's very little height, so the scale can
-> get small. If that reads badly, the fix is a two-column landscape layout
-> rather than loosening the no-scroll rule.
-
-**Who's playing, and who's winning**
-
-- In the lobby and during the game, everyone sees **the list of players' names**
-  — so you know who you're up against.
-- **Nobody sees anyone else's score or word count until the round ends.** The
-  host doesn't get a peek either. An earlier version broadcast live counts;
-  that's now removed and `pushLive()` is a deliberate no-op with a comment
-  saying why.
-
-**⚠️ The one that got away — tracing stopped working**
-
-While restyling, the letter squares were renamed from `.tile` to `.tileL` (to
-stop them clashing with the home-screen menu tiles). The place that *creates*
-them was updated; the place that *hit-tests* them was not. `tileAt()` went on
-looking for `.tile`, never matched anything, and **dragging silently did
-nothing at all**.
-
-Two things stop it happening again:
-
-- The class name now lives in a single `TILE_CLASS` constant, declared at the
-  top of the file, used by both the renderer and the hit-test.
-- `dragtest.js` drives the **real pointer handlers** with real coordinates —
-  pointerdown, a series of pointermoves across squares, pointerup — and asserts
-  the word is accepted. Verified by putting the bug back: the test fails.
-
-The deeper cause was a **gap in the test harness**, not the game. The fake DOM
-never connected `.className` to `.classList`, so a class-name mismatch was
-invisible to every test. It does now.
+Ordinary words like KILL, DEAD, BLOOD and GUN are left in. They're normal
+English and appear in any book.
 
 **Things worth knowing**
 
@@ -556,16 +487,15 @@ If a strong player getting everything in three rounds feels too quick, raise the
 
 | Size | Squares | Words hiding on it | Feel |
 |---|---|---|---|
-| 3 × 3 | 9 | ~35 | Quick. Extra vowels in the dice, or a small board starves |
-| 4 × 4 | 16 | ~88 | Classic Boggle |
-| 5 × 5 | 25 | ~198 | Big Boggle — far more to find |
+| 3 × 3 | 9 | ~69 | Quick. Extra vowels in the dice, or a small board starves |
+| 4 × 4 | 16 | ~187 | Classic Boggle |
+| 5 × 5 | 25 | ~413 | Big Boggle — far more to find |
 
 - Each size uses a **real dice set**: the standard 16 for 4×4, the Big Boggle 25
   for 5×5, and a 9-dice set picked from the 4×4 dice with the vowel share
   raised to 46%.
 - **Duds are rejected.** A raw random roll produced a 3×3 board with a *single
-  word* in testing. Boards are now re-rolled until they clear a minimum (12 / 30
-  / 60 words). Solving costs under 5ms, so it's free.
+  word* in testing. Boards are now re-rolled until they clear a minimum (25 / 70 / 150 words). Solving costs under 5ms, so it's free.
 - Online, the **host's size applies to everyone**. Guests are only sent the
   letters and work the size out from how many there are, so the two can never
   disagree.
@@ -585,10 +515,6 @@ If a strong player getting everything in three rounds feels too quick, raise the
 
 **The dictionary**
 
-- **36,635 words.** Built from a 234,000-word source, then cut to words with a
-  real-world frequency (Zipf ≥ 2.0) so the "missed words" list is useful rather
-  than full of things nobody has heard of
-- Rude words filtered out
 - Stored **front-coded**: an uppercase letter says how many characters this word
   shares with the previous one, then the rest. 306 KB → 135 KB, and 69 KB
   gzipped over the wire
