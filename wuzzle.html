@@ -1035,9 +1035,13 @@ const DICT_ENC = 'AaaaDaEhDhDsCcDhenCdhaarDmiCfChClDiyahCmDirCnDgCpDlCrDdvarkDhu
 
   const myScore = () => scoreList([...new Set(myWords)]);
 
+  // Both spans already exist in the markup — rebuilding scoreBox's innerHTML
+  // created a SECOND element with id="foundCount", leaving the original stuck
+  // on "0 words" forever.
   function updateScore() {
-    $('scoreBox').innerHTML =
-      `${myScore()} <span id="foundCount">${myWords.length} word${myWords.length === 1 ? '' : 's'}</span>`;
+    $('scoreBox').textContent = String(myScore());
+    $('foundCount').textContent =
+      `${myWords.length} word${myWords.length === 1 ? '' : 's'}`;
   }
 
   function renderWordList() {
@@ -1102,7 +1106,10 @@ const DICT_ENC = 'AaaaDaEhDhDsCcDhenCdhaarDmiCfChClDiyahCmDirCnDgCpDlCrDdvarkDhu
     }
     if (netRole === 'host') {
       remoteWords[0] = myWords.slice();
-      finishHostRound();
+      // Guests' clocks start when the "start" message lands, so they finish a
+      // fraction later. Wait a beat for any word still in flight.
+      showResults('TIME!', '<p class="note">Adding up…</p>', '');
+      setTimeout(finishHostRound, 700);
       return;
     }
     finishSolo();
@@ -1166,10 +1173,14 @@ const DICT_ENC = 'AaaaDaEhDhDsCcDhenCdhaarDmiCfChClDiyahCmDirCnDgCpDlCrDdvarkDhu
       ? `<div class="unlockBanner">🎉 NEW TEXTURE PACK${lastGained.length > 1 ? 'S' : ''}!<br>` +
         lastGained.map(t => `${t.emoji} ${t.name}`).join('<br>') +
         `<span>Equip it in Settings</span></div>` : '';
-    const progress = `<p class="note">+${myScore()} to your total · <b>${totalPoints}</b> points` +
+    // Deliberately your OWN words, before duplicates cancel — pack progress is
+    // yours to keep. Labelled clearly so it isn't confused with the match score.
+    const progress = `<p class="note">+${myScore()} towards texture packs · ` +
+      `<b>${totalPoints}</b> total` +
       (nx ? ` · ${nx.unlockAt - totalPoints} more for ${nx.emoji} ${nx.name}` : ' · every pack unlocked') +
       `</p>`;
     $('resDetail').innerHTML = banner + progress + (detailHtml || '');
+    lastGained = [];        // shown once; a guest's screen redraws twice
     $('btnAgain').classList.toggle('hidden', netRole === 'guest');
     refreshProfile();
     scheduleFit();
@@ -1195,6 +1206,10 @@ const DICT_ENC = 'AaaaDaEhDhDsCcDhenCdhaarDmiCfChClDiyahCmDirCnDgCpDlCrDdvarkDhu
       disarmQuit();
       running = false;
       clearInterval(tickTimer);
+      // You keep what you scored. Leaving early shouldn't cost you the points
+      // you already earned — Snake has always worked this way.
+      bankPoints(myScore());
+      refreshProfile();
       if (netRole === 'host') broadcast({ type: 'hostleft' });
       if (netRole) teardownPeer();
       $('game').style.display = 'none';
@@ -1404,6 +1419,7 @@ const DICT_ENC = 'AaaaDaEhDhDsCcDhenCdhaarDmiCfChClDiyahCmDirCnDgCpDlCrDdvarkDhu
       myIndex = msg.you;
       lobby = msg.names.map(n => ({ name: n, conn: null }));
       renderLobby();
+      renderPlayerStrip();
       $('btnStartMatch').classList.add('hidden');
     } else if (msg.type === 'start') {
       lobby = (msg.names || []).map(n => ({ name: n, conn: null }));

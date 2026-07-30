@@ -392,6 +392,41 @@ English and appear in any book.
 
 ---
 
+## 🐞 Bug sweep
+
+A pass over both games looking for anything broken. Four real bugs found, all in
+Wuzzle — Snake came through clean.
+
+| Bug | What went wrong |
+|---|---|
+| **Quitting wiped your points** | Wuzzle threw away everything you'd scored when you left mid-round. Snake had always banked it. Now both do. |
+| **Stale word counter** | `updateScore()` rebuilt a `<span id="foundCount">` that already existed in the markup — so the page had **two elements with the same id** and the original sat on "0 words" forever. |
+| **"New pack!" banner shown twice** | A guest's results screen redraws (once waiting, once when the host's tally lands), and the unlock banner reappeared each time. |
+| **Host tallied too early** | The host added up the instant its own clock hit zero. Guests' clocks start when the "start" message lands, so a word sent in the final moment could miss the count. The host now waits 700ms. |
+
+Also clarified confusing wording: the results screen said "+3 to your total"
+next to a table showing 2. Those are different numbers on purpose — pack
+progress counts **your own words**, the match score applies the duplicate
+cancellation — so it now reads "+3 towards texture packs".
+
+**Two new test suites came out of this:**
+
+- `wzonline.js` — boots **two (and three) complete copies of Wuzzle** wired by a
+  fake network, and plays a real match: same board for everyone, words traced by
+  dragging, duplicates cancelling, cheat attempts rejected, host leaving. This
+  path had never been tested end to end.
+- `structuretest.js` — checks all three pages for duplicate ids, unbalanced CSS,
+  elements the code reaches for that don't exist, broken links, and ids created
+  in JavaScript that clash with the markup. That last check is what would have
+  caught the `foundCount` bug on day one.
+
+> ⚠️ Both scanners produced **false alarms** first time by reading ids out of
+> comments, CSS selectors and template strings. They now strip `<script>`,
+> `<style>` and comments before looking. A test that cries wolf is worse than no
+> test.
+
+---
+
 ## ⚠️ What still needs doing### 🤖 Bots and team modes
 
 **Game mode** and **Computer players** pickers sit on the main menu.
@@ -597,6 +632,41 @@ invisible to every test. It does now.
   can actually be traced on that board. A guest can send anything.
 - During play only *counts* go over the wire, never the words themselves —
   otherwise you could read your opponents' answers off the network.
+
+---
+
+## 🐞 Bug sweep
+
+A pass over both games looking for anything broken. Four real bugs found, all in
+Wuzzle — Snake came through clean.
+
+| Bug | What went wrong |
+|---|---|
+| **Quitting wiped your points** | Wuzzle threw away everything you'd scored when you left mid-round. Snake had always banked it. Now both do. |
+| **Stale word counter** | `updateScore()` rebuilt a `<span id="foundCount">` that already existed in the markup — so the page had **two elements with the same id** and the original sat on "0 words" forever. |
+| **"New pack!" banner shown twice** | A guest's results screen redraws (once waiting, once when the host's tally lands), and the unlock banner reappeared each time. |
+| **Host tallied too early** | The host added up the instant its own clock hit zero. Guests' clocks start when the "start" message lands, so a word sent in the final moment could miss the count. The host now waits 700ms. |
+
+Also clarified confusing wording: the results screen said "+3 to your total"
+next to a table showing 2. Those are different numbers on purpose — pack
+progress counts **your own words**, the match score applies the duplicate
+cancellation — so it now reads "+3 towards texture packs".
+
+**Two new test suites came out of this:**
+
+- `wzonline.js` — boots **two (and three) complete copies of Wuzzle** wired by a
+  fake network, and plays a real match: same board for everyone, words traced by
+  dragging, duplicates cancelling, cheat attempts rejected, host leaving. This
+  path had never been tested end to end.
+- `structuretest.js` — checks all three pages for duplicate ids, unbalanced CSS,
+  elements the code reaches for that don't exist, broken links, and ids created
+  in JavaScript that clash with the markup. That last check is what would have
+  caught the `foundCount` bug on day one.
+
+> ⚠️ Both scanners produced **false alarms** first time by reading ids out of
+> comments, CSS selectors and template strings. They now strip `<script>`,
+> `<style>` and comments before looking. A test that cries wolf is worse than no
+> test.
 
 ---
 
