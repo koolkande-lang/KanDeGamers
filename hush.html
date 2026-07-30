@@ -178,6 +178,9 @@
 
   <div id="menu" class="card">
     <div id="mainMenu" class="screen">
+      <button class="tile" id="btnEndless">
+        <span class="tI">∞</span><span><span class="tT">ENDLESS</span>
+        <span class="tS">A factory with no end. How far can you get?</span></span></button>
       <button class="tile" id="btnPlay">
         <span class="tI">▶</span><span><span class="tT">ENTER THE FACTORY</span>
         <span class="tS">Find a way out. Don't get caught.</span></span></button>
@@ -240,6 +243,7 @@
     </div>
     <div id="gameBottom">
       <button id="btnQuit">✕ Quit</button>
+      <button id="btnFull">⛶ Fullscreen</button>
     </div>
   </div>
 
@@ -309,8 +313,123 @@
   const grid = MAP_SRC.map(r => r.split(''));
 
   const SOLID = new Set(['#', '+', 'K', 'S']);
-  const at = (x, y) => (x < 0 || y < 0 || x >= W || y >= H) ? '#' : grid[y][x];
-  const isWall = (x, y) => SOLID.has(at(Math.floor(x), Math.floor(y)));
+
+  // ============================================================
+  //  The world — a fixed building, or an endless one
+  // ============================================================
+  // Story mode reads the grid above. Endless mode generates 15x15 chunks on
+  // demand and caches them. Everything else in the game goes through at() and
+  // setCell(), so neither the renderer nor the monster knows the difference.
+  const CH = 15;                       // chunk size, odd so the maze carves evenly
+  let worldMode = 'story';
+  let worldSeed = 1;
+  const chunks = new Map();            // "cx,cy" -> array of rows
+  const edits = new Map();             // "x,y"   -> replacement cell
+
+  // Deterministic RNG so a chunk always generates the same way.
+  function mulberry(a) {
+    return function () {
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      let t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  const hash3 = (a, b, c) => {
+    let h = 2166136261 >>> 0;
+    for (const v of [a, b, c]) { h ^= v & 0xffff; h = Math.imul(h, 16777619) >>> 0; h ^= v >>> 16; }
+    return h >>> 0;
+  };
+
+  function buildChunk(cx, cy) {
+    const rnd = mulberry(hash3(worldSeed, cx | 0, cy | 0));
+    const c = Array.from({ length: CH }, () => new Array(CH).fill('#'));
+
+    // Perfect maze on the odd cells — guarantees the inside is all connected.
+    const stack = [[1, 1]];
+    c[1][1] = '.';
+    const seen = new Set(['1,1']);
+    while (stack.length) {
+      const [x, y] = stack[stack.length - 1];
+      const opts = [];
+      for (const [dx, dy] of [[2,0],[-2,0],[0,2],[0,-2]]) {
+        const nx = x + dx, ny = y + dy;
+        if (nx > 0 && ny > 0 && nx < CH - 1 && ny < CH - 1 && !seen.has(nx + ',' + ny))
+          opts.push([nx, ny, dx, dy]);
+      }
+      if (!opts.length) { stack.pop(); continue; }
+      const [nx, ny, dx, dy] = opts[(rnd() * opts.length) | 0];
+      c[y + dy / 2][x + dx / 2] = '.';
+      c[ny][nx] = '.';
+      seen.add(nx + ',' + ny);
+      stack.push([nx, ny]);
+    }
+    // knock through a few walls so it reads as rooms rather than a hedge maze
+    for (let i = 0; i < CH; i++) {
+      const x = 2 + ((rnd() * (CH - 4)) | 0), y = 2 + ((rnd() * (CH - 4)) | 0);
+      if (c[y][x] === '#') c[y][x] = '.';
+    }
+
+    // Doorways at the exact middle of each edge. Every chunk does this, so
+    // neighbours always line up and the whole infinite world stays connected.
+    const mid = (CH - 1) / 2;
+    c[0][mid] = '.'; c[CH - 1][mid] = '.'; c[mid][0] = '.'; c[mid][CH - 1] = '.';
+    c[1][mid] = '.'; c[CH - 2][mid] = '.'; c[mid][1] = '.'; c[mid][CH - 2] = '.';
+    // and a corridor joining those four doorways, so they're never sealed off
+    for (let i = 1; i < CH - 1; i++) { c[mid][i] = '.'; c[i][mid] = '.'; }
+
+    // scatter pickups
+    for (let i = 0; i < 3; i++) {
+      const x = 1 + ((rnd() * (CH - 2)) | 0), y = 1 + ((rnd() * (CH - 2)) | 0);
+      if (c[y][x] === '.' && !(x === mid && y === mid)) c[y][x] = rnd() < 0.75 ? 'f' : 'n';
+    }
+    return c;
+  }
+
+  function chunkAt(cx, cy) {
+    const k = cx + ',' + cy;
+    let c = chunks.get(k);
+    if (!c) {
+      c = buildChunk(cx, cy);
+      chunks.set(k, c);
+      if (chunks.size > 400) chunks.delete(chunks.keys().next().value);
+    }
+    return c;
+  }
+
+  function at(x, y) {
+    x = Math.floor(x); y = Math.floor(y);
+    if (worldMode === 'story') {
+      return (x < 0 || y < 0 || x >= W || y >= H) ? '#' : grid[y][x];
+    }
+    const e = edits.get(x + ',' + y);
+    if (e !== undefined) return e;
+    const cx = Math.floor(x / CH), cy = Math.floor(y / CH);
+    return chunkAt(cx, cy)[y - cy * CH][x - cx * CH];
+  }
+
+  function setCell(x, y, ch) {
+    if (worldMode === 'story') {
+      if (x >= 0 && y >= 0 && x < W && y < H) grid[y][x] = ch;
+    } else {
+      edits.set(x + ',' + y, ch);
+    }
+  }
+
+  const isWall = (x, y) => SOLID.has(at(x, y));
+
+  // Everything within `r` cells — used for drawing and for finding things
+  // nearby, since in endless mode we can't scan the whole map.
+  function cellsNear(px, py, r, pred) {
+    const out = [];
+    const x0 = Math.floor(px - r), x1 = Math.floor(px + r);
+    const y0 = Math.floor(py - r), y1 = Math.floor(py + r);
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const c = at(x, y);
+      if (pred(c)) out.push({ x, y, c });
+    }
+    return out;
+  }
 
   function findAll(ch) {
     const out = [];
@@ -349,7 +468,24 @@
     };
   }
 
+  // Endless: no puzzles, no exit. Collect what you find, and it gets faster.
+  function startEndless() {
+    worldMode = 'endless';
+    worldSeed = (Math.random() * 1e9) | 0;
+    chunks.clear(); edits.clear();
+    state = freshState();
+    state.endless = true;
+    state.started = performance.now();
+    const mid = (CH - 1) / 2;
+    player = { x: mid + 0.5, y: mid + 0.5, a: 0, speed: 0, bob: 0 };
+    // drop it somewhere out of sight, but reachable
+    monster = { x: mid + 0.5, y: mid + 12.5, a: 0, path: [], think: 0, hunting: false, speed: 0 };
+    if (isWall(player.x, player.y)) { player.x = mid + 0.5; player.y = 1.5; }
+    beginRound();
+  }
+
   function resetLevel(full) {
+    worldMode = 'story';
     // rebuild the map from source so pickups come back
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) grid[y][x] = MAP_SRC[y][x];
     const s = findAll('@')[0], m = findAll('M')[0];
@@ -365,38 +501,41 @@
   }
 
   function openDoors(ch) {
-    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (grid[y][x] === ch) grid[y][x] = '.';
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++)
+      if (grid[y][x] === ch) grid[y][x] = '.';
   }
 
   // ============================================================
   //  Pathfinding — how the monster finds you
   // ============================================================
+  // Bounded breadth-first search. In an endless world there are no edges to
+  // stop at, so the search is capped by distance and by how many cells it will
+  // look at — otherwise one call could wander for ever.
+  const BFS_RADIUS = 26, BFS_BUDGET = 4000;
   function bfsPath(from, to) {
-    const key = (x, y) => y * W + x;
+    const key = (x, y) => x + ',' + y;
     const start = key(from.x, from.y), goal = key(to.x, to.y);
     if (start === goal) return [];
     const prev = new Map([[start, null]]);
     const q = [[from.x, from.y]];
-    let head = 0;
-    while (head < q.length) {
+    let head = 0, looked = 0, found = false;
+    while (head < q.length && looked < BFS_BUDGET) {
       const [cx, cy] = q[head++];
-      if (key(cx, cy) === goal) break;
+      looked++;
+      if (key(cx, cy) === goal) { found = true; break; }
       for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
         const nx = cx + dx, ny = cy + dy, k = key(nx, ny);
-        if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
-        if (SOLID.has(grid[ny][nx])) continue;
+        if (Math.abs(nx - from.x) > BFS_RADIUS || Math.abs(ny - from.y) > BFS_RADIUS) continue;
+        if (SOLID.has(at(nx, ny))) continue;
         if (prev.has(k)) continue;
         prev.set(k, [cx, cy]);
         q.push([nx, ny]);
       }
     }
-    if (!prev.has(goal)) return [];
+    if (!found) return [];
     const path = [];
     let cur = [to.x, to.y];
-    while (cur) {
-      path.push({ x: cur[0], y: cur[1] });
-      cur = prev.get(key(cur[0], cur[1]));
-    }
+    while (cur) { path.push({ x: cur[0], y: cur[1] }); cur = prev.get(key(cur[0], cur[1])); }
     return path.reverse().slice(1);
   }
 
@@ -414,85 +553,228 @@
   // ============================================================
   //  Raycasting
   // ============================================================
-  // Classic DDA: step through the grid one cell boundary at a time until we
-  // hit a wall. Returns the perpendicular distance, so there's no fisheye.
-  function castRay(px, py, ang) {
-    const sin = Math.sin(ang), cos = Math.cos(ang);
-    let mapX = Math.floor(px), mapY = Math.floor(py);
-    const dDistX = Math.abs(1 / (cos || 1e-9)), dDistY = Math.abs(1 / (sin || 1e-9));
-    let stepX, stepY, sideDistX, sideDistY;
-    if (cos < 0) { stepX = -1; sideDistX = (px - mapX) * dDistX; }
-    else { stepX = 1; sideDistX = (mapX + 1 - px) * dDistX; }
-    if (sin < 0) { stepY = -1; sideDistY = (py - mapY) * dDistY; }
-    else { stepY = 1; sideDistY = (mapY + 1 - py) * dDistY; }
-
-    let side = 0, hit = '#';
-    for (let guard = 0; guard < 128; guard++) {
-      if (sideDistX < sideDistY) { sideDistX += dDistX; mapX += stepX; side = 0; }
-      else { sideDistY += dDistY; mapY += stepY; side = 1; }
-      const c = at(mapX, mapY);
-      if (SOLID.has(c)) { hit = c; break; }
-    }
-    const dist = side === 0 ? (sideDistX - dDistX) : (sideDistY - dDistY);
-    return { dist: Math.max(0.0001, dist), side, hit, mapX, mapY };
-  }
-
   const FOV = Math.PI / 3;
   const view = $('view');
   const ctx = view.getContext('2d');
-  const RW = view.width, RH = view.height;
-  const zbuf = new Float32Array(RW);
+  let RW = view.width, RH = view.height;
+  let zbuf = new Float32Array(RW);
+  let img = null, buf = null, beamF = null;
 
-  const WALL_COL = {
-    '#': [92, 74, 60],
-    '+': [150, 70, 25],
-    'K': [140, 110, 40],
-    'S': [70, 90, 130]
+  function allocBuffers() {
+    RW = view.width; RH = view.height;
+    zbuf = new Float32Array(RW);
+    img = ctx.createImageData(RW, RH);
+    buf = new Uint32Array(img.data.buffer);
+  }
+
+  // ---- procedural textures, 64x64, built once at startup ----
+  const TEX = 64, TEXMASK = TEX - 1;
+  const textures = {};
+  const rgb = (r, g, b) => (255 << 24) | (b << 16) | (g << 8) | r;   // little-endian RGBA
+
+  function makeTextures() {
+    const noise = (x, y, s) => {
+      const n = Math.sin(x * 12.9898 + y * 78.233 + s) * 43758.5453;
+      return n - Math.floor(n);
+    };
+    // brick: courses of blocks with mortar lines and grime
+    const brick = new Uint32Array(TEX * TEX);
+    for (let y = 0; y < TEX; y++) for (let x = 0; x < TEX; x++) {
+      const row = (y / 8) | 0;
+      const off = (row % 2) * 8;
+      const mortar = (y % 8 === 0) || ((x + off) % 16 === 0);
+      const g = noise((x / 4) | 0, (y / 4) | 0, 1) * 0.25;
+      let r0 = mortar ? 74 : 116, g0 = mortar ? 66 : 74, b0 = mortar ? 58 : 58;
+      const dirt = 1 - g * (mortar ? 0.4 : 1);
+      brick[y * TEX + x] = rgb((r0 * dirt) | 0, (g0 * dirt) | 0, (b0 * dirt) | 0);
+    }
+    textures['#'] = brick;
+
+    const tint = (src, mr, mg, mb) => {
+      const out = new Uint32Array(TEX * TEX);
+      for (let i = 0; i < out.length; i++) {
+        const v = src[i];
+        const r = (v & 255), g = (v >> 8) & 255, b = (v >> 16) & 255;
+        out[i] = rgb(Math.min(255, r * mr) | 0, Math.min(255, g * mg) | 0, Math.min(255, b * mb) | 0);
+      }
+      return out;
+    };
+    textures['+'] = tint(brick, 1.5, 0.75, 0.45);   // powered door — rusty
+    textures['K'] = tint(brick, 1.35, 1.15, 0.55);  // coded door — brass
+    textures['S'] = tint(brick, 0.7, 0.95, 1.5);    // shutter — cold steel
+
+    // floor: worn concrete with scuffs
+    const floor = new Uint32Array(TEX * TEX);
+    for (let y = 0; y < TEX; y++) for (let x = 0; x < TEX; x++) {
+      const n = noise(x, y, 7) * 0.5 + noise((x / 8) | 0, (y / 8) | 0, 3) * 0.5;
+      const v = 26 + n * 26;
+      const tileLine = (x % 32 === 0 || y % 32 === 0) ? 0.7 : 1;
+      floor[y * TEX + x] = rgb((v * 1.05 * tileLine) | 0, (v * tileLine) | 0, (v * 0.9 * tileLine) | 0);
+    }
+    textures.floor = floor;
+
+    // ceiling: darker, with panel seams
+    const ceil = new Uint32Array(TEX * TEX);
+    for (let y = 0; y < TEX; y++) for (let x = 0; x < TEX; x++) {
+      const n = noise(x, y, 11) * 0.4;
+      const seam = (x % 16 === 0 || y % 16 === 0) ? 0.55 : 1;
+      const v = (16 + n * 14) * seam;
+      ceil[y * TEX + x] = rgb((v * 0.95) | 0, (v * 0.92) | 0, v | 0);
+    }
+    textures.ceil = ceil;
+  }
+
+  const shadePix = (c, k) => {
+    if (k >= 1) return c;
+    if (k <= 0) return 0xff000000;
+    const r = (c & 255) * k, g = ((c >> 8) & 255) * k, b = ((c >> 16) & 255) * k;
+    return (255 << 24) | ((b | 0) << 16) | ((g | 0) << 8) | (r | 0);
   };
 
+  // Shading every one of ~150,000 pixels a frame with real multiplies was
+  // costing more than everything else put together. Instead each texture is
+  // pre-darkened into LEVELS copies once at startup, so drawing a pixel is a
+  // single array read. 64 steps is fine enough that no banding shows.
+  const LEVELS = 64;
+  const shaded = {};
+  function buildShadeTables() {
+    for (const key in textures) {
+      const src = textures[key], out = new Array(LEVELS);
+      for (let l = 0; l < LEVELS; l++) {
+        const k = (l + 0.5) / LEVELS, dst = new Uint32Array(src.length);
+        for (let i = 0; i < src.length; i++) dst[i] = shadePix(src[i], k);
+        out[l] = dst;
+      }
+      shaded[key] = out;
+    }
+  }
+  const levelOf = k => k <= 0 ? 0 : k >= 1 ? LEVELS - 1 : (k * LEVELS) | 0;
+
+  // How lit something is: a flashlight cone that falls away with distance,
+  // plus a little ambient once the power is on.
+  function lightAt(camX, dist, flicker) {
+    const beam = Math.max(0, 1 - Math.abs(camX) * 1.15);
+    const amb = state && state.powerOn ? 0.30 : 0.10;
+    return Math.max(0.02, Math.min(1.35,
+      (amb + beam * beam * 1.25 * flicker) / (1 + dist * dist * 0.045)));
+  }
+
   function render(now) {
-    // ceiling and floor
-    const g = ctx.createLinearGradient(0, 0, 0, RH);
-    g.addColorStop(0, '#0a0806'); g.addColorStop(0.5, '#150f0b'); g.addColorStop(1, '#0a0806');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, RW, RH);
+    if (!img) allocBuffers();
+    // the torch is old; it wavers
+    const flicker = 0.93 + Math.sin(now / 70) * 0.03 + Math.sin(now / 13) * 0.02;
+    const bob = Math.sin(player.bob) * RH * 0.008;
+    const horizon = (RH / 2 + bob) | 0;
 
-    for (let col = 0; col < RW; col++) {
-      const camX = 2 * col / RW - 1;
-      const ang = player.a + Math.atan(camX * Math.tan(FOV / 2));
-      const r = castRay(player.x, player.y, ang);
-      const perp = r.dist * Math.cos(ang - player.a);
-      zbuf[col] = perp;
-      const h = Math.min(RH * 4, RH / perp);
-      const y0 = (RH - h) / 2;
+    const dirX = Math.cos(player.a), dirY = Math.sin(player.a);
+    const planeX = -dirY * Math.tan(FOV / 2), planeY = dirX * Math.tan(FOV / 2);
 
-      const base = WALL_COL[r.hit] || WALL_COL['#'];
-      // Flashlight: bright straight ahead, falling away to nothing.
-      const beam = Math.max(0, 1 - Math.abs(camX) * 1.25);
-      const lit = state.powerOn ? 0.34 : 0.13;
-      let shade = (lit + beam * 0.95) / (1 + perp * perp * 0.055);
-      if (r.side === 1) shade *= 0.72;
-      shade = Math.max(0.03, Math.min(1, shade));
-      ctx.fillStyle = `rgb(${base[0]*shade|0},${base[1]*shade|0},${base[2]*shade|0})`;
-      ctx.fillRect(col, y0, 1, h);
+    // The torch beam only depends on the column, so work it out once per frame
+    // rather than once per pixel.
+    if (!beamF || beamF.length !== RW) beamF = new Float32Array(RW);
+    const amb = state && state.powerOn ? 0.30 : 0.10;
+    for (let x = 0; x < RW; x++) {
+      const beam = Math.max(0, 1 - Math.abs(2 * x / RW - 1) * 1.15);
+      beamF[x] = beam * beam * 1.25 * flicker;
     }
 
+    // ---- floor and ceiling, cast per row ----
+    for (let y = 0; y < RH; y++) {
+      const isFloor = y > horizon;
+      const p = isFloor ? (y - horizon) : (horizon - y);
+      if (p === 0) continue;
+      const rowDist = (RH * 0.5) / p;
+      const row = y * RW;
+      if (rowDist > 30) {          // beyond the torch, just darkness
+        buf.fill(0xff000000, row, row + RW);
+        continue;
+      }
+      const stepX = rowDist * 2 * planeX / RW, stepY = rowDist * 2 * planeY / RW;
+      let fx = player.x + rowDist * (dirX - planeX), fy = player.y + rowDist * (dirY - planeY);
+      const lut = isFloor ? shaded.floor : shaded.ceil;
+      // distance falloff and the ceiling's dimming are constant across the row
+      const rowK = (isFloor ? 1 : 0.75) / (1 + rowDist * rowDist * 0.045);
+      for (let x = 0; x < RW; x++) {
+        const tx = ((fx * TEX) | 0) & TEXMASK, ty = ((fy * TEX) | 0) & TEXMASK;
+        let k = (amb + beamF[x]) * rowK;
+        buf[row + x] = lut[k <= 0.02 ? 0 : k >= 1 ? LEVELS - 1 : (k * LEVELS) | 0][ty * TEX + tx];
+        fx += stepX; fy += stepY;
+      }
+    }
+
+    // ---- walls ----
+    for (let x = 0; x < RW; x++) {
+      const camX = 2 * x / RW - 1;
+      const rdx = dirX + planeX * camX, rdy = dirY + planeY * camX;
+      const r = castRayDir(player.x, player.y, rdx, rdy);
+      zbuf[x] = r.dist;
+      if (r.dist > 30) continue;
+
+      const h = (RH / r.dist) | 0;
+      let y0 = horizon - (h >> 1), y1 = y0 + h;
+      const drawStart = Math.max(0, y0), drawEnd = Math.min(RH - 1, y1);
+
+      // where along the wall face this column landed, for the texture
+      let wallX = r.side === 0 ? player.y + r.dist * rdy : player.x + r.dist * rdx;
+      wallX -= Math.floor(wallX);
+      let texX = (wallX * TEX) | 0;
+      if (r.side === 0 && rdx > 0) texX = TEX - texX - 1;
+      if (r.side === 1 && rdy < 0) texX = TEX - texX - 1;
+
+      // a whole wall column is lit the same, so pick its shade once
+      const lut = shaded[r.hit] || shaded['#'];
+      const k = lightAt(camX, r.dist, flicker) * (r.side === 1 ? 0.68 : 1);
+      const tex = lut[levelOf(k)];
+      const stepTex = TEX / h;
+      let texPos = (drawStart - horizon + (h >> 1)) * stepTex;
+      for (let y = drawStart; y <= drawEnd; y++) {
+        const texY = (texPos | 0) & TEXMASK;
+        texPos += stepTex;
+        buf[y * RW + x] = tex[texY * TEX + texX];
+      }
+    }
+
+    ctx.putImageData(img, 0, 0);
     drawSprites(now);
     drawGrain(now);
   }
 
-  // Everything that isn't a wall is drawn as a flat billboard facing you.
-  function spriteList() {
-    const out = [];
-    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-      const c = grid[y][x];
-      if (c === 'f') out.push({ x: x + .5, y: y + .5, kind: 'fuse' });
-      else if (c === 'n') out.push({ x: x + .5, y: y + .5, kind: 'note' });
-      else if (c === 'G') out.push({ x: x + .5, y: y + .5, kind: 'gen' });
-      else if (c === 'P') out.push({ x: x + .5, y: y + .5, kind: 'pad' });
-      else if (c === 'L') out.push({ x: x + .5, y: y + .5, kind: 'lever' });
-      else if (c === 'X') out.push({ x: x + .5, y: y + .5, kind: 'exit' });
+  // Same DDA as before, but taking a direction vector — which is what the
+  // floor casting maths needs anyway.
+  function castRayDir(px, py, rdx, rdy) {
+    let mapX = Math.floor(px), mapY = Math.floor(py);
+    const dDistX = Math.abs(1 / (rdx || 1e-9)), dDistY = Math.abs(1 / (rdy || 1e-9));
+    let stepX, stepY, sideDistX, sideDistY;
+    if (rdx < 0) { stepX = -1; sideDistX = (px - mapX) * dDistX; }
+    else { stepX = 1; sideDistX = (mapX + 1 - px) * dDistX; }
+    if (rdy < 0) { stepY = -1; sideDistY = (py - mapY) * dDistY; }
+    else { stepY = 1; sideDistY = (mapY + 1 - py) * dDistY; }
+    let side = 0, hit = '#', dist = 60;
+    for (let guard = 0; guard < 96; guard++) {
+      if (sideDistX < sideDistY) { sideDistX += dDistX; mapX += stepX; side = 0; }
+      else { sideDistY += dDistY; mapY += stepY; side = 1; }
+      const c = at(mapX, mapY);
+      if (SOLID.has(c)) {
+        hit = c;
+        dist = side === 0 ? (sideDistX - dDistX) : (sideDistY - dDistY);
+        break;
+      }
+      if ((side === 0 ? sideDistX : sideDistY) > 34) break;
     }
+    return { dist: Math.max(0.0001, dist), side, hit, mapX, mapY };
+  }
+
+  // Kept for the tests and for line-of-sight work: same thing, by angle.
+  function castRay(px, py, ang) {
+    return castRayDir(px, py, Math.cos(ang), Math.sin(ang));
+  }
+
+  // Everything that isn't a wall is drawn as a flat billboard facing you.
+  const SPRITE_OF = { f: 'fuse', n: 'note', G: 'gen', P: 'pad', L: 'lever', X: 'exit' };
+  function spriteList() {
+    // Only what's near enough to see — the endless world has no end to scan.
+    const out = cellsNear(player.x, player.y, 22, c => SPRITE_OF[c])
+      .map(p => ({ x: p.x + .5, y: p.y + .5, kind: SPRITE_OF[p.c] }));
     out.push({ x: monster.x, y: monster.y, kind: 'monster' });
     return out;
   }
@@ -667,7 +949,7 @@
       if (!monster.hunting && monster.path.length === 0) monster.wander = randomFloor();
     }
 
-    const speed = (monster.hunting ? 1.45 : 0.75) * dt;
+    const speed = (monster.hunting ? 1.45 * huntSpeed() : 0.75) * dt;
     const step = monster.path[0];
     if (step) {
       const tx = step.x + 0.5, ty = step.y + 0.5;
@@ -685,13 +967,21 @@
     if (dist < 0.55) caught();
   }
 
+  // In endless mode it gets steadily quicker — capped, so it stays beatable.
+  function huntSpeed() {
+    if (!state || !state.endless) return 1;
+    const mins = (performance.now() - state.started) / 60000;
+    return Math.min(1.6, 1 + mins * 0.12);
+  }
+
   function randomFloor() {
+    const ox = Math.floor(monster ? monster.x : 1), oy = Math.floor(monster ? monster.y : 1);
     for (let i = 0; i < 200; i++) {
-      const x = 1 + Math.floor(Math.random() * (W - 2));
-      const y = 1 + Math.floor(Math.random() * (H - 2));
-      if (!SOLID.has(grid[y][x])) return { x, y };
+      const x = ox + Math.floor((Math.random() - 0.5) * 24);
+      const y = oy + Math.floor((Math.random() - 0.5) * 24);
+      if (!SOLID.has(at(x, y))) return { x, y };
     }
-    return { x: 1, y: 1 };
+    return { x: ox, y: oy };
   }
 
   // ============================================================
@@ -729,7 +1019,7 @@
     const a = nearbyAction();
     if (!a) return;
     if (a.kind === 'fuse') {
-      grid[a.c.y][a.c.x] = '.';
+      setCell(a.c.x, a.c.y, '.');
       state.fuses++;
       beep(660, 0.08);
       setObjective();
@@ -738,6 +1028,7 @@
       const idx = (a.c.y * W + a.c.x) % keyList.length;
       showNote(keyList[idx]);
     } else if (a.kind === 'gen') {
+      if (state.endless) return;
       if (state.powerOn) return;
       if (state.fuses >= 3) {
         state.powerOn = true;
@@ -785,6 +1076,15 @@
   //  Objective text
   // ============================================================
   function setObjective() {
+    if (state.endless) {
+      const mins = Math.floor((performance.now() - state.started) / 60000);
+      $('objText').textContent =
+        `Survive. Fuses found: ${state.fuses}` + (mins ? ` · ${mins} min` : '');
+      $('carry').innerHTML =
+        `<span class="item">🔌 ${state.fuses}</span>` +
+        `<span class="item">🏃 ×${huntSpeed().toFixed(2)}</span>`;
+      return;
+    }
     let t;
     if (!state.powerOn) t = `Find 3 fuses and start the generator (${state.fuses}/3)`;
     else if (!state.keypadDone) t = 'Find the door code and use the keypad';
@@ -857,6 +1157,19 @@
   function finishScare() {
     $('scare').classList.remove('on');
     scaring = false;
+    if (state.endless) {
+      const secs = Math.round((performance.now() - state.started) / 1000);
+      showResults('CAUGHT',
+        `<p class="note">You lasted <b>${Math.floor(secs/60)}m ${secs%60}s</b>
+         and found <b>${state.fuses}</b> fuse${state.fuses === 1 ? '' : 's'}.</p>`);
+      try {
+        const best = Math.max(secs, parseInt(localStorage.getItem('hushBest') || '0', 10) || 0);
+        localStorage.setItem('hushBest', String(best));
+        $('resBody').innerHTML +=
+          `<p class="note">Best run: <b>${Math.floor(best/60)}m ${best%60}s</b></p>`;
+      } catch (e) {}
+      return;
+    }
     showResults('CAUGHT',
       `<p class="note">It found you.</p>
        <p class="note">Caught <b>${state.caught}</b> time${state.caught === 1 ? '' : 's'}.
@@ -883,6 +1196,7 @@
   //  Win / results
   // ============================================================
   function checkEscape() {
+    if (state.endless) return;
     if (!state.leversDone) return;
     if (at(Math.floor(player.x), Math.floor(player.y)) === 'X') win();
   }
@@ -983,6 +1297,10 @@
   function startGame(fresh) {
     resetLevel(fresh);
     if (fresh) state.started = performance.now();
+    beginRound();
+  }
+
+  function beginRound() {
     running = true; lastT = performance.now();
     $('menu').style.display = 'none';
     $('results').classList.add('hidden');
@@ -1002,6 +1320,7 @@
     keys[k] = true;
     if (k === 'e' && running) doAction();
     if (k === 'escape' && running) pressQuit();
+    if (k === 'f' && !state.keypadOpen) toggleFullscreen();
     if (['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright',' '].includes(k)) e.preventDefault();
   });
   window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
@@ -1094,11 +1413,14 @@
   const goHome = () => { stack = ['mainMenu']; showPanel('mainMenu'); };
 
   $('btnPlay').addEventListener('click', () => startGame(true));
+  $('btnEndless').addEventListener('click', () => startEndless());
   $('btnHowTo').addEventListener('click', () => goTo('howToPanel'));
   $('btnSettings').addEventListener('click', () => goTo('settingsPanel'));
   $('btnHowToBack').addEventListener('click', goBack);
   $('btnSettingsBack').addEventListener('click', goBack);
-  $('btnAgain').addEventListener('click', () => startGame(false));
+  $('btnAgain').addEventListener('click', () => {
+    if (state.endless) startEndless(); else startGame(false);
+  });
   $('btnResMenu').addEventListener('click', () => {
     $('results').classList.add('hidden');
     $('menu').style.display = '';
@@ -1168,6 +1490,37 @@
   quitBtn.addEventListener('click', e => { e.preventDefault(); pressQuit(); });
 
   // ============================================================
+  //  Fullscreen
+  // ============================================================
+  function isFull() {
+    return !!(document.fullscreenElement || document.webkitFullscreenElement);
+  }
+  // Fullscreen support varies a lot — iOS Safari has no Element.requestFullscreen
+  // at all. Every step is guarded so an unsupported browser just does nothing
+  // instead of throwing halfway through a game.
+  function toggleFullscreen() {
+    try {
+      if (isFull()) {
+        const exit = document.exitFullscreen || document.webkitExitFullscreen;
+        if (exit) exit.call(document);
+        return;
+      }
+      const el = document.documentElement || document.body;
+      if (!el) return;
+      const req = el.requestFullscreen || el.webkitRequestFullscreen;
+      if (req) req.call(el);
+    } catch (e) { /* not supported here — no harm done */ }
+  }
+  function refreshFullBtn() {
+    const b = $('btnFull');
+    if (b) b.textContent = isFull() ? '⛶ Exit fullscreen' : '⛶ Fullscreen';
+    scheduleFit();
+  }
+  $('btnFull').addEventListener('click', e => { e.preventDefault(); toggleFullscreen(); });
+  document.addEventListener('fullscreenchange', refreshFullBtn);
+  document.addEventListener('webkitfullscreenchange', refreshFullBtn);
+
+  // ============================================================
   //  Fit to screen
   // ============================================================
   let fitPending = null;
@@ -1192,6 +1545,8 @@
   //  Boot
   // ============================================================
   state = freshState();
+  makeTextures();          // must happen before the first frame is drawn
+  buildShadeTables();      // ...and the shade tables are built from them
   resetLevel(true);
   buildSettings();
   refreshSettings();
@@ -1199,7 +1554,13 @@
   scheduleFit();
 
   window.__hush = {
-    MAP_SRC, W, H, SOLID, NOTES,
+    MAP_SRC, W, H, SOLID, NOTES, CH,
+    setCell, cellsNear, buildChunk, chunkAt, startEndless, huntSpeed,
+    castRayDir, makeTextures, allocBuffers, buildShadeTables, shaded, LEVELS,
+    get textures() { return textures; },
+    get worldMode() { return worldMode; },
+    set worldMode(v) { worldMode = v; },
+    toggleFullscreen, isFull,
     get grid() { return grid; },
     at, isWall, findAll, bfsPath, lineOfSight, castRay, freshState, resetLevel,
     openDoors, spriteList, nearbyAction, doAction, pullLever, randomFloor,

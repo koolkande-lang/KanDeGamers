@@ -470,6 +470,68 @@ caught keeps your progress: doors you opened stay open.
 **Controls** work both ways — WASD + mouse-look on a laptop, on-screen stick and
 drag-to-look on a tablet.
 
+---
+
+## 🆕 Round 4 — fullscreen, realism, endless
+
+Three things you asked for, all in Hush.
+
+### ⛶ Fullscreen
+
+A **Fullscreen** button under the view, and the **F** key on a keyboard. It
+fills the whole screen so the room around you disappears — which matters more in
+a horror game than in the other two. On an iPad, Safari doesn't allow proper
+fullscreen for a page, so the button quietly does nothing there rather than
+breaking. Adding the game to your Home Screen gets you the same effect.
+
+### 🧱 Everything is more realistic
+
+The old renderer drew each column as one flat block of colour. It now draws
+**real pixels**:
+
+| Before | Now |
+|---|---|
+| Flat coloured columns | **Textured walls** — brick courses, mortar, grime |
+| Plain grey floor band | **Perspective floor and ceiling**, cast per row |
+| Even lighting | **A flashlight cone that flickers** and falls off with distance |
+| Fixed horizon | Horizon **moves with your head-bob** as you walk |
+
+All the textures are **drawn by code**, not downloaded — the page still has no
+image files at all, so it loads just as fast.
+
+> ⚠️ **This nearly shipped unplayable.** The first version called two maths
+> functions on *every one of ~150,000 pixels, every frame* — it ran at about
+> **7 frames a second**. Unusable on your iPad. Each texture is now
+> pre-darkened into 64 brightness copies once at startup, so drawing a pixel is
+> a single lookup instead of a pile of multiplications. That took it from
+> **141ms a frame to 12ms** — about **11× faster**, comfortably smooth. There's
+> now a test that fails if a frame ever creeps back over 40ms.
+
+### ♾️ The endless map
+
+A second mode on the menu: **ENDLESS**. No puzzles and no exit — the building
+simply never stops.
+
+The world is cut into **15×15 chunks** that are built the moment you walk near
+them, and thrown away behind you. Each chunk is a perfect maze, and every chunk
+has a doorway at the **exact middle of all four edges**, so any two neighbours
+always join up. That's what stops the endless world doing what the first
+hand-drawn map did — sealing you into a dead end.
+
+Because the same seed always produces the same chunk, walking away and coming
+back gives you **the same corridors**, not a fresh scramble.
+
+The monster's pathfinding had to change too: you can't search an infinite map,
+so it searches a **26-cell bubble** around itself with a step budget. And it
+**speeds up the longer you survive** — from normal to 1.6× over about five
+minutes, then capped, so it stays hard but never impossible. Your best run time
+is saved.
+
+**Tested:** a flood-fill from the start reached **9,000 squares spanning 178×178
+cells** without ever being boxed in, and a 2,500-step walk through freshly
+generated chunks never once ended up inside a wall.
+
+
 > ⚠️ **Two bugs the tests caught before you ever played it:**
 > 1. `flashPrompt()` was called but never written — so trying the generator
 >    without enough fuses **crashed the game**. That's the most likely first
@@ -777,8 +839,8 @@ drag-to-look on a tablet.
 
 ## ⚠️ What still needs doing
 
-**Upload it, then play it with real people.** Everything above passed automated
-tests, but no human has actually played the 6-player version. Things worth
+**Upload it, then play it with real people.** All **19 test suites — 863 checks
+— pass**, but no human has actually played any of this yet. Things worth
 watching for:
 
 - Does 6 snakes on a 40×40 board feel crowded or fun?
