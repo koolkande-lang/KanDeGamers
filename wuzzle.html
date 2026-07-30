@@ -331,14 +331,17 @@
       <b>Drag</b> through letters that <b>touch</b> — sideways, up, down or
       diagonally. Never the same square twice. <b>3 letters minimum.</b>
       <b>Qu</b> is one square but counts as two letters.</p>
-    <p class="lbl">Points</p>
-    <div class="row" style="flex-wrap:wrap;gap:5px">
-      <button style="pointer-events:none">3–4<br><b>1</b></button>
-      <button style="pointer-events:none">5<br><b>2</b></button>
-      <button style="pointer-events:none">6<br><b>3</b></button>
+    <p class="lbl">Points = letters − 2</p>
+    <div class="row" style="flex-wrap:wrap;gap:4px">
+      <button style="pointer-events:none">3<br><b>1</b></button>
+      <button style="pointer-events:none">4<br><b>2</b></button>
+      <button style="pointer-events:none">5<br><b>3</b></button>
+      <button style="pointer-events:none">6<br><b>4</b></button>
       <button style="pointer-events:none">7<br><b>5</b></button>
-      <button style="pointer-events:none">8+<br><b>11</b></button>
+      <button style="pointer-events:none">8<br><b>6</b></button>
     </div>
+    <p class="note" style="text-align:left">Every extra letter is one more point,
+       so longer words are always worth more.</p>
     <p class="lbl">With friends</p>
     <p class="note" style="text-align:left">If <b>two people find the same word,
        nobody scores it</b>. It pays to find words the others won't.</p>
@@ -766,14 +769,12 @@ const DICT_ENC = 'AaalCmCrdvarkDonBbaDckEusDloneDndonHedHmentDteFmentEtoirCbDaEs
     return best;                     // nothing great — use the best we saw
   }
 
+  // Points = letters - 2. So a 3-letter word is 1, and every extra letter is
+  // one more point. Simpler than Boggle's jumpy 1/1/2/3/5/11 ladder, and much
+  // easier to explain to someone who has just picked the game up.
   const scoreWord = w => {
     const n = w.length;
-    if (n < 3) return 0;
-    if (n <= 4) return 1;
-    if (n === 5) return 2;
-    if (n === 6) return 3;
-    if (n === 7) return 5;
-    return 11;
+    return n < 3 ? 0 : n - 2;
   };
   const scoreList = ws => ws.reduce((s, w) => s + scoreWord(w), 0);
 

@@ -298,9 +298,30 @@ clock runs out.
 - Drag through **touching** letters — sideways, up, down or diagonally
 - No square twice in the same word · 3 letters minimum
 - **Qu** is one square but counts as two letters
-- 3–4 letters = 1 point · 5 = 2 · 6 = 3 · 7 = 5 · 8+ = 11
+- **Points = letters − 2.** 3 letters = 1, 4 = 2, 5 = 3, 6 = 4, and so on.
+  Every extra letter is worth one more point
 - **If two players find the same word, nobody scores it.** That's the real rule,
   and it's what makes the game about finding words others won't
+
+**Scoring**
+
+`points = letters − 2`, so 3→1, 4→2, 5→3, 6→4, 7→5, 8→6…
+
+Boggle's real ladder is 1/1/2/3/5/11, which jumps around and is hard to explain.
+The linear rule is easier to hold in your head and always rewards a longer word.
+
+Side effect worth knowing: **scores are about 40% higher** than before, because
+4-letter words (the most common kind) went from 1 point to 2. That makes texture
+packs unlock faster:
+
+| | first pack | all seven |
+|---|---|---|
+| beginner (~5 pts/round) | round 3 | round 17 |
+| decent (~15 pts/round) | round 2 | round 8 |
+| strong (~30 pts/round) | round 2 | round 3 |
+
+If a strong player getting everything in three rounds feels too quick, raise the
+`unlockAt` numbers in `THEMES` — they're the only thing that would need changing.
 
 **Board sizes** (Solo → Board size, or Settings for the default)
 
@@ -506,9 +527,30 @@ clock runs out.
 - Drag through **touching** letters — sideways, up, down or diagonally
 - No square twice in the same word · 3 letters minimum
 - **Qu** is one square but counts as two letters
-- 3–4 letters = 1 point · 5 = 2 · 6 = 3 · 7 = 5 · 8+ = 11
+- **Points = letters − 2.** 3 letters = 1, 4 = 2, 5 = 3, 6 = 4, and so on.
+  Every extra letter is worth one more point
 - **If two players find the same word, nobody scores it.** That's the real rule,
   and it's what makes the game about finding words others won't
+
+**Scoring**
+
+`points = letters − 2`, so 3→1, 4→2, 5→3, 6→4, 7→5, 8→6…
+
+Boggle's real ladder is 1/1/2/3/5/11, which jumps around and is hard to explain.
+The linear rule is easier to hold in your head and always rewards a longer word.
+
+Side effect worth knowing: **scores are about 40% higher** than before, because
+4-letter words (the most common kind) went from 1 point to 2. That makes texture
+packs unlock faster:
+
+| | first pack | all seven |
+|---|---|---|
+| beginner (~5 pts/round) | round 3 | round 17 |
+| decent (~15 pts/round) | round 2 | round 8 |
+| strong (~30 pts/round) | round 2 | round 3 |
+
+If a strong player getting everything in three rounds feels too quick, raise the
+`unlockAt` numbers in `THEMES` — they're the only thing that would need changing.
 
 **Board sizes** (Solo → Board size, or Settings for the default)
 
