@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>HUSH — escape the toy factory</title>
+<style>
+  :root{
+    --ink:#e8e2d8; --dim:rgba(232,226,216,.5);
+    --rust:#c2410c; --amber:#f59e0b; --blood:#7f1d1d;
+    --line:#3a2f28;
+    --pad:clamp(10px,2.2vh,18px);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden;overscroll-behavior:none}
+  body{
+    margin:0;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(900px 600px at 50% -10%,#241a14 0%,#080605 65%);
+    font-family:'Trebuchet MS',system-ui,sans-serif;color:var(--ink);
+  }
+  #stage{transform-origin:center center}
+
+  .brand{text-align:center;margin-bottom:var(--pad)}
+  .brand h1{
+    margin:0;font-size:clamp(1.9rem,6.5vh,3.2rem);letter-spacing:.4em;font-weight:800;
+    color:#e8e2d8;text-shadow:0 0 22px rgba(194,65,12,.55),0 0 4px #000;
+  }
+  .brand p{margin:6px 0 0;font-size:clamp(.58rem,1.4vh,.72rem);letter-spacing:.28em;color:var(--dim)}
+  body.playing .brand{display:none}
+
+  .card{
+    width:min(92vw,440px);
+    background:linear-gradient(165deg,rgba(30,22,17,.95),rgba(10,8,6,.97));
+    border:1px solid var(--line);border-radius:6px;padding:var(--pad) clamp(14px,3vw,22px);
+    box-shadow:0 24px 70px rgba(0,0,0,.75),inset 0 1px 0 rgba(255,255,255,.05);
+    position:relative;overflow:hidden;text-align:center;
+  }
+  .card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+    background:linear-gradient(90deg,transparent,var(--rust),transparent)}
+  .screen{animation:in .18s ease both}
+  @keyframes in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  h2.title{
+    margin:0 0 var(--pad);font-size:clamp(.8rem,2vh,.95rem);letter-spacing:.24em;
+    text-transform:uppercase;color:#e7c9a0;border-bottom:1px solid var(--line);padding-bottom:8px;
+  }
+  .lbl{margin:calc(var(--pad)*.7) 0 6px;font-size:clamp(.56rem,1.3vh,.66rem);letter-spacing:.2em;
+    text-transform:uppercase;color:var(--dim);text-align:left}
+  .note{font-size:clamp(.64rem,1.5vh,.76rem);color:var(--dim);line-height:1.55;margin:6px 0}
+  button{font-family:inherit;cursor:pointer;border:none}
+  .big{display:block;width:100%;margin:8px 0 0;padding:clamp(10px,1.9vh,14px);border-radius:6px;
+    font-weight:800;letter-spacing:.16em;font-size:clamp(.78rem,1.9vh,.92rem);
+    background:linear-gradient(135deg,var(--rust),#7c2d12);color:#fff7ed;transition:transform .12s,filter .12s}
+  .big:hover{transform:translateY(-2px);filter:brightness(1.12)}
+  .ghost{display:block;width:100%;margin:10px 0 0;padding:clamp(8px,1.6vh,11px);border-radius:6px;
+    background:transparent;border:1px solid var(--line);color:var(--ink);opacity:.7;
+    letter-spacing:.18em;font-size:clamp(.64rem,1.5vh,.74rem)}
+  .ghost:hover{opacity:1;background:rgba(255,255,255,.05)}
+  .tile{display:flex;align-items:center;gap:12px;width:100%;text-align:left;margin:0 0 8px;
+    padding:clamp(9px,1.8vh,13px) 14px;border-radius:8px;color:var(--ink);
+    background:linear-gradient(90deg,rgba(194,65,12,.18),rgba(194,65,12,.02));
+    border-left:3px solid var(--rust);transition:transform .13s,background .13s}
+  .tile:hover{transform:translateX(4px);background:linear-gradient(90deg,rgba(194,65,12,.42),rgba(194,65,12,.05))}
+  .tI{font-size:clamp(1.1rem,2.6vh,1.4rem);width:1.6em;text-align:center;flex:none}
+  .tT{font-size:clamp(.85rem,2vh,1rem);font-weight:800;letter-spacing:.12em;display:block}
+  .tS{font-size:clamp(.58rem,1.4vh,.68rem);color:var(--dim);display:block;margin-top:1px}
+  .row{display:flex;gap:6px}
+  .row button{flex:1;padding:clamp(7px,1.6vh,10px) 2px;border-radius:6px;
+    font-size:clamp(.62rem,1.5vh,.74rem);background:#241a14;color:var(--ink);
+    border:2px solid transparent;opacity:.7}
+  .row button.active{background:linear-gradient(135deg,var(--rust),#7c2d12);color:#fff7ed;
+    border-color:#fdba74;opacity:1}
+  a{color:var(--amber)}
+
+  /* ---------------- game ---------------- */
+  #game{display:none;flex-direction:column;align-items:center;touch-action:none;position:relative}
+  #view{
+    display:block;background:#000;border:1px solid #2a211b;border-radius:4px;
+    width:min(94vw,80vh,900px);height:auto;aspect-ratio:16/10;
+    image-rendering:pixelated;touch-action:none;
+  }
+  #hud{
+    position:absolute;inset:0;pointer-events:none;display:flex;flex-direction:column;
+    justify-content:space-between;padding:clamp(8px,1.8vh,16px);
+  }
+  #hudTop{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+  #objective{
+    background:rgba(0,0,0,.55);border-left:3px solid var(--amber);padding:6px 10px;
+    font-size:clamp(.6rem,1.5vh,.76rem);max-width:60%;border-radius:0 4px 4px 0;
+  }
+  #objective b{color:var(--amber);display:block;font-size:.85em;letter-spacing:.14em}
+  #carry{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+  .item{background:rgba(0,0,0,.55);border:1px solid var(--line);border-radius:20px;
+    padding:3px 9px;font-size:clamp(.56rem,1.3vh,.68rem)}
+  #hudBottom{display:flex;justify-content:space-between;align-items:flex-end;gap:10px}
+  #prompt{
+    background:rgba(0,0,0,.6);border:1px solid var(--amber);border-radius:6px;
+    padding:6px 12px;font-size:clamp(.62rem,1.5vh,.78rem);opacity:0;transition:opacity .15s;
+  }
+  #prompt.on{opacity:1}
+  #fear{width:120px;height:5px;background:rgba(255,255,255,.12);border-radius:3px;overflow:hidden}
+  #fearFill{height:100%;width:0%;background:linear-gradient(90deg,#f59e0b,#b91c1c);transition:width .25s}
+
+  /* touch controls */
+  #touch{position:absolute;inset:0;pointer-events:none}
+  #stick{
+    position:absolute;left:4%;bottom:6%;width:clamp(84px,17vh,130px);aspect-ratio:1;
+    border-radius:50%;border:2px solid rgba(232,226,216,.25);background:rgba(0,0,0,.3);
+    pointer-events:auto;touch-action:none;
+  }
+  #stickNub{position:absolute;left:50%;top:50%;width:38%;aspect-ratio:1;border-radius:50%;
+    background:rgba(232,226,216,.35);transform:translate(-50%,-50%)}
+  #btnUse{
+    position:absolute;right:5%;bottom:9%;width:clamp(64px,13vh,96px);aspect-ratio:1;
+    border-radius:50%;border:2px solid var(--amber);background:rgba(194,65,12,.35);
+    color:#fff;font-weight:800;letter-spacing:.06em;font-size:clamp(.6rem,1.5vh,.78rem);
+    pointer-events:auto;touch-action:none;
+  }
+  #btnRun{
+    position:absolute;right:5%;bottom:calc(9% + clamp(74px,15vh,110px));
+    width:clamp(52px,10vh,74px);aspect-ratio:1;border-radius:50%;
+    border:2px solid rgba(232,226,216,.3);background:rgba(0,0,0,.35);color:var(--ink);
+    font-size:clamp(.52rem,1.3vh,.66rem);pointer-events:auto;touch-action:none;
+  }
+  body.nokeys #touch{display:block}
+
+  #gameBottom{display:flex;gap:10px;justify-content:center;margin-top:8px}
+  #gameBottom button{padding:6px 16px;font-size:clamp(.6rem,1.4vh,.7rem);border-radius:20px;
+    border:1px solid var(--line);background:transparent;color:var(--ink);opacity:.6;letter-spacing:.1em}
+  #btnQuit{border-color:#7f1d1d;color:#fca5a5}
+  #btnQuit.armed{opacity:1;background:#7f1d1d;color:#fff;border-color:#ef4444;font-weight:800}
+
+  /* jumpscare + overlays */
+  #scare{
+    position:fixed;inset:0;display:none;align-items:center;justify-content:center;
+    background:#000;z-index:50;
+  }
+  #scare.on{display:flex;animation:shake .4s infinite}
+  @keyframes shake{
+    0%,100%{transform:translate(0,0)} 25%{transform:translate(-6px,4px)}
+    50%{transform:translate(5px,-5px)} 75%{transform:translate(-4px,-3px)}
+  }
+  #scareFace{width:min(90vw,90vh);height:min(90vw,90vh)}
+
+  #keypad{
+    position:fixed;inset:0;display:none;align-items:center;justify-content:center;
+    background:rgba(0,0,0,.82);z-index:40;
+  }
+  #keypad.on{display:flex}
+  #keypadBox{background:#1a120d;border:2px solid var(--line);border-radius:8px;padding:18px;text-align:center}
+  #kpDisplay{font-family:'Courier New',monospace;font-size:2rem;letter-spacing:.4em;color:var(--amber);
+    background:#0a0705;border:1px solid var(--line);border-radius:4px;padding:8px 14px;margin-bottom:12px;min-width:180px}
+  #kpGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  #kpGrid button{width:56px;height:52px;font-size:1.2rem;font-weight:700;border-radius:6px;
+    background:#2a1f18;color:var(--ink);border:1px solid var(--line)}
+  #kpGrid button:active{background:var(--rust)}
+
+  #noteView{
+    position:fixed;inset:0;display:none;align-items:center;justify-content:center;
+    background:rgba(0,0,0,.85);z-index:40;padding:20px;
+  }
+  #noteView.on{display:flex}
+  #noteBox{
+    background:#e8dcc0;color:#2a1f18;max-width:min(90vw,420px);padding:22px 24px;border-radius:3px;
+    font-family:'Courier New',monospace;font-size:clamp(.75rem,1.9vh,.95rem);line-height:1.7;
+    box-shadow:0 20px 60px rgba(0,0,0,.8);transform:rotate(-1deg);
+  }
+  #noteBox h3{margin:0 0 10px;font-size:1em;letter-spacing:.1em;text-transform:uppercase}
+  .hidden{display:none !important}
+</style>
+</head>
+<body>
+
+<div id="stage">
+  <div class="brand">
+    <h1>HUSH</h1>
+    <p>SOMETHING IS STILL IN THE FACTORY</p>
+  </div>
+
+  <div id="menu" class="card">
+    <div id="mainMenu" class="screen">
+      <button class="tile" id="btnPlay">
+        <span class="tI">▶</span><span><span class="tT">ENTER THE FACTORY</span>
+        <span class="tS">Find a way out. Don't get caught.</span></span></button>
+      <button class="tile" id="btnHowTo">
+        <span class="tI">❓</span><span><span class="tT">HOW TO PLAY</span>
+        <span class="tS">Controls and what you're doing</span></span></button>
+      <button class="tile" id="btnSettings">
+        <span class="tI">⚙️</span><span><span class="tT">SETTINGS</span>
+        <span class="tS">Scare level and sound</span></span></button>
+      <p class="note" style="margin-top:10px"><a href="index.html">← KanDe Bros</a></p>
+    </div>
+
+    <div id="howToPanel" class="screen hidden">
+      <h2 class="title">❓ How to play</h2>
+      <p class="note" style="text-align:left">
+        <b>Keyboard:</b> <b>W A S D</b> to move · mouse or <b>←→</b> to look ·
+        <b>E</b> to use things · <b>Shift</b> to run.<br><br>
+        <b>Touch:</b> left stick to move · drag anywhere on the right to look ·
+        <b>USE</b> to interact · <b>RUN</b> to sprint.
+      </p>
+      <p class="lbl">What you're doing</p>
+      <p class="note" style="text-align:left">
+        Three things stand between you and the exit: the <b>power</b>, a <b>locked
+        door</b>, and the <b>shutter</b>. Read every note you find — the codes are
+        written down somewhere.<br><br>
+        <b>Something else is in here.</b> It hears you run. Walk when it's close.
+      </p>
+      <button class="ghost" id="btnHowToBack">◀ BACK</button>
+    </div>
+
+    <div id="settingsPanel" class="screen hidden">
+      <h2 class="title">⚙️ Settings</h2>
+      <p class="lbl">Scare level</p>
+      <div class="row" id="scareRow"></div>
+      <p class="note" id="scareNote"></p>
+      <p class="lbl">Sound</p>
+      <div class="row" id="soundRow"></div>
+      <button class="ghost" id="btnSettingsBack">◀ BACK</button>
+    </div>
+  </div>
+
+  <div id="game">
+    <div style="position:relative">
+      <canvas id="view" width="480" height="300"></canvas>
+      <div id="hud">
+        <div id="hudTop">
+          <div id="objective"><b>OBJECTIVE</b><span id="objText">Find a way out.</span></div>
+          <div id="carry"></div>
+        </div>
+        <div id="hudBottom">
+          <div id="prompt">Press E</div>
+          <div id="fear"><div id="fearFill"></div></div>
+        </div>
+      </div>
+      <div id="touch">
+        <div id="stick"><div id="stickNub"></div></div>
+        <button id="btnRun">RUN</button>
+        <button id="btnUse">USE</button>
+      </div>
+    </div>
+    <div id="gameBottom">
+      <button id="btnQuit">✕ Quit</button>
+    </div>
+  </div>
+
+  <div id="results" class="card hidden">
+    <h2 class="title" id="resTitle">CAUGHT</h2>
+    <div id="resBody"></div>
+    <button class="big" id="btnAgain">TRY AGAIN</button>
+    <button class="ghost" id="btnResMenu">◀ MENU</button>
+  </div>
+</div>
+
+<div id="scare"><canvas id="scareFace" width="400" height="400"></canvas></div>
+
+<div id="keypad"><div id="keypadBox">
+  <div id="kpDisplay">____</div>
+  <div id="kpGrid"></div>
+  <button class="ghost" id="kpClose" style="margin-top:10px">CLOSE</button>
+</div></div>
+
+<div id="noteView"><div id="noteBox">
+  <h3 id="noteTitle">NOTE</h3>
+  <div id="noteText"></div>
+  <p class="note" style="color:#6b5844;margin-top:14px">tap anywhere to close</p>
+</div></div>
+
+<script>
+(function () {
+  'use strict';
+  const $ = id => document.getElementById(id);
+
+  // ============================================================
+  //  The factory
+  // ============================================================
+  //  #  wall            .  floor           +  locked door (power)
+  //  K  keypad door     S  shutter (exit)  @  player start
+  //  M  monster start   f  fuse            n  note
+  //  G  generator       P  keypad panel    L  lever
+  const MAP_SRC = [
+    '#########################',
+    '#f#......@........#.....#',
+    '#.#n###########.#.#####.#',
+    '#G#.#.............#...#M#',
+    '#.###.#######.#.#.#.#...#',
+    '#n...f#.........#f..#...#',
+    '#########+###############',
+    '#...#...#.#.n.......#...#',
+    '###.#.#...#.###.###.#.P.#',
+    '#.#...#.#.....#.#.#...#.#',
+    '#.#####.#######.#.#####.#',
+    '#...............#.......#',
+    '##########K##############',
+    '#.#.....#L..............#',
+    '#.#.###.#####.#######.###',
+    '#.#.#...#...#.#.....#.L.#',
+    '#...#.###.#.###.###.###.#',
+    '#..L#.....#.............#',
+    '###################S#####',
+    '#.#.....#.....#.........#',
+    '#.#.###.###.#.#.###.###.#',
+    '#...#.#.#...#.#.....#...#',
+    '#####.....###.###.#.#.#.#',
+    '#.........#.....X.....#.#',
+    '#########################'
+  ];
+
+  const H = MAP_SRC.length, W = MAP_SRC[0].length;
+  const grid = MAP_SRC.map(r => r.split(''));
+
+  const SOLID = new Set(['#', '+', 'K', 'S']);
+  const at = (x, y) => (x < 0 || y < 0 || x >= W || y >= H) ? '#' : grid[y][x];
+  const isWall = (x, y) => SOLID.has(at(Math.floor(x), Math.floor(y)));
+
+  function findAll(ch) {
+    const out = [];
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (grid[y][x] === ch) out.push({ x, y });
+    return out;
+  }
+
+  // ============================================================
+  //  State
+  // ============================================================
+  let player, monster, state, running = false, lastT = 0, rafId = null;
+  let scareLevel = 'spooky', soundOn = true;
+  try {
+    const s = localStorage.getItem('hushScare'); if (s) scareLevel = s;
+    const so = localStorage.getItem('hushSound'); if (so !== null) soundOn = so === '1';
+  } catch (e) {}
+
+  const NOTES = {
+    a: { title: 'SHIFT LOG', body: 'Power tripped again. Three fuses missing from the box.<br>' +
+         'Nobody signed them out. Nobody will say where they went.<br><br>' +
+         '— <i>the first two digits of the door code are <b>4 7</b></i>' },
+    b: { title: 'TAPED TO A LOCKER', body: 'It only comes when it hears you.<br>' +
+         'WALK. Do not run when it is close.<br><br>' +
+         '— <i>last two digits: <b>1 2</b></i>' },
+    c: { title: 'MAINTENANCE', body: 'Shutter needs all three levers.<br>' +
+         'Left first. Then right. Then the middle one.<br><br>' +
+         '<i>L → R → M</i>' }
+  };
+
+  function freshState() {
+    return {
+      fuses: 0, powerOn: false, doorOpen: false,
+      code: '4712', keypadOpen: false, keypadDone: false,
+      leverOrder: [], leversDone: false,
+      notesRead: {}, caught: 0, started: 0, fear: 0
+    };
+  }
+
+  function resetLevel(full) {
+    // rebuild the map from source so pickups come back
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) grid[y][x] = MAP_SRC[y][x];
+    const s = findAll('@')[0], m = findAll('M')[0];
+    player = { x: s.x + 0.5, y: s.y + 0.5, a: 0, speed: 0, bob: 0 };
+    monster = { x: m.x + 0.5, y: m.y + 0.5, a: 0, path: [], think: 0, hunting: false, speed: 0 };
+    if (full) state = freshState();
+    else { state.leverOrder = []; state.fear = 0; }
+    // put already-solved things back the way they were
+    if (state.powerOn) openDoors('+');
+    if (state.keypadDone) openDoors('K');
+    if (state.leversDone) openDoors('S');
+    state.fuses = state.powerOn ? 3 : 0;
+  }
+
+  function openDoors(ch) {
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (grid[y][x] === ch) grid[y][x] = '.';
+  }
+
+  // ============================================================
+  //  Pathfinding — how the monster finds you
+  // ============================================================
+  function bfsPath(from, to) {
+    const key = (x, y) => y * W + x;
+    const start = key(from.x, from.y), goal = key(to.x, to.y);
+    if (start === goal) return [];
+    const prev = new Map([[start, null]]);
+    const q = [[from.x, from.y]];
+    let head = 0;
+    while (head < q.length) {
+      const [cx, cy] = q[head++];
+      if (key(cx, cy) === goal) break;
+      for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+        const nx = cx + dx, ny = cy + dy, k = key(nx, ny);
+        if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+        if (SOLID.has(grid[ny][nx])) continue;
+        if (prev.has(k)) continue;
+        prev.set(k, [cx, cy]);
+        q.push([nx, ny]);
+      }
+    }
+    if (!prev.has(goal)) return [];
+    const path = [];
+    let cur = [to.x, to.y];
+    while (cur) {
+      path.push({ x: cur[0], y: cur[1] });
+      cur = prev.get(key(cur[0], cur[1]));
+    }
+    return path.reverse().slice(1);
+  }
+
+  // Can the monster see you? Walks the line between the two points.
+  function lineOfSight(ax, ay, bx, by) {
+    const dx = bx - ax, dy = by - ay;
+    const steps = Math.ceil(Math.hypot(dx, dy) * 8);
+    for (let i = 1; i < steps; i++) {
+      const t = i / steps;
+      if (isWall(ax + dx * t, ay + dy * t)) return false;
+    }
+    return true;
+  }
+
+  // ============================================================
+  //  Raycasting
+  // ============================================================
+  // Classic DDA: step through the grid one cell boundary at a time until we
+  // hit a wall. Returns the perpendicular distance, so there's no fisheye.
+  function castRay(px, py, ang) {
+    const sin = Math.sin(ang), cos = Math.cos(ang);
+    let mapX = Math.floor(px), mapY = Math.floor(py);
+    const dDistX = Math.abs(1 / (cos || 1e-9)), dDistY = Math.abs(1 / (sin || 1e-9));
+    let stepX, stepY, sideDistX, sideDistY;
+    if (cos < 0) { stepX = -1; sideDistX = (px - mapX) * dDistX; }
+    else { stepX = 1; sideDistX = (mapX + 1 - px) * dDistX; }
+    if (sin < 0) { stepY = -1; sideDistY = (py - mapY) * dDistY; }
+    else { stepY = 1; sideDistY = (mapY + 1 - py) * dDistY; }
+
+    let side = 0, hit = '#';
+    for (let guard = 0; guard < 128; guard++) {
+      if (sideDistX < sideDistY) { sideDistX += dDistX; mapX += stepX; side = 0; }
+      else { sideDistY += dDistY; mapY += stepY; side = 1; }
+      const c = at(mapX, mapY);
+      if (SOLID.has(c)) { hit = c; break; }
+    }
+    const dist = side === 0 ? (sideDistX - dDistX) : (sideDistY - dDistY);
+    return { dist: Math.max(0.0001, dist), side, hit, mapX, mapY };
+  }
+
+  const FOV = Math.PI / 3;
+  const view = $('view');
+  const ctx = view.getContext('2d');
+  const RW = view.width, RH = view.height;
+  const zbuf = new Float32Array(RW);
+
+  const WALL_COL = {
+    '#': [92, 74, 60],
+    '+': [150, 70, 25],
+    'K': [140, 110, 40],
+    'S': [70, 90, 130]
+  };
+
+  function render(now) {
+    // ceiling and floor
+    const g = ctx.createLinearGradient(0, 0, 0, RH);
+    g.addColorStop(0, '#0a0806'); g.addColorStop(0.5, '#150f0b'); g.addColorStop(1, '#0a0806');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, RW, RH);
+
+    for (let col = 0; col < RW; col++) {
+      const camX = 2 * col / RW - 1;
+      const ang = player.a + Math.atan(camX * Math.tan(FOV / 2));
+      const r = castRay(player.x, player.y, ang);
+      const perp = r.dist * Math.cos(ang - player.a);
+      zbuf[col] = perp;
+      const h = Math.min(RH * 4, RH / perp);
+      const y0 = (RH - h) / 2;
+
+      const base = WALL_COL[r.hit] || WALL_COL['#'];
+      // Flashlight: bright straight ahead, falling away to nothing.
+      const beam = Math.max(0, 1 - Math.abs(camX) * 1.25);
+      const lit = state.powerOn ? 0.34 : 0.13;
+      let shade = (lit + beam * 0.95) / (1 + perp * perp * 0.055);
+      if (r.side === 1) shade *= 0.72;
+      shade = Math.max(0.03, Math.min(1, shade));
+      ctx.fillStyle = `rgb(${base[0]*shade|0},${base[1]*shade|0},${base[2]*shade|0})`;
+      ctx.fillRect(col, y0, 1, h);
+    }
+
+    drawSprites(now);
+    drawGrain(now);
+  }
+
+  // Everything that isn't a wall is drawn as a flat billboard facing you.
+  function spriteList() {
+    const out = [];
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const c = grid[y][x];
+      if (c === 'f') out.push({ x: x + .5, y: y + .5, kind: 'fuse' });
+      else if (c === 'n') out.push({ x: x + .5, y: y + .5, kind: 'note' });
+      else if (c === 'G') out.push({ x: x + .5, y: y + .5, kind: 'gen' });
+      else if (c === 'P') out.push({ x: x + .5, y: y + .5, kind: 'pad' });
+      else if (c === 'L') out.push({ x: x + .5, y: y + .5, kind: 'lever' });
+      else if (c === 'X') out.push({ x: x + .5, y: y + .5, kind: 'exit' });
+    }
+    out.push({ x: monster.x, y: monster.y, kind: 'monster' });
+    return out;
+  }
+
+  function drawSprites(now) {
+    const list = spriteList()
+      .map(s => ({ ...s, d: (s.x - player.x) ** 2 + (s.y - player.y) ** 2 }))
+      .sort((a, b) => b.d - a.d);
+
+    for (const s of list) {
+      const dx = s.x - player.x, dy = s.y - player.y;
+      let rel = Math.atan2(dy, dx) - player.a;
+      while (rel > Math.PI) rel -= 2 * Math.PI;
+      while (rel < -Math.PI) rel += 2 * Math.PI;
+      if (Math.abs(rel) > FOV * 0.75) continue;
+      const dist = Math.sqrt(s.d);
+      if (dist < 0.2) continue;
+      const screenX = (0.5 + Math.tan(rel) / (2 * Math.tan(FOV / 2))) * RW;
+      const size = Math.min(RH * 3, RH / dist);
+      const shade = Math.max(0.08, Math.min(1, 1.1 / (1 + dist * dist * 0.05)));
+      if (screenX < -size || screenX > RW + size) continue;
+      if (zbuf[Math.max(0, Math.min(RW - 1, screenX | 0))] < dist) continue;
+      drawSprite(s.kind, screenX, size, shade, now);
+    }
+  }
+
+  function drawSprite(kind, cx, size, shade, now) {
+    const cy = RH / 2;
+    const S = (v) => size * v;
+    ctx.save();
+    if (kind === 'fuse') {
+      ctx.fillStyle = `rgb(${230*shade|0},${170*shade|0},${40*shade|0})`;
+      ctx.fillRect(cx - S(.06), cy + S(.18), S(.12), S(.16));
+      ctx.fillStyle = `rgb(${90*shade|0},${70*shade|0},${50*shade|0})`;
+      ctx.fillRect(cx - S(.03), cy + S(.14), S(.06), S(.05));
+    } else if (kind === 'note') {
+      ctx.fillStyle = `rgb(${225*shade|0},${215*shade|0},${190*shade|0})`;
+      ctx.fillRect(cx - S(.07), cy + S(.16), S(.14), S(.18));
+    } else if (kind === 'gen') {
+      ctx.fillStyle = `rgb(${70*shade|0},${75*shade|0},${80*shade|0})`;
+      ctx.fillRect(cx - S(.22), cy - S(.1), S(.44), S(.55));
+      ctx.fillStyle = state.powerOn
+        ? `rgb(${60*shade|0},${220*shade|0},${90*shade|0})`
+        : `rgb(${200*shade|0},${50*shade|0},${40*shade|0})`;
+      ctx.fillRect(cx - S(.06), cy - S(.02), S(.12), S(.08));
+    } else if (kind === 'pad') {
+      ctx.fillStyle = `rgb(${55*shade|0},${55*shade|0},${60*shade|0})`;
+      ctx.fillRect(cx - S(.13), cy - S(.08), S(.26), S(.34));
+      ctx.fillStyle = state.keypadDone
+        ? `rgb(${60*shade|0},${220*shade|0},${90*shade|0})`
+        : `rgb(${240*shade|0},${180*shade|0},${40*shade|0})`;
+      ctx.fillRect(cx - S(.08), cy - S(.04), S(.16), S(.09));
+    } else if (kind === 'lever') {
+      ctx.fillStyle = `rgb(${80*shade|0},${70*shade|0},${65*shade|0})`;
+      ctx.fillRect(cx - S(.05), cy + S(.05), S(.1), S(.3));
+      ctx.fillStyle = `rgb(${210*shade|0},${60*shade|0},${40*shade|0})`;
+      ctx.fillRect(cx - S(.08), cy + S(.02), S(.16), S(.07));
+    } else if (kind === 'exit') {
+      // a lit doorway — the only green thing in the building
+      ctx.fillStyle = `rgb(${40*shade|0},${200*shade|0},${90*shade|0})`;
+      ctx.fillRect(cx - S(.16), cy - S(.30), S(.32), S(.62));
+      ctx.fillStyle = `rgb(${220*shade|0},${255*shade|0},${230*shade|0})`;
+      ctx.fillRect(cx - S(.10), cy - S(.22), S(.20), S(.10));
+    } else if (kind === 'monster') {
+      drawMonster(cx, cy, size, shade, now);
+    }
+    ctx.restore();
+  }
+
+  // A patchwork toy, far too tall, with long arms. Cartoonish rather than gory.
+  function drawMonster(cx, cy, size, shade, now) {
+    const S = v => size * v;
+    const sway = Math.sin(now / 180) * S(.03);
+    const body = `rgb(${120*shade|0},${45*shade|0},${60*shade|0})`;
+    const dark = `rgb(${70*shade|0},${25*shade|0},${35*shade|0})`;
+    ctx.fillStyle = body;
+    ctx.fillRect(cx - S(.16), cy - S(.30), S(.32), S(.62));           // torso
+    ctx.fillStyle = dark;
+    ctx.fillRect(cx - S(.16), cy + S(.02), S(.32), S(.04));            // stitching
+    ctx.fillStyle = body;
+    ctx.fillRect(cx - S(.34) + sway, cy - S(.24), S(.13), S(.60));     // arms
+    ctx.fillRect(cx + S(.21) - sway, cy - S(.24), S(.13), S(.60));
+    ctx.fillRect(cx - S(.11), cy + S(.30), S(.09), S(.24));            // legs
+    ctx.fillRect(cx + S(.02), cy + S(.30), S(.09), S(.24));
+    ctx.fillStyle = `rgb(${140*shade|0},${55*shade|0},${70*shade|0})`;
+    ctx.fillRect(cx - S(.19), cy - S(.56), S(.38), S(.28));            // head
+    // eyes — the only bright thing in the building
+    const glow = monster.hunting ? 1 : 0.65;
+    ctx.fillStyle = `rgb(255,${(235 * glow)|0},${(180 * glow)|0})`;
+    ctx.fillRect(cx - S(.12), cy - S(.47), S(.08), S(.07));
+    ctx.fillRect(cx + S(.04), cy - S(.47), S(.08), S(.07));
+    ctx.fillStyle = `rgb(${20*shade|0},${10*shade|0},${12*shade|0})`;
+    ctx.fillRect(cx - S(.10), cy - S(.36), S(.20), S(.05));            // mouth line
+  }
+
+  function drawGrain(now) {
+    // A little film grain and a vignette. Cheap, and it hides the flat shading.
+    const n = 90;
+    ctx.fillStyle = 'rgba(255,255,255,0.03)';
+    for (let i = 0; i < n; i++) {
+      ctx.fillRect((Math.random() * RW) | 0, (Math.random() * RH) | 0, 1, 1);
+    }
+    const v = ctx.createRadialGradient(RW/2, RH/2, RH*0.2, RW/2, RH/2, RH*0.85);
+    v.addColorStop(0, 'rgba(0,0,0,0)');
+    v.addColorStop(1, `rgba(0,0,0,${0.55 + state.fear * 0.35})`);
+    ctx.fillStyle = v;
+    ctx.fillRect(0, 0, RW, RH);
+    if (state.fear > 0.55) {
+      ctx.fillStyle = `rgba(120,0,0,${(state.fear - 0.55) * 0.30})`;
+      ctx.fillRect(0, 0, RW, RH);
+    }
+  }
+
+  // ============================================================
+  //  Movement
+  // ============================================================
+  const keys = {};
+  let look = 0, moveVec = { x: 0, y: 0 }, wantRun = false, usePressed = false;
+
+  function tryMove(ent, nx, ny, radius) {
+    const r = radius || 0.22;
+    if (!isWall(nx + Math.sign(nx - ent.x) * r, ent.y)) ent.x = nx;
+    if (!isWall(ent.x, ny + Math.sign(ny - ent.y) * r)) ent.y = ny;
+  }
+
+  function updatePlayer(dt) {
+    let fx = 0, fy = 0;
+    if (keys['w'] || keys['arrowup']) fy += 1;
+    if (keys['s'] || keys['arrowdown']) fy -= 1;
+    if (keys['a']) fx -= 1;
+    if (keys['d']) fx += 1;
+    fx += moveVec.x; fy += moveVec.y;
+    const mag = Math.hypot(fx, fy);
+    if (mag > 1) { fx /= mag; fy /= mag; }
+
+    const runningNow = (keys['shift'] || wantRun) && mag > 0.1;
+    const spd = (runningNow ? 2.7 : 1.5) * dt;
+    player.speed = mag * (runningNow ? 1 : 0.55);
+
+    if (keys['arrowleft']) player.a -= 2.2 * dt;
+    if (keys['arrowright']) player.a += 2.2 * dt;
+    player.a += look; look = 0;
+
+    const cos = Math.cos(player.a), sin = Math.sin(player.a);
+    const nx = player.x + (cos * fy - sin * fx) * spd;
+    const ny = player.y + (sin * fy + cos * fx) * spd;
+    tryMove(player, nx, ny);
+    player.bob += mag * dt * 8;
+  }
+
+  // ============================================================
+  //  The monster
+  // ============================================================
+  const HEAR_WALK = 3.5, HEAR_RUN = 9.0, SEE = 11;
+
+  function updateMonster(dt, now) {
+    const dist = Math.hypot(player.x - monster.x, player.y - monster.y);
+    const hearRange = player.speed > 0.8 ? HEAR_RUN : (player.speed > 0.05 ? HEAR_WALK : 1.5);
+    const sees = dist < SEE && lineOfSight(monster.x, monster.y, player.x, player.y);
+    const hears = dist < hearRange;
+
+    if (sees || hears) { monster.hunting = true; monster.lastSeen = now; }
+    else if (monster.hunting && now - (monster.lastSeen || 0) > 6000) monster.hunting = false;
+
+    if (now - monster.think > 380) {
+      monster.think = now;
+      const from = { x: Math.floor(monster.x), y: Math.floor(monster.y) };
+      let target;
+      if (monster.hunting) target = { x: Math.floor(player.x), y: Math.floor(player.y) };
+      else target = monster.wander || (monster.wander = randomFloor());
+      monster.path = bfsPath(from, target);
+      if (!monster.hunting && monster.path.length === 0) monster.wander = randomFloor();
+    }
+
+    const speed = (monster.hunting ? 1.45 : 0.75) * dt;
+    const step = monster.path[0];
+    if (step) {
+      const tx = step.x + 0.5, ty = step.y + 0.5;
+      const dx = tx - monster.x, dy = ty - monster.y;
+      const d = Math.hypot(dx, dy);
+      if (d < 0.12) monster.path.shift();
+      else { monster.x += dx / d * speed; monster.y += dy / d * speed; }
+      monster.a = Math.atan2(dy, dx);
+    }
+
+    // fear rises when it's close and in view
+    const target = Math.max(0, Math.min(1, (10 - dist) / 10)) * (monster.hunting ? 1 : 0.5);
+    state.fear += (target - state.fear) * Math.min(1, dt * 2);
+
+    if (dist < 0.55) caught();
+  }
+
+  function randomFloor() {
+    for (let i = 0; i < 200; i++) {
+      const x = 1 + Math.floor(Math.random() * (W - 2));
+      const y = 1 + Math.floor(Math.random() * (H - 2));
+      if (!SOLID.has(grid[y][x])) return { x, y };
+    }
+    return { x: 1, y: 1 };
+  }
+
+  // ============================================================
+  //  Interacting
+  // ============================================================
+  function facingCell() {
+    // the cell just in front of you, then the one you're standing on
+    const fx = player.x + Math.cos(player.a) * 0.75;
+    const fy = player.y + Math.sin(player.a) * 0.75;
+    return [{ x: Math.floor(fx), y: Math.floor(fy) },
+            { x: Math.floor(player.x), y: Math.floor(player.y) }];
+  }
+
+  function nearbyAction() {
+    for (const c of facingCell()) {
+      const ch = at(c.x, c.y);
+      if (ch === 'f') return { kind: 'fuse', c };
+      if (ch === 'n') return { kind: 'note', c };
+      if (ch === 'G') return { kind: 'gen', c };
+      if (ch === 'P') return { kind: 'pad', c };
+      if (ch === 'L') return { kind: 'lever', c };
+    }
+    return null;
+  }
+
+  // A short message that overrides the usual prompt. The render loop rewrites
+  // that element every frame, so it has to know to leave this alone for a bit.
+  let flashMsg = '', flashUntil = 0;
+  function flashPrompt(msg, ms) {
+    flashMsg = msg;
+    flashUntil = performance.now() + (ms || 1600);
+  }
+
+  function doAction() {
+    const a = nearbyAction();
+    if (!a) return;
+    if (a.kind === 'fuse') {
+      grid[a.c.y][a.c.x] = '.';
+      state.fuses++;
+      beep(660, 0.08);
+      setObjective();
+    } else if (a.kind === 'note') {
+      const keyList = Object.keys(NOTES);
+      const idx = (a.c.y * W + a.c.x) % keyList.length;
+      showNote(keyList[idx]);
+    } else if (a.kind === 'gen') {
+      if (state.powerOn) return;
+      if (state.fuses >= 3) {
+        state.powerOn = true;
+        openDoors('+');
+        boom();
+        setObjective();
+      } else {
+        flashPrompt(`Needs 3 fuses — you have ${state.fuses}`);
+      }
+    } else if (a.kind === 'pad') {
+      if (state.keypadDone) return;
+      openKeypad();
+    } else if (a.kind === 'lever') {
+      pullLever(a.c);
+    }
+  }
+
+  // Left, then right, then middle — the order is on a note.
+  function pullLever(c) {
+    if (state.leversDone) return;
+    const all = [];
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++)
+      if (MAP_SRC[y][x] === 'L') all.push({ x, y });
+    all.sort((p, q) => p.x - q.x);
+    const idx = all.findIndex(p => p.x === c.x && p.y === c.y);
+    const wanted = [0, 2, 1];                       // left, right, middle
+    const step = state.leverOrder.length;
+    if (idx === wanted[step]) {
+      state.leverOrder.push({ x: c.x, y: c.y });
+      beep(520 + step * 140, 0.1);
+      if (state.leverOrder.length === 3) {
+        state.leversDone = true;
+        openDoors('S');
+        boom();
+        setObjective();
+      }
+    } else {
+      state.leverOrder = [];
+      beep(140, 0.25);
+      flashPrompt('Wrong order — it resets');
+    }
+  }
+
+  // ============================================================
+  //  Objective text
+  // ============================================================
+  function setObjective() {
+    let t;
+    if (!state.powerOn) t = `Find 3 fuses and start the generator (${state.fuses}/3)`;
+    else if (!state.keypadDone) t = 'Find the door code and use the keypad';
+    else if (!state.leversDone) t = 'Three levers open the shutter — the order matters';
+    else t = 'The shutter is open. GET OUT.';
+    $('objText').textContent = t;
+    $('carry').innerHTML =
+      (state.fuses ? `<span class="item">🔌 ${state.fuses}/3</span>` : '') +
+      (state.powerOn ? '<span class="item">⚡ power</span>' : '') +
+      (state.keypadDone ? '<span class="item">🔑 door</span>' : '');
+  }
+
+  // ============================================================
+  //  Sound — all generated, no files
+  // ============================================================
+  let actx = null;
+  const audio = () => {
+    if (!soundOn) return null;
+    if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } }
+    return actx;
+  };
+  function beep(freq, dur, type) {
+    const a = audio(); if (!a) return;
+    const o = a.createOscillator(), g = a.createGain();
+    o.type = type || 'square'; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.12, a.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, a.currentTime + dur);
+    o.connect(g); g.connect(a.destination);
+    o.start(); o.stop(a.currentTime + dur);
+  }
+  function boom() {
+    const a = audio(); if (!a) return;
+    const o = a.createOscillator(), g = a.createGain();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(120, a.currentTime);
+    o.frequency.exponentialRampToValueAtTime(40, a.currentTime + 0.5);
+    g.gain.setValueAtTime(0.25, a.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, a.currentTime + 0.6);
+    o.connect(g); g.connect(a.destination); o.start(); o.stop(a.currentTime + 0.6);
+  }
+  function screech() {
+    const a = audio(); if (!a) return;
+    const dur = scareLevel === 'mild' ? 0.25 : 0.7;
+    const o = a.createOscillator(), n = a.createOscillator(), g = a.createGain();
+    o.type = 'sawtooth'; o.frequency.setValueAtTime(880, a.currentTime);
+    o.frequency.exponentialRampToValueAtTime(90, a.currentTime + dur);
+    n.type = 'square'; n.frequency.setValueAtTime(220, a.currentTime);
+    g.gain.setValueAtTime(scareLevel === 'mild' ? 0.12 : 0.32, a.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, a.currentTime + dur);
+    o.connect(g); n.connect(g); g.connect(a.destination);
+    o.start(); n.start(); o.stop(a.currentTime + dur); n.stop(a.currentTime + dur);
+  }
+
+  // ============================================================
+  //  Getting caught
+  // ============================================================
+  let scaring = false;
+  function caught() {
+    if (scaring) return;
+    scaring = true;
+    state.caught++;
+    running = false;
+    screech();
+    if (scareLevel === 'mild') { finishScare(); return; }
+    const el = $('scare');
+    el.classList.add('on');
+    drawScareFace();
+    setTimeout(finishScare, scareLevel === 'tense' ? 1400 : 1000);
+  }
+  function finishScare() {
+    $('scare').classList.remove('on');
+    scaring = false;
+    showResults('CAUGHT',
+      `<p class="note">It found you.</p>
+       <p class="note">Caught <b>${state.caught}</b> time${state.caught === 1 ? '' : 's'}.
+       Your progress is kept — the doors you opened stay open.</p>`);
+  }
+  function drawScareFace() {
+    const c = $('scareFace'), g = c.getContext('2d'), S = c.width;
+    g.fillStyle = '#5b1a26'; g.fillRect(0, 0, S, S);
+    g.fillStyle = '#7a2433';
+    g.fillRect(S*0.1, S*0.12, S*0.8, S*0.76);
+    g.fillStyle = '#fff3c4';
+    g.fillRect(S*0.22, S*0.3, S*0.2, S*0.16);
+    g.fillRect(S*0.58, S*0.3, S*0.2, S*0.16);
+    g.fillStyle = '#120608';
+    g.fillRect(S*0.29, S*0.34, S*0.07, S*0.09);
+    g.fillRect(S*0.65, S*0.34, S*0.07, S*0.09);
+    g.fillStyle = '#160709';
+    g.fillRect(S*0.28, S*0.6, S*0.44, S*0.16);
+    g.fillStyle = '#fff3c4';
+    for (let i = 0; i < 7; i++) g.fillRect(S*(0.30 + i*0.06), S*0.6, S*0.03, S*0.16);
+  }
+
+  // ============================================================
+  //  Win / results
+  // ============================================================
+  function checkEscape() {
+    if (!state.leversDone) return;
+    if (at(Math.floor(player.x), Math.floor(player.y)) === 'X') win();
+  }
+  function win() {
+    running = false;
+    const secs = Math.round((performance.now() - state.started) / 1000);
+    showResults('YOU GOT OUT',
+      `<p class="note">Out in <b>${Math.floor(secs/60)}m ${secs%60}s</b>,
+       caught <b>${state.caught}</b> time${state.caught === 1 ? '' : 's'}.</p>
+       <p class="note">It's still in there.</p>`);
+  }
+
+  function showResults(title, html) {
+    stopLoop();
+    $('game').style.display = 'none';
+    document.body.classList.remove('playing');
+    $('results').classList.remove('hidden');
+    $('resTitle').textContent = title;
+    $('resBody').innerHTML = html;
+    scheduleFit();
+  }
+
+  // ============================================================
+  //  Keypad and notes
+  // ============================================================
+  let kpEntry = '', kpFailed = false;
+  function openKeypad() {
+    kpEntry = ''; kpFailed = false;
+    $('kpDisplay').textContent = '____';
+    $('keypad').classList.add('on');
+    state.keypadOpen = true;
+  }
+  function closeKeypad() { $('keypad').classList.remove('on'); state.keypadOpen = false; }
+  function kpPress(d) {
+    // A wrong code clears on the NEXT press, not on a timer. Relying on the
+    // timeout meant a fast player could jam the pad with four dead digits.
+    if (kpFailed) { kpEntry = ''; kpFailed = false; }
+    if (kpEntry.length >= 4) return;
+    kpEntry += d;
+    $('kpDisplay').textContent = (kpEntry + '____').slice(0, 4);
+    beep(440 + Number(d) * 40, 0.05);
+    if (kpEntry.length === 4) {
+      if (kpEntry === state.code) {
+        state.keypadDone = true;
+        openDoors('K');
+        boom();
+        setObjective();
+        setTimeout(closeKeypad, 350);
+      } else {
+        beep(120, 0.3);
+        kpFailed = true;
+        setTimeout(() => {
+          if (kpFailed) { kpEntry = ''; kpFailed = false; $('kpDisplay').textContent = '____'; }
+        }, 400);
+      }
+    }
+  }
+
+  function showNote(key) {
+    const n = NOTES[key];
+    if (!n) return;
+    state.notesRead[key] = true;
+    $('noteTitle').textContent = n.title;
+    $('noteText').innerHTML = n.body;
+    $('noteView').classList.add('on');
+  }
+  $('noteView').addEventListener('click', () => $('noteView').classList.remove('on'));
+
+  // ============================================================
+  //  Loop
+  // ============================================================
+  function loop(now) {
+    if (!running) return;
+    const dt = Math.min(0.05, (now - lastT) / 1000 || 0.016);
+    lastT = now;
+    updatePlayer(dt);
+    updateMonster(dt, now);
+    checkEscape();
+    render(now);
+    $('fearFill').style.width = (state.fear * 100).toFixed(0) + '%';
+    const a = nearbyAction();
+    const p = $('prompt');
+    if (now < flashUntil) {
+      p.classList.add('on');
+      p.textContent = flashMsg;
+    } else if (a && !state.keypadOpen) {
+      p.classList.add('on');
+      p.textContent = a.kind === 'fuse' ? 'Take the fuse'
+        : a.kind === 'note' ? 'Read it'
+        : a.kind === 'gen' ? (state.powerOn ? 'Running' : 'Start the generator')
+        : a.kind === 'pad' ? (state.keypadDone ? 'Unlocked' : 'Enter the code')
+        : 'Pull the lever';
+    } else p.classList.remove('on');
+    rafId = requestAnimationFrame(loop);
+  }
+  function stopLoop() { if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null; } running = false; }
+
+  function startGame(fresh) {
+    resetLevel(fresh);
+    if (fresh) state.started = performance.now();
+    running = true; lastT = performance.now();
+    $('menu').style.display = 'none';
+    $('results').classList.add('hidden');
+    $('game').style.display = 'flex';
+    document.body.classList.add('playing');
+    disarmQuit();
+    setObjective();
+    scheduleFit();
+    rafId = requestAnimationFrame(loop);
+  }
+
+  // ============================================================
+  //  Input
+  // ============================================================
+  window.addEventListener('keydown', e => {
+    const k = e.key.toLowerCase();
+    keys[k] = true;
+    if (k === 'e' && running) doAction();
+    if (k === 'escape' && running) pressQuit();
+    if (['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright',' '].includes(k)) e.preventDefault();
+  });
+  window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+  // mouse look
+  view.addEventListener('click', () => { if (running && view.requestPointerLock) view.requestPointerLock(); });
+  document.addEventListener('mousemove', e => {
+    if (document.pointerLockElement === view && running) look += e.movementX * 0.0022;
+  });
+
+  // touch: left stick, right side drags to look
+  const stick = $('stick'), nub = $('stickNub');
+  let stickId = null, lookId = null, lookLast = 0;
+  function stickStart(e) {
+    const t = e.changedTouches ? e.changedTouches[0] : e;
+    stickId = t.identifier !== undefined ? t.identifier : 'mouse';
+    stickMove(e);
+  }
+  function stickMove(e) {
+    const t = [...(e.changedTouches || [e])].find(x =>
+      (x.identifier !== undefined ? x.identifier : 'mouse') === stickId);
+    if (!t) return;
+    const r = stick.getBoundingClientRect();
+    let dx = (t.clientX - (r.left + r.width / 2)) / (r.width / 2);
+    let dy = (t.clientY - (r.top + r.height / 2)) / (r.height / 2);
+    const m = Math.hypot(dx, dy);
+    if (m > 1) { dx /= m; dy /= m; }
+    moveVec = { x: dx, y: -dy };
+    nub.style.left = (50 + dx * 30) + '%';
+    nub.style.top = (50 + dy * 30) + '%';
+  }
+  function stickEnd() { stickId = null; moveVec = { x: 0, y: 0 }; nub.style.left = '50%'; nub.style.top = '50%'; }
+  stick.addEventListener('touchstart', e => { e.preventDefault(); stickStart(e); }, { passive: false });
+  stick.addEventListener('touchmove', e => { e.preventDefault(); stickMove(e); }, { passive: false });
+  stick.addEventListener('touchend', stickEnd);
+  stick.addEventListener('touchcancel', stickEnd);
+
+  view.addEventListener('touchstart', e => {
+    const t = e.changedTouches[0];
+    lookId = t.identifier; lookLast = t.clientX;
+  }, { passive: true });
+  view.addEventListener('touchmove', e => {
+    for (const t of e.changedTouches) {
+      if (t.identifier !== lookId) continue;
+      look += (t.clientX - lookLast) * 0.006;
+      lookLast = t.clientX;
+    }
+  }, { passive: true });
+  view.addEventListener('touchend', () => { lookId = null; });
+
+  $('btnUse').addEventListener('click', e => { e.preventDefault(); if (running) doAction(); });
+  $('btnRun').addEventListener('touchstart', e => { e.preventDefault(); wantRun = true; }, { passive: false });
+  $('btnRun').addEventListener('touchend', () => { wantRun = false; });
+  $('btnRun').addEventListener('mousedown', () => { wantRun = true; });
+  window.addEventListener('mouseup', () => { wantRun = false; });
+
+  // keypad buttons
+  const kpGrid = $('kpGrid');
+  ['1','2','3','4','5','6','7','8','9','←','0','✓'].forEach(lbl => {
+    const b = document.createElement('button');
+    b.textContent = lbl;
+    b.addEventListener('click', () => {
+      if (lbl === '←') {
+        kpFailed = false;
+        kpEntry = kpEntry.slice(0, -1);
+        $('kpDisplay').textContent = (kpEntry + '____').slice(0, 4);
+      }
+      else if (lbl === '✓') closeKeypad();
+      else kpPress(lbl);
+    });
+    kpGrid.appendChild(b);
+  });
+  $('kpClose').addEventListener('click', closeKeypad);
+
+  // ============================================================
+  //  Menus
+  // ============================================================
+  const SCREENS = ['mainMenu', 'howToPanel', 'settingsPanel'];
+  let stack = ['mainMenu'];
+  function showPanel(id) {
+    SCREENS.forEach(p => {
+      const el = $(p), on = p === id;
+      el.classList.toggle('hidden', !on);
+      if (on) { el.classList.remove('screen'); void el.offsetWidth; el.classList.add('screen'); }
+    });
+    scheduleFit();
+  }
+  const goTo = id => { if (stack[stack.length-1] !== id) stack.push(id); showPanel(id); };
+  const goBack = () => { stack.pop(); showPanel(stack[stack.length-1] || 'mainMenu'); };
+  const goHome = () => { stack = ['mainMenu']; showPanel('mainMenu'); };
+
+  $('btnPlay').addEventListener('click', () => startGame(true));
+  $('btnHowTo').addEventListener('click', () => goTo('howToPanel'));
+  $('btnSettings').addEventListener('click', () => goTo('settingsPanel'));
+  $('btnHowToBack').addEventListener('click', goBack);
+  $('btnSettingsBack').addEventListener('click', goBack);
+  $('btnAgain').addEventListener('click', () => startGame(false));
+  $('btnResMenu').addEventListener('click', () => {
+    $('results').classList.add('hidden');
+    $('menu').style.display = '';
+    goHome();
+  });
+
+  const SCARES = [
+    ['mild',   '😌 Mild',   'Atmosphere and chases, but no sudden scares.'],
+    ['spooky', '😨 Spooky', 'Tense chases and sudden reveals. Creepy, never gory.'],
+    ['tense',  '😱 Tense',  'Darker, louder, and it lingers longer.']
+  ];
+  function buildSettings() {
+    const r = $('scareRow'); r.innerHTML = '';
+    SCARES.forEach(([key, label]) => {
+      const b = document.createElement('button');
+      b.textContent = label; b.dataset.key = key;
+      b.addEventListener('click', () => {
+        scareLevel = key;
+        try { localStorage.setItem('hushScare', key); } catch (e) {}
+        refreshSettings();
+      });
+      r.appendChild(b);
+    });
+    const s = $('soundRow'); s.innerHTML = '';
+    [['on','🔊 On'],['off','🔇 Off']].forEach(([k, label]) => {
+      const b = document.createElement('button');
+      b.textContent = label; b.dataset.key = k;
+      b.addEventListener('click', () => {
+        soundOn = k === 'on';
+        try { localStorage.setItem('hushSound', soundOn ? '1' : '0'); } catch (e) {}
+        refreshSettings();
+      });
+      s.appendChild(b);
+    });
+  }
+  function refreshSettings() {
+    Array.from($('scareRow').children).forEach(b =>
+      b.classList.toggle('active', b.dataset.key === scareLevel));
+    Array.from($('soundRow').children).forEach(b =>
+      b.classList.toggle('active', b.dataset.key === (soundOn ? 'on' : 'off')));
+    const found = SCARES.find(s => s[0] === scareLevel);
+    $('scareNote').textContent = found ? found[2] : '';
+  }
+
+  // ============================================================
+  //  Quit
+  // ============================================================
+  const quitBtn = $('btnQuit');
+  let quitArmed = false, quitAt = 0;
+  function disarmQuit() { quitArmed = false; quitAt = 0; quitBtn.textContent = '✕ Quit'; quitBtn.classList.remove('armed'); }
+  function pressQuit() {
+    if (!running) return;
+    const t = performance.now();
+    if (quitArmed && t - quitAt <= 3000) {
+      disarmQuit(); stopLoop();
+      $('game').style.display = 'none';
+      document.body.classList.remove('playing');
+      $('menu').style.display = '';
+      goHome();
+      return;
+    }
+    quitArmed = true; quitAt = t;
+    quitBtn.textContent = '✕ Really quit?';
+    quitBtn.classList.add('armed');
+    setTimeout(() => { if (quitArmed && performance.now() - quitAt > 2900) disarmQuit(); }, 3100);
+  }
+  quitBtn.addEventListener('click', e => { e.preventDefault(); pressQuit(); });
+
+  // ============================================================
+  //  Fit to screen
+  // ============================================================
+  let fitPending = null;
+  function fitScreen() {
+    const s = $('stage');
+    if (!s) return;
+    s.style.transform = 'scale(1)';
+    const r = s.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    const k = Math.min(1, (window.innerWidth - 12) / r.width, (window.innerHeight - 12) / r.height);
+    s.style.transform = `scale(${k.toFixed(4)})`;
+  }
+  function scheduleFit() {
+    cancelAnimationFrame(fitPending);
+    fitPending = requestAnimationFrame(() => requestAnimationFrame(fitScreen));
+  }
+  window.addEventListener('resize', scheduleFit);
+  window.addEventListener('orientationchange', scheduleFit);
+  window.addEventListener('load', scheduleFit);
+
+  // ============================================================
+  //  Boot
+  // ============================================================
+  state = freshState();
+  resetLevel(true);
+  buildSettings();
+  refreshSettings();
+  showPanel('mainMenu');
+  scheduleFit();
+
+  window.__hush = {
+    MAP_SRC, W, H, SOLID, NOTES,
+    get grid() { return grid; },
+    at, isWall, findAll, bfsPath, lineOfSight, castRay, freshState, resetLevel,
+    openDoors, spriteList, nearbyAction, doAction, pullLever, randomFloor,
+    get player() { return player; }, set player(v) { player = v; },
+    get monster() { return monster; }, set monster(v) { monster = v; },
+    get state() { return state; }, set state(v) { state = v; },
+    updateMonster, updatePlayer, tryMove, fitScreen, kpPress,
+    get kpEntry() { return kpEntry; },
+    HEAR_WALK, HEAR_RUN, SEE
+  };
+})();
+</script>
+
+</body>
+</html>

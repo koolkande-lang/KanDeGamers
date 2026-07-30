@@ -1,16 +1,17 @@
 # KanDe Bros — Roadmap
 
-**Two games now.** Nothing is uploaded yet.
+**Three games now.** Nothing is uploaded yet.
 
-## 📁 The site is now three files
+## 📁 The site is now four files
 
 | File | What it is |
 |---|---|
-| `index.html` | **KanDe Bros hub** — the front page listing both games |
+| `index.html` | **KanDe Bros hub** — the front page listing all three games |
 | `snake.html` | Snake & Candy (this used to be `index.html`) |
 | `wuzzle.html` | Wuzzle, the word game |
+| `hush.html` | Hush, the first-person horror game |
 
-⚠️ **Upload all three together.** Snake has *moved* — if you upload the new
+⚠️ **Upload all four together.** Snake has *moved* — if you upload the new
 `index.html` without `snake.html`, the hub's Play button will 404.
 
 > 📌 **Upload this file to your GitHub repo** (same place as `index.html`).
@@ -427,6 +428,58 @@ cancellation — so it now reads "+3 towards texture packs".
 
 ---
 
+# 🔦 HUSH
+
+A first-person horror game. You're locked in a toy factory; something is in
+there with you.
+
+**Three puzzles, in order**
+
+1. **The power** — find 3 fuses, start the generator. Opens the first door.
+2. **The code** — a 4-digit code split across two notes. Opens the second door.
+3. **The shutter** — three levers, and the order matters. A third note has it.
+
+**How it's built**
+
+No 3D library. It's a **raycaster** — for each of 480 screen columns it walks a
+ray through the grid until it hits a wall, and draws that column at a height
+based on distance. Same technique as the original Wolfenstein. That means:
+
+- **Nothing to download** beyond the page itself
+- The maths is **testable** — 720 rays cast from two positions all land on a
+  wall, none escape the building, none run forever
+- It runs on anything, including an old iPad
+
+**The monster** hunts by **sound**. Walking is heard from ~3.5 cells, running
+from ~9, and it sees ~11 cells if nothing's in the way. It finds you with a
+breadth-first search over the grid, re-planned about three times a second.
+Walk when it's close.
+
+**The map is generated, not hand-drawn.** My first attempt was drawn by hand and
+was badly broken — of the things you need, almost nothing was reachable. It's
+now built as four zones stacked up the building, each sealed by one door, with a
+perfect maze carved inside each zone so everything within is guaranteed
+reachable. A test walks the whole building at every stage and checks both that
+you *can* reach what you need, and that you *can't* reach the next puzzle early.
+
+**Scares.** Default is "Spooky" — tense chases, a cartoonish patchwork toy, a
+sudden loud reveal when it catches you. **No blood, no gore.** Settings has
+**Mild** (no jumpscares at all) and **Tense**, plus a sound toggle. Getting
+caught keeps your progress: doors you opened stay open.
+
+**Controls** work both ways — WASD + mouse-look on a laptop, on-screen stick and
+drag-to-look on a tablet.
+
+> ⚠️ **Two bugs the tests caught before you ever played it:**
+> 1. `flashPrompt()` was called but never written — so trying the generator
+>    without enough fuses **crashed the game**. That's the most likely first
+>    thing anyone does.
+> 2. The keypad cleared a wrong code on a `setTimeout`. Type fast, or let the
+>    timer slip, and the pad jammed with four dead digits. It now clears on the
+>    next keypress instead of trusting a timer.
+
+---
+
 ## ⚠️ What still needs doing### 🤖 Bots and team modes
 
 **Game mode** and **Computer players** pickers sit on the main menu.
@@ -670,6 +723,58 @@ cancellation — so it now reads "+3 towards texture packs".
 
 ---
 
+# 🔦 HUSH
+
+A first-person horror game. You're locked in a toy factory; something is in
+there with you.
+
+**Three puzzles, in order**
+
+1. **The power** — find 3 fuses, start the generator. Opens the first door.
+2. **The code** — a 4-digit code split across two notes. Opens the second door.
+3. **The shutter** — three levers, and the order matters. A third note has it.
+
+**How it's built**
+
+No 3D library. It's a **raycaster** — for each of 480 screen columns it walks a
+ray through the grid until it hits a wall, and draws that column at a height
+based on distance. Same technique as the original Wolfenstein. That means:
+
+- **Nothing to download** beyond the page itself
+- The maths is **testable** — 720 rays cast from two positions all land on a
+  wall, none escape the building, none run forever
+- It runs on anything, including an old iPad
+
+**The monster** hunts by **sound**. Walking is heard from ~3.5 cells, running
+from ~9, and it sees ~11 cells if nothing's in the way. It finds you with a
+breadth-first search over the grid, re-planned about three times a second.
+Walk when it's close.
+
+**The map is generated, not hand-drawn.** My first attempt was drawn by hand and
+was badly broken — of the things you need, almost nothing was reachable. It's
+now built as four zones stacked up the building, each sealed by one door, with a
+perfect maze carved inside each zone so everything within is guaranteed
+reachable. A test walks the whole building at every stage and checks both that
+you *can* reach what you need, and that you *can't* reach the next puzzle early.
+
+**Scares.** Default is "Spooky" — tense chases, a cartoonish patchwork toy, a
+sudden loud reveal when it catches you. **No blood, no gore.** Settings has
+**Mild** (no jumpscares at all) and **Tense**, plus a sound toggle. Getting
+caught keeps your progress: doors you opened stay open.
+
+**Controls** work both ways — WASD + mouse-look on a laptop, on-screen stick and
+drag-to-look on a tablet.
+
+> ⚠️ **Two bugs the tests caught before you ever played it:**
+> 1. `flashPrompt()` was called but never written — so trying the generator
+>    without enough fuses **crashed the game**. That's the most likely first
+>    thing anyone does.
+> 2. The keypad cleared a wrong code on a `setTimeout`. Type fast, or let the
+>    timer slip, and the pad jammed with four dead digits. It now clears on the
+>    next keypress instead of trusting a timer.
+
+---
+
 ## ⚠️ What still needs doing
 
 **Upload it, then play it with real people.** Everything above passed automated
@@ -696,6 +801,15 @@ watching for:
   complaint. The fix is to lower the frequency cutoff from 2.0 and rebuild.
 - Are 8 players too many for one board?
 - On a phone in landscape, does the fit-to-screen scale get too small to read?
+
+**Hush specifically:**
+
+- Is it actually frightening, or just dark? Atmosphere is the hardest thing to
+  judge without playing.
+- Is the monster too aggressive, or too easy to lose? `HEAR_RUN`, `SEE` and its
+  speed are the three numbers to turn.
+- Do the three puzzles read clearly, or do people wander lost?
+- Does the raycaster hold 60fps on an older iPad?
 - Are Easy bots actually beatable for a real beginner, and is Medium too big a
   jump? The simulation says easy→medium is a cliff.
 - In team modes, is it obvious at a glance who's on your side?
