@@ -302,6 +302,30 @@ clock runs out.
 - **If two players find the same word, nobody scores it.** That's the real rule,
   and it's what makes the game about finding words others won't
 
+**Board sizes** (Solo → Board size, or Settings for the default)
+
+| Size | Squares | Words hiding on it | Feel |
+|---|---|---|---|
+| 3 × 3 | 9 | ~35 | Quick. Extra vowels in the dice, or a small board starves |
+| 4 × 4 | 16 | ~88 | Classic Boggle |
+| 5 × 5 | 25 | ~198 | Big Boggle — far more to find |
+
+- Each size uses a **real dice set**: the standard 16 for 4×4, the Big Boggle 25
+  for 5×5, and a 9-dice set picked from the 4×4 dice with the vowel share
+  raised to 46%.
+- **Duds are rejected.** A raw random roll produced a 3×3 board with a *single
+  word* in testing. Boards are now re-rolled until they clear a minimum (12 / 30
+  / 60 words). Solving costs under 5ms, so it's free.
+- Online, the **host's size applies to everyone**. Guests are only sent the
+  letters and work the size out from how many there are, so the two can never
+  disagree.
+- Tiles and gaps resize per board, so 5×5 still fits without scrolling.
+
+> ⚠️ **A crash this caused.** `rollPlayableBoard()` rolled a board at the new
+> size but solved it against the *old* neighbour map — so choosing 5×5 while the
+> game was on 4×4 crashed on Start. Fixed at the root, and `solve()` now works
+> the grid out from the board it's handed rather than trusting the current size.
+
 **Modes**
 
 - **Solo** — 1, 1½ or 3 minutes, then it shows you every word you missed and
@@ -485,6 +509,30 @@ clock runs out.
 - 3–4 letters = 1 point · 5 = 2 · 6 = 3 · 7 = 5 · 8+ = 11
 - **If two players find the same word, nobody scores it.** That's the real rule,
   and it's what makes the game about finding words others won't
+
+**Board sizes** (Solo → Board size, or Settings for the default)
+
+| Size | Squares | Words hiding on it | Feel |
+|---|---|---|---|
+| 3 × 3 | 9 | ~35 | Quick. Extra vowels in the dice, or a small board starves |
+| 4 × 4 | 16 | ~88 | Classic Boggle |
+| 5 × 5 | 25 | ~198 | Big Boggle — far more to find |
+
+- Each size uses a **real dice set**: the standard 16 for 4×4, the Big Boggle 25
+  for 5×5, and a 9-dice set picked from the 4×4 dice with the vowel share
+  raised to 46%.
+- **Duds are rejected.** A raw random roll produced a 3×3 board with a *single
+  word* in testing. Boards are now re-rolled until they clear a minimum (12 / 30
+  / 60 words). Solving costs under 5ms, so it's free.
+- Online, the **host's size applies to everyone**. Guests are only sent the
+  letters and work the size out from how many there are, so the two can never
+  disagree.
+- Tiles and gaps resize per board, so 5×5 still fits without scrolling.
+
+> ⚠️ **A crash this caused.** `rollPlayableBoard()` rolled a board at the new
+> size but solved it against the *old* neighbour map — so choosing 5×5 while the
+> game was on 4×4 crashed on Start. Fixed at the root, and `solve()` now works
+> the grid out from the board it's handed rather than trusting the current size.
 
 **Modes**
 

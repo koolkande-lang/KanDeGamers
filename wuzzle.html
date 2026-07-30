@@ -190,6 +190,11 @@
     box-shadow:var(--bBoardShadow);
     transition:background .25s ease, border-color .25s ease;
   }
+  #board.s3{ gap:clamp(7px,1.6vh,12px) }
+  #board.s5{ gap:clamp(3px,.8vh,6px) }
+  #board.s3 .tileL{ font-size:clamp(1.3rem,6.2vh,2.6rem);border-radius:14px }
+  #board.s5 .tileL{ font-size:clamp(.75rem,3.4vh,1.4rem);border-radius:9px;border-width:1px }
+
   .tileL{
     display:flex;align-items:center;justify-content:center;
     background:var(--bTile);color:var(--bInk);
@@ -280,6 +285,9 @@
   <!-- ============ SOLO ============ -->
   <div id="soloPanel" class="screen hidden">
     <h2 class="title">▶ Solo</h2>
+    <p class="lbl">Board size</p>
+    <div class="row" id="sizeRow"></div>
+
     <p class="lbl">Round length</p>
     <div class="row" id="timeRow"></div>
     <p class="note">Find as many words as you can. Afterwards you'll see every
@@ -292,7 +300,8 @@
   <div id="onlinePanel" class="screen hidden">
     <h2 class="title">🌐 Online</h2>
     <p class="note">Everyone gets the <b>same letters</b> and the same clock.
-       Scores stay hidden until the end.</p>
+       Scores stay hidden until the end. <b>The host's board size and round
+       length are used for everyone.</b></p>
     <button class="big" id="btnHost">CREATE ROOM</button>
     <p class="note" style="text-align:center;margin:8px 0">— or join one —</p>
     <input id="joinCodeInput" maxlength="4" placeholder="CODE">
@@ -341,6 +350,9 @@
     <h2 class="title">⚙️ Settings</h2>
     <p class="lbl">Your name</p>
     <input id="nameInput" maxlength="12" placeholder="Player">
+    <p class="lbl">Default board size</p>
+    <div class="row" id="sizeRow2"></div>
+
     <p class="lbl">Default round length</p>
     <div class="row" id="timeRow2"></div>
     <p class="lbl">Texture pack</p>
@@ -638,39 +650,64 @@ const DICT_ENC = 'AaalCmCrdvarkDonBbaDckEusDloneDndonHedHmentDteFmentEtoirCbDaEs
   // ============================================================
   //  Board
   // ============================================================
-  // The real Boggle dice. Random letters produce unplayable boards; these are
+  // Real Boggle dice. Random letters make unplayable consonant soup; these are
   // tuned so vowels and consonants land in usable proportions.
-  const DICE = [
-    'aaeegn', 'abbjoo', 'achops', 'affkps', 'aoottw', 'cimotu', 'deilrx', 'delrvy',
-    'distty', 'eeghnw', 'eeinsu', 'ehrtvw', 'eiosst', 'elrtty', 'himnQu', 'hlnnrz'
-  ];
-  const SIZE = 4;
+  //   4x4 — the standard 1992 set
+  //   5x5 — the Big Boggle set
+  //   3x3 — no official set exists, so this one is picked from the 4x4 dice
+  //         with extra vowels, because a small board starves without them
+  const DICE_SETS = {
+    3: ['aaeegn', 'aoottw', 'eiosst', 'eeinsu', 'elrtty',
+        'cimotu', 'deilrx', 'abbjoo', 'himnQu'],
+    4: ['aaeegn', 'abbjoo', 'achops', 'affkps', 'aoottw', 'cimotu', 'deilrx', 'delrvy',
+        'distty', 'eeghnw', 'eeinsu', 'ehrtvw', 'eiosst', 'elrtty', 'himnQu', 'hlnnrz'],
+    5: ['aaafrs', 'aaeeee', 'aafirs', 'adennn', 'aeeeem',
+        'aeegmu', 'aegmnn', 'afirsy', 'bjkQuxz', 'ccnstw',
+        'ceiilt', 'ceilpt', 'ceipst', 'ddlnor', 'dhhlor',
+        'dhhnot', 'dhlnor', 'eiiitt', 'emottt', 'ensssu',
+        'fiprsy', 'gorrvw', 'hiprry', 'nootuw', 'ooottu']
+  };
+  const SIZES = [3, 4, 5];
+  let SIZE = 4;
 
-  function rollBoard(rng) {
+  // Which squares touch which. Rebuilt whenever the board changes size —
+  // everything else (paths, the solver, cheat-checking) reads this.
+  let NEIGHBOURS = [];
+  function buildNeighbours(n) {
+    const out = [];
+    for (let idx = 0; idx < n * n; idx++) {
+      const x = idx % n, y = (idx / n) | 0, list = [];
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (!dx && !dy) continue;
+          const nx = x + dx, ny = y + dy;
+          if (nx >= 0 && nx < n && ny >= 0 && ny < n) list.push(ny * n + nx);
+        }
+      }
+      out.push(list);
+    }
+    return out;
+  }
+  function setSize(n) {
+    SIZE = n;
+    NEIGHBOURS = buildNeighbours(n);
+  }
+  setSize(4);
+
+  function rollBoard(size, rng) {
+    const n = SIZES.includes(size) ? size : SIZE;
     const r = rng || Math.random;
-    const dice = DICE.slice();
+    const dice = DICE_SETS[n].slice();
     for (let i = dice.length - 1; i > 0; i--) {          // shuffle the dice
       const j = Math.floor(r() * (i + 1));
       [dice[i], dice[j]] = [dice[j], dice[i]];
     }
     return dice.map(d => {
-      const faces = d === 'himnQu' ? ['h', 'i', 'm', 'n', 'qu'] : d.split('');
+      // "Qu" is a single face written with a capital U in the die string.
+      const faces = d.replace(/Qu/g, 'Q').split('').map(c => c === 'Q' ? 'qu' : c);
       return faces[Math.floor(r() * faces.length)];
     });
   }
-
-  const neighbours = idx => {
-    const x = idx % SIZE, y = (idx / SIZE) | 0, out = [];
-    for (let dy = -1; dy <= 1; dy++) {
-      for (let dx = -1; dx <= 1; dx++) {
-        if (!dx && !dy) continue;
-        const nx = x + dx, ny = y + dy;
-        if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE) out.push(ny * SIZE + nx);
-      }
-    }
-    return out;
-  };
-  const NEIGHBOURS = Array.from({ length: SIZE * SIZE }, (_, i) => neighbours(i));
 
   // Is this list of squares a legal Boggle path?
   function pathValid(path) {
@@ -687,11 +724,15 @@ const DICT_ENC = 'AaalCmCrdvarkDonBbaDckEusDloneDndonHedHmentDteFmentEtoirCbDaEs
   // Every word hiding on the board. Depth-first with prefix pruning.
   function solve(letters) {
     const found = new Set();
-    const used = new Array(SIZE * SIZE).fill(false);
+    const used = new Array(letters.length).fill(false);
+    // Work the grid out from the board itself rather than trusting the current
+    // SIZE — solving a board of a different size used to crash outright.
+    const NB = NEIGHBOURS.length === letters.length
+      ? NEIGHBOURS : buildNeighbours(Math.round(Math.sqrt(letters.length)));
     function walk(idx, str) {
       if (!isPrefix(str)) return;                  // dead end, stop early
       if (str.length >= 3 && isWord(str)) found.add(str);
-      for (const n of NEIGHBOURS[idx]) {
+      for (const n of NB[idx]) {
         if (used[n]) continue;
         used[n] = true;
         walk(n, str + letters[n]);
@@ -704,6 +745,25 @@ const DICT_ENC = 'AaalCmCrdvarkDonBbaDckEusDloneDndonHedHmentDteFmentEtoirCbDaEs
       used[i] = false;
     }
     return found;
+  }
+
+  // A random roll can produce a board with almost nothing on it — the worst of
+  // 300 test rolls at 3x3 had a single word. Solving is cheap (under 3ms even
+  // at 5x5), so reject duds and roll again.
+  const MIN_WORDS = { 3: 12, 4: 30, 5: 60 };
+  function rollPlayableBoard(size, tries) {
+    const n = SIZES.includes(size) ? size : SIZE;
+    setSize(n);                      // solve() below needs the matching grid
+    const want = MIN_WORDS[n] || 20;
+    const max = tries || 12;
+    let best = null, bestCount = -1;
+    for (let i = 0; i < max; i++) {
+      const b = rollBoard(n);
+      const count = solve(b).size;
+      if (count >= want) return b;
+      if (count > bestCount) { bestCount = count; best = b; }
+    }
+    return best;                     // nothing great — use the best we saw
   }
 
   const scoreWord = w => {
@@ -733,6 +793,7 @@ const DICT_ENC = 'AaalCmCrdvarkDonBbaDckEusDloneDndonHedHmentDteFmentEtoirCbDaEs
   // ============================================================
   let letters = [], myWords = [], myPath = [];
   let running = false, roundEndsAt = 0, roundLen = 90;
+  let boardSize = 4;
   let tickTimer = null;
   let myName = 'Player';
   let netRole = null, peer = null, conns = [], lobby = [], matchConns = null, myIndex = 0;
@@ -746,6 +807,8 @@ const DICT_ENC = 'AaalCmCrdvarkDonBbaDckEusDloneDndonHedHmentDteFmentEtoirCbDaEs
     const n = localStorage.getItem('wzName'); if (n) myName = n;
     const t = parseInt(localStorage.getItem('wzTime') || '90', 10);
     if ([60, 90, 180].includes(t)) roundLen = t;
+    const bs = parseInt(localStorage.getItem('wzSize') || '4', 10);
+    if (SIZES.includes(bs)) boardSize = bs;
     bestSolo = parseInt(localStorage.getItem('wzBest') || '0', 10) || 0;
     totalPoints = parseInt(localStorage.getItem('wzTotal') || '0', 10) || 0;
     const th = localStorage.getItem('wzTheme');
@@ -795,6 +858,32 @@ const DICT_ENC = 'AaalCmCrdvarkDonBbaDckEusDloneDndonHedHmentDteFmentEtoirCbDaEs
       row.appendChild(b);
     });
   }
+  function buildSizeRow(rowId) {
+    const row = $(rowId);
+    if (!row) return;
+    row.innerHTML = '';
+    [[3, '3 × 3', 'quick'], [4, '4 × 4', 'classic'], [5, '5 × 5', 'lots of words']]
+      .forEach(([n, label, sub]) => {
+        const b = document.createElement('button');
+        b.innerHTML = `${label}<span class="sub">${sub}</span>`;
+        b.dataset.size = n;
+        b.addEventListener('click', () => {
+          boardSize = n;
+          try { localStorage.setItem('wzSize', String(n)); } catch (e) {}
+          refreshSizeRows();
+        });
+        row.appendChild(b);
+      });
+  }
+  function refreshSizeRows() {
+    ['sizeRow', 'sizeRow2'].forEach(id => {
+      const row = $(id);
+      if (!row) return;
+      Array.from(row.children).forEach(b =>
+        b.classList.toggle('active', Number(b.dataset.size) === boardSize));
+    });
+  }
+
   function refreshTimeRows() {
     ['timeRow', 'timeRow2'].forEach(id =>
       Array.from($(id).children).forEach(b =>
@@ -809,6 +898,8 @@ const DICT_ENC = 'AaalCmCrdvarkDonBbaDckEusDloneDndonHedHmentDteFmentEtoirCbDaEs
 
   function renderBoard() {
     boardEl.innerHTML = '';
+    boardEl.style.gridTemplateColumns = `repeat(${SIZE}, 1fr)`;
+    boardEl.className = 's' + SIZE;
     tileEls = letters.map((ch, i) => {
       const d = document.createElement('div');
       d.className = TILE_CLASS;
@@ -957,6 +1048,10 @@ const DICT_ENC = 'AaalCmCrdvarkDonBbaDckEusDloneDndonHedHmentDteFmentEtoirCbDaEs
   //  Round flow
   // ============================================================
   function startRound(seedLetters, seconds) {
+    // A guest is told the letters, not the size — derive it so the two can
+    // never disagree.
+    const n = Math.round(Math.sqrt(seedLetters.length));
+    if (SIZES.includes(n)) setSize(n);
     letters = seedLetters;
     myWords = [];
     myPath = [];
@@ -1127,13 +1222,13 @@ const DICT_ENC = 'AaalCmCrdvarkDonBbaDckEusDloneDndonHedHmentDteFmentEtoirCbDaEs
 
   $('btnStartSolo').addEventListener('click', () => {
     netRole = null;
-    startRound(rollBoard(), roundLen);
+    startRound(rollPlayableBoard(boardSize), roundLen);
   });
 
   $('btnAgain').addEventListener('click', () => {
     if (netRole === 'guest') return;
     if (netRole === 'host') hostStart();
-    else startRound(rollBoard(), roundLen);
+    else startRound(rollPlayableBoard(boardSize), roundLen);
   });
   $('btnResMenu').addEventListener('click', () => {
     if (netRole) teardownPeer();
@@ -1270,7 +1365,7 @@ const DICT_ENC = 'AaalCmCrdvarkDonBbaDckEusDloneDndonHedHmentDteFmentEtoirCbDaEs
     matchConns = lobby.map(l => l.conn);
     remoteWords = lobby.map(() => []);
     liveTotals = lobby.map(() => 0);
-    const b = rollBoard();
+    const b = rollPlayableBoard(boardSize);
     broadcast({ type: 'start', letters: b, secs: roundLen, names: lobby.map(l => l.name) });
     $('menu').style.display = 'none';
     startRound(b, roundLen);
@@ -1334,7 +1429,7 @@ const DICT_ENC = 'AaalCmCrdvarkDonBbaDckEusDloneDndonHedHmentDteFmentEtoirCbDaEs
 
   // Server-side check that a claimed word can actually be traced on this board.
   function wordIsOnBoard(w) {
-    const used = new Array(SIZE * SIZE).fill(false);
+    const used = new Array(letters.length).fill(false);
     function walk(idx, pos) {
       const ch = letters[idx];
       if (w.substr(pos, ch.length) !== ch) return false;
@@ -1366,6 +1461,9 @@ const DICT_ENC = 'AaalCmCrdvarkDonBbaDckEusDloneDndonHedHmentDteFmentEtoirCbDaEs
   loadDict();
   buildTimeRow('timeRow');
   buildTimeRow('timeRow2');
+  buildSizeRow('sizeRow');
+  buildSizeRow('sizeRow2');
+  refreshSizeRows();
   buildThemeRow();
   applyTheme(myTheme);
   refreshTimeRows();
@@ -1381,7 +1479,13 @@ const DICT_ENC = 'AaalCmCrdvarkDonBbaDckEusDloneDndonHedHmentDteFmentEtoirCbDaEs
     get myTheme() { return myTheme; },
     get totalPoints() { return totalPoints; },
     set totalPoints(v) { totalPoints = v; },
-    tallyRound, pathValid, pathWord, wordIsOnBoard, NEIGHBOURS, SIZE, DICE,
+    tallyRound, pathValid, pathWord, wordIsOnBoard, setSize, DICE_SETS, SIZES,
+    rollPlayableBoard, MIN_WORDS,
+    buildNeighbours,
+    get NEIGHBOURS() { return NEIGHBOURS; },
+    get SIZE() { return SIZE; },
+    get boardSize() { return boardSize; },
+    set boardSize(v) { boardSize = v; },
     get WORDS() { return WORDS; },
     get letters() { return letters; },
     set letters(v) { letters = v; }
