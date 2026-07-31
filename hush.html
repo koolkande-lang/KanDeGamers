@@ -1905,7 +1905,7 @@
   function showTape(idx) {
     const t = TAPES[idx];
     if (!t) return;
-    running = false;
+    pauseRound();
     $('noteTitle').textContent = t.title;
     $('noteText').innerHTML =
       `<div class="tvbar">▶ PLAYING &nbsp;·&nbsp; ${t.who}</div>${t.body}` +
@@ -2420,10 +2420,15 @@
   function openKeypad() {
     kpEntry = ''; kpFailed = false;
     $('kpDisplay').textContent = '____';
+    pauseRound();
     $('keypad').classList.add('on');
     state.keypadOpen = true;
   }
-  function closeKeypad() { $('keypad').classList.remove('on'); state.keypadOpen = false; }
+  function closeKeypad() {
+    $('keypad').classList.remove('on');
+    state.keypadOpen = false;
+    resumeRound();
+  }
   function kpPress(d) {
     // A wrong code clears on the NEXT press, not on a timer. Relying on the
     // timeout meant a fast player could jam the pad with four dead digits.
@@ -2453,11 +2458,16 @@
     const n = NOTES[key];
     if (!n) return;
     state.notesRead[key] = true;
+    pauseRound();
     $('noteTitle').textContent = n.title;
     $('noteText').innerHTML = n.body;
     $('noteView').classList.add('on');
   }
-  $('noteView').addEventListener('click', () => $('noteView').classList.remove('on'));
+  function closeNote() {
+    $('noteView').classList.remove('on');
+    resumeRound();
+  }
+  $('noteView').addEventListener('click', closeNote);
 
   // ============================================================
   //  Loop
@@ -2491,6 +2501,34 @@
   }
   function stopLoop() { if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null; } running = false; }
 
+  // ---- pausing for an overlay ----
+  // Reading a note, watching a tape or working the keypad all stop the round.
+  // Every one of them MUST come back through resumeRound(), or the game just
+  // freezes: `running` stays false, the animation frame chain dies and nothing
+  // ever asks for another one. That was the "it keeps pausing" bug.
+  let pausedForOverlay = false;
+  function pauseRound() {
+    if (!running) return;
+    pausedForOverlay = true;
+    stopLoop();
+  }
+  function resumeRound() {
+    if (!pausedForOverlay) return;
+    // Check everything BEFORE clearing the flag. Clearing it first meant that
+    // closing a keypad opened on top of a note threw the flag away, and the
+    // note's own close then had nothing left to resume from.
+    if (anyOverlayOpen()) return;                                  // still one up
+    if ($('results') && !$('results').classList.contains('hidden')) return;
+    if (scaring) return;
+    pausedForOverlay = false;
+    running = true;
+    lastT = performance.now();             // don't jump: the clock stood still
+    if (rafId === null) rafId = requestAnimationFrame(loop);
+  }
+  function anyOverlayOpen() {
+    return $('noteView').classList.contains('on') || $('keypad').classList.contains('on');
+  }
+
   function startGame(fresh) {
     resetLevel(fresh);
     if (fresh) state.started = performance.now();
@@ -2499,6 +2537,9 @@
 
   function beginRound() {
     running = true; lastT = performance.now();
+    pausedForOverlay = false;              // a fresh round is never mid-overlay
+    $('noteView').classList.remove('on');
+    $('keypad').classList.remove('on');
     $('menu').style.display = 'none';
     $('results').classList.add('hidden');
     $('game').style.display = 'flex';
@@ -2808,7 +2849,9 @@
     HEAR_WALK, HEAR_RUN, SEE, SCARE_CFG, sizeScareCanvas,
     ZONE_NAMES, zoneOf, TAPES, REACH_ARM, noteKeyFor, NOTES, SPRITE_OF, ACTIONS,
     drawSprite, reachableCells, nearbyAction,
-    pickUpTape, showTape, useTV, startFinale, win, ZONE_TINT, checkEscape,
+    pickUpTape, showTape, useTV, startFinale, showNote, closeNote,
+    pauseRound, resumeRound, openKeypad, closeKeypad, loop,
+    get pausedForOverlay() { return pausedForOverlay; }, win, ZONE_TINT, checkEscape,
     get running() { return running; }, drawScareFace, drawMonster, ambientDread,
     footstep, roar, screech, panOf, setMode, nearFloor, caught, finishScare, cfg,
     get scareLevel() { return scareLevel; }, set scareLevel(v) { scareLevel = v; },

@@ -570,6 +570,44 @@ flagship was **WINK**. The slogan was *"Wink never sleeps — so you can."*
 Every floor is painted differently — walls, floor and ceiling are tinted per
 zone — so you always know where you are, and the HUD names the floor you're on.
 
+### 🧊 Round 8 — the freeze
+
+**You reported the game kept pausing. It was a real bug, and a bad one.**
+
+Watching a tape called `showTape()`, which set `running = false` to stop the
+world while you read. Closing the box ran this:
+
+```js
+$('noteView').addEventListener('click', () => $('noteView').classList.remove('on'));
+```
+
+That hides the box — and does nothing else. `running` stayed `false`, the
+animation-frame chain was never restarted, and **the game was frozen for good.**
+The picture stayed on screen, so it looked like a pause rather than a crash.
+
+Every overlay now goes through one shared pair, `pauseRound()` and
+`resumeRound()`, and closing any of them restarts the loop. Along the way:
+
+- **Reading a note now pauses too.** It didn't before — the monster kept walking
+  around while you had a full-screen note in your face, and could catch you
+  mid-sentence with no warning.
+- **The clock doesn't jump.** `lastT` is reset on resume, so staring at a note
+  for thirty seconds doesn't teleport the monster across the map on the next
+  frame. There's a test for exactly that.
+- **Starting a round always clears a stale pause**, so nothing can carry over.
+
+> ⚠️ **My first attempt at the fix had its own bug.** `resumeRound()` cleared the
+> "paused" flag *before* checking whether another overlay was still open — so
+> opening the keypad on top of a note and closing the keypad threw the flag
+> away, and closing the note then had nothing left to resume from. The tests
+> caught it. The checks now all happen before the flag is touched.
+
+**A new suite, `stucktest.js`, exists purely to hunt for this class of bug.** It
+opens every overlay and closes it every possible way, opens the same one three
+times over, quits from inside one, starts a fresh round mid-overlay, and checks
+the source for any place that stops the loop without a documented way back. 28
+checks.
+
 ### 📺 Round 7 — nothing floats any more, and the tapes have somewhere to play
 
 **The floating was a real bug, and it affected everything.** A wall one square
@@ -1041,7 +1079,7 @@ drag-to-look on a tablet.
 
 ## ⚠️ What still needs doing
 
-**Upload it, then play it with real people.** All **20 test suites — 1,099 checks
+**Upload it, then play it with real people.** All **21 test suites — 1,180 checks
 — pass**, but no human has actually played any of this yet. Things worth
 watching for:
 
