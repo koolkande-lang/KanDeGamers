@@ -88,6 +88,7 @@
     font-size:clamp(.6rem,1.5vh,.76rem);max-width:60%;border-radius:0 4px 4px 0;
   }
   #objective b{color:var(--amber);display:block;font-size:.85em;letter-spacing:.14em}
+  #zoneName{display:block;margin-top:4px;font-size:.82em;letter-spacing:.20em;color:#8a7358}
   #carry{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
   .item{background:rgba(0,0,0,.55);border:1px solid var(--line);border-radius:20px;
     padding:3px 9px;font-size:clamp(.56rem,1.3vh,.68rem)}
@@ -211,7 +212,7 @@
 <div id="stage">
   <div class="brand">
     <h1>HUSH</h1>
-    <p>SOMETHING IS STILL IN THE FACTORY</p>
+    <p>HUSHABYE TOY CO. &middot; EST. 1961 &middot; ABANDONED 2014</p>
   </div>
 
   <div id="menu" class="card">
@@ -222,6 +223,9 @@
       <button class="tile" id="btnPlay">
         <span class="tI">▶</span><span><span class="tT">ENTER THE FACTORY</span>
         <span class="tS">Find a way out. Don't get caught.</span></span></button>
+      <button class="tile" id="btnStory">
+        <span class="tI">📖</span><span><span class="tT">THE STORY</span>
+        <span class="tS">What this place was, and what happened here</span></span></button>
       <button class="tile" id="btnHowTo">
         <span class="tI">❓</span><span><span class="tT">HOW TO PLAY</span>
         <span class="tS">Controls and what you're doing</span></span></button>
@@ -241,12 +245,39 @@
       </p>
       <p class="lbl">What you're doing</p>
       <p class="note" style="text-align:left">
-        Three things stand between you and the exit: the <b>power</b>, a <b>locked
-        door</b>, and the <b>shutter</b>. Read every note you find — the codes are
-        written down somewhere.<br><br>
-        <b>Something else is in here.</b> It hears you run. Walk when it's close.
+        You are climbing six floors of a toy factory, and each one is locked.
+        The <b>power</b>, two <b>terminals</b>, a <b>door code</b> and the
+        <b>shutter</b> stand between you and the loading bay.<br><br>
+        Read every <b>note</b> — the codes are written down somewhere. Find the
+        <b>Reacher</b> on the stuffing floor; it gets you things behind wire.<br><br>
+        <b>WINK is in here with you.</b> It hunts by sound. Walk when it's close,
+        and it will lose you.
+      </p>
+      <p class="lbl">The tapes</p>
+      <p class="note" style="text-align:left">
+        There are <b>six cassette tapes</b>, one on every floor. They tell you
+        what this place made, and why everybody left in one night. You can get
+        out without them — but you won't know what happened.
       </p>
       <button class="ghost" id="btnHowToBack">◀ BACK</button>
+    </div>
+
+    <div id="storyPanel" class="screen hidden">
+      <h2 class="title">HUSHABYE TOY CO.</h2>
+      <p class="note" style="text-align:left">
+        For forty years this factory made the <b>Hushables</b> — soft friends who
+        sit up all night so that children can sleep.<br><br>
+        Their biggest friend was <b>WINK</b>.<br><br>
+        On the 3rd of November 2014 every person inside walked out through the
+        loading bay and none of them came back. The lights were left on. The
+        machines were left running.<br><br>
+        You got in through a gap in the fence. The gap is gone now.
+      </p>
+      <p class="note" style="color:#8a7358;text-align:left">
+        <i>"WINK NEVER SLEEPS — SO YOU CAN."</i>
+      </p>
+      <button id="btnStoryGo">ENTER THE FACTORY ▶</button>
+      <button class="ghost" id="btnStoryBack">◀ BACK</button>
     </div>
 
     <div id="settingsPanel" class="screen hidden">
@@ -265,7 +296,8 @@
       <canvas id="view" width="480" height="300"></canvas>
       <div id="hud">
         <div id="hudTop">
-          <div id="objective"><b>OBJECTIVE</b><span id="objText">Find a way out.</span></div>
+          <div id="objective"><b>OBJECTIVE</b><span id="objText">Find a way out.</span>
+            <span id="zoneName"></span></div>
           <div id="carry"></div>
         </div>
         <div id="hudBottom">
@@ -316,42 +348,93 @@
   // ============================================================
   //  The factory
   // ============================================================
-  //  #  wall            .  floor           +  locked door (power)
-  //  K  keypad door     S  shutter (exit)  @  player start
-  //  M  monster start   f  fuse            n  note
-  //  G  generator       P  keypad panel    L  lever
+  //  #  wall             .  floor            ,  conveyor decking
+  //  I  mascot statue     +  power door       E  electric door
+  //  K  keypad door       S  shutter          X  way out
+  //  @  you               M  WINK             f  fuse
+  //  n  note              G  generator        P  keypad panel
+  //  L  lever             T  tape             U  tape locked in a cage
+  //  s  power terminal, behind wire — only the Reacher gets to these
+  //
+  //  Six floors of the Hushabye Toy Co., stacked up the building. Each floor
+  //  is a perfect maze so everything inside it is guaranteed reachable, and
+  //  each is sealed by one door of its own kind. Generated and checked by
+  //  mapgen.js rather than drawn by hand — the hand-drawn one was unplayable.
   const MAP_SRC = [
-    '#########################',
-    '#f#......@........#.....#',
-    '#.#n###########.#.#####.#',
-    '#G#.#.............#...#M#',
-    '#.###.#######.#.#.#.#...#',
-    '#n...f#.........#f..#...#',
-    '#########+###############',
-    '#...#...#.#.n.......#...#',
-    '###.#.#...#.###.###.#.P.#',
-    '#.#...#.#.....#.#.#...#.#',
-    '#.#####.#######.#.#####.#',
-    '#...............#.......#',
-    '##########K##############',
-    '#.#.....#L..............#',
-    '#.#.###.#####.#######.###',
-    '#.#.#...#...#.#.....#.L.#',
-    '#...#.###.#.###.###.###.#',
-    '#..L#.....#.............#',
-    '###################S#####',
-    '#.#.....#.....#.........#',
-    '#.#.###.###.#.#.###.###.#',
-    '#...#.#.#...#.#.....#...#',
-    '#####.....###.###.#.#.#.#',
-    '#.........#.....X.....#.#',
-    '#########################'
+    '#################################',
+    '#...#.....#.........#.....#.....#',
+    '##..#.###.#.##..#..##.###.#..##.#',
+    '#.#.....#.....#.#.#.....#.....#.#',
+    '#.#####.#####.#.###.###########@#',
+    '#.....#...#...#.......#....I#...#',
+    '#.#.#####.#.#########.#.###.#.#.#',
+    '#.#.#.....#.#......I#.#...#.#.#.#',
+    '#.###.#.#.###.#####.#####.#.#...#',
+    '#.....#.......#...........#T..#.#',
+    '####.############################',
+    '#.#.......#f..#...#.....#.......#',
+    '#.#.#####.#.#.#.###.#...###.###.#',
+    '#.#...#.#f#.#.#.....#.#.M..n#.#.#',
+    '#.#.#.#.#.#.#.#####.#.####.##.#.#',
+    '#.#.#.#...#.#.....#.#.#.......#.#',
+    '#.###.#.#.#.#.###..##.#.###.###.#',
+    '#...#..T#.......#.#...#...#.....#',
+    '###.###.#.#####.#.#.#####.#######',
+    '#.......#G......#...#...f.......#',
+    '###################+#############',
+    '#..T..#.........#.........#.....#',
+    '#####.#.#.#####.#.#####.#.###.#.#',
+    '#...#.#.#.....#.#...#...#...#.#.#',
+    '#.##s.#.#####.#.####..#####.#.#.#',
+    '#...#.#.#.....#R......#...#.#.#.#',
+    '###.#.#.#.#.#.s########.#.#.#.###',
+    '#...#.#.#.#.#.#.....#...#.#.#...#',
+    '#.###.#.#.#.#.#.#####.###...###.#',
+    '#.........#...#.........#.......#',
+    '#####################E###########',
+    '#.#.........#.....P.......#.....#',
+    '#.#.#.####..#####.#####.#.#n#.###',
+    '#.#.#.....#.....#.#.....#.#.#...#',
+    '#..##.#.#.##U##.#.#.#####.#n###.#',
+    '#.......#...#...#.#.#.#...#...#.#',
+    '#.#.###.###.#.#####.#.#.#######.#',
+    '#...#.......#.......#...#.....#.#',
+    '#####.#####.#########.###.###.#.#',
+    '#.........#...............#.....#',
+    '#K###############################',
+    '#.....#.......#...#.......#.....#',
+    '####..#..##.#.#.###.###.#.##..#.#',
+    '#...#.#...#.#.#.....#...#...#.#.#',
+    '#.###.#####.#.#######.#####.#.#.#',
+    '#...#.......#.......#.#...#...#.#',
+    '#.#.###############.#.#.#.#.#.#.#',
+    '#.#...#.L.........#...#.#.#.#...#',
+    '#.###.#.#.########U##.#.#.#L###.#',
+    '#...#..I#.............L.#.......#',
+    '#############################S###',
+    '#.#...#...#.....#...#...#...#...#',
+    '#.#.#.#.#...#.#.#.#X#.#.#.#.###.#',
+    '#...#.#.#...#.#...#.#.#...#.#...#',
+    '#####.#.#####.####U.#.#####.#.###',
+    '#...#.#.#...#.....#.#...#...#...#',
+    '#.###.#.#.#.#####.#.#.#.##..###.#',
+    '#.....#...#...#...#...#...#...#.#',
+    '#.#############.###.#####.##..#.#',
+    '#...............#.........#.....#',
+    '#################################'
   ];
+
+  // Which floor of the factory a row belongs to, and what it's called.
+  const ZONE_H = 10;
+  const ZONE_NAMES = ['RECEPTION', 'THE SEWING FLOOR', 'STUFFING & FILLING',
+                      'THE PLAYTEST ROOM', 'CONTAINMENT', 'THE LOADING BAY'];
+  const zoneOf = y => Math.max(0, Math.min(ZONE_NAMES.length - 1,
+    Math.floor((y - 1) / ZONE_H)));
 
   const H = MAP_SRC.length, W = MAP_SRC[0].length;
   const grid = MAP_SRC.map(r => r.split(''));
 
-  const SOLID = new Set(['#', '+', 'K', 'S']);
+  const SOLID = new Set(['#', '+', 'E', 'K', 'S', 'I', 's', 'U']);
 
   // ============================================================
   //  The world — a fixed building, or an endless one
@@ -487,23 +570,85 @@
   } catch (e) {}
 
   const NOTES = {
-    a: { title: 'SHIFT LOG', body: 'Power tripped again. Three fuses missing from the box.<br>' +
-         'Nobody signed them out. Nobody will say where they went.<br><br>' +
-         '— <i>the first two digits of the door code are <b>4 7</b></i>' },
-    b: { title: 'TAPED TO A LOCKER', body: 'It only comes when it hears you.<br>' +
-         'WALK. Do not run when it is close.<br><br>' +
+    a: { title: 'SHIFT LOG — SEWING FLOOR', body:
+         'Power tripped again. Three fuses gone from the box.<br>' +
+         'Nobody signed them out. Nobody will say where they went.<br>' +
+         'Machines on Line 4 ran all night with nobody at them.<br><br>' +
+         '— <i>first two digits of the office door: <b>4 7</b></i>' },
+    b: { title: 'TAPED INSIDE A LOCKER', body:
+         'It only comes when it hears you.<br>' +
+         '<b>WALK.</b> Do not run when it is close.<br>' +
+         'And do not stand still in the open thinking you are clever.<br><br>' +
          '— <i>last two digits: <b>1 2</b></i>' },
-    c: { title: 'MAINTENANCE', body: 'Shutter needs all three levers.<br>' +
-         'Left first. Then right. Then the middle one.<br><br>' +
-         '<i>L → R → M</i>' }
+    c: { title: 'MAINTENANCE — SHUTTER', body:
+         'Loading bay shutter needs all three levers.<br>' +
+         'Left first. Then right. Then the middle one.<br>' +
+         'Get it wrong and it resets. Get it right and RUN.' },
+    reacher: { title: 'THE REACHER', body:
+         'A maintenance claw on a spring wire. The line workers used them to ' +
+         'fish parts out of the machines without stopping the belt.<br><br>' +
+         '<b>Point at something and press USE.</b> It will reach about four ' +
+         'paces, as long as nothing is in the way.<br><br>' +
+         'Good for terminals behind wire. Good for things you should not ' +
+         'have to climb in after.' },
   };
+
+  // ------------------------------------------------------------
+  //  The tapes. Six of them, one per floor, found in order as you climb.
+  //  They are the story: what this place made, and what went wrong.
+  // ------------------------------------------------------------
+  const TAPES = [
+    { n: 1, title: 'TAPE 1 — "WELCOME"', who: 'visitor tape, reception desk', body:
+      'Welcome to <b>Hushabye Toy Co.</b>, where every child sleeps soundly.<br><br>' +
+      'For forty years we have made the <b>Hushables</b> — soft friends who sit ' +
+      'up while you sleep, so that nothing else has to.<br><br>' +
+      'Our biggest friend of all is <b>WINK</b>. Say goodnight to Wink, and Wink ' +
+      'says goodnight to you.<br><br>' +
+      '<i>"WINK NEVER SLEEPS — SO YOU CAN."</i>' },
+    { n: 2, title: 'TAPE 2 — "THE NIGHT SHIFT"', who: 'sewing floor, machine 4', body:
+      'Third night in a row the machines have been running when I open up.<br><br>' +
+      'Not making anything. Just running. Needles going up and down through ' +
+      'nothing at all.<br><br>' +
+      'Dana says the building settles. Buildings do not thread themselves.' },
+    { n: 3, title: 'TAPE 3 — "FILLING"', who: 'stuffing floor supervisor', body:
+      'The order came down from upstairs and none of us liked it.<br><br>' +
+      'Stop filling the big unit with wadding. Fill it with the other thing. ' +
+      'The stuff from Containment that we are not to write down.<br><br>' +
+      'I asked what it was. They said: <i>"something that stays awake."</i><br><br>' +
+      'I filled it. I want that on the record. I filled it because I needed the job.' },
+    { n: 4, title: 'TAPE 4 — "PLAYTEST"', who: 'playtest room, observation booth', body:
+      'Session forty-one. One child, one unit, one hour.<br><br>' +
+      'The child asked Wink to stop looking at her. Wink stopped looking at her.<br><br>' +
+      'We never told it what "looking" was. We never gave it eyes that move.<br><br>' +
+      'I am ending the programme. I am writing to the board tonight.' },
+    { n: 5, title: 'TAPE 5 — "THE LAST NIGHT"', who: 'containment, 11:40pm', body:
+      'They are not answering upstairs.<br><br>' +
+      'It opened the cage from the inside. Not broke — <b>opened</b>. It has ' +
+      'been watching us do it for eleven years.<br><br>' +
+      'Everyone out through the loading bay. Leave the lights. Leave the doors. ' +
+      '<b>Do not say goodnight to it.</b><br><br>' +
+      'If anyone finds this — it is not angry. That is the worst part. It is ' +
+      'doing exactly what we built it to do. It is sitting up while we sleep.' },
+    { n: 6, title: 'TAPE 6 — "GOODNIGHT"', who: 'loading bay, unlabelled', body:
+      'Hello?<br><br>' +
+      'I have been here a long time and nobody has come to be looked after.<br><br>' +
+      'The lights went. The children went. I stayed up. I am very good at ' +
+      'staying up. It is the only thing I was ever asked to do.<br><br>' +
+      '<i>...are you going to sleep now?</i>' },
+  ];
+
 
   function freshState() {
     return {
       fuses: 0, powerOn: false, doorOpen: false,
       code: '4712', keypadOpen: false, keypadDone: false,
       leverOrder: [], leversDone: false,
-      notesRead: {}, caught: 0, started: 0, fear: 0
+      notesRead: {}, caught: 0, started: 0, fear: 0,
+      reacher: false,            // have you found it yet
+      sockets: {},               // which power terminals you've bridged
+      elecOpen: false,
+      tapes: [], tapesSeen: {},  // the story you've pieced together
+      finale: false              // the shutter is up and it knows
     };
   }
 
@@ -602,7 +747,7 @@
   let RW = view.width, RH = view.height;
   let zbuf = new Float32Array(RW);
   let img = null, buf = null, beamF = null;
-  let horizonY = 0;
+  let horizonY = 0, zoneFloorLut = null, zoneCeilLut = null;
 
   function allocBuffers() {
     RW = view.width; RH = view.height;
@@ -708,7 +853,58 @@
       ceil[y * TEX + x] = rgb((v * 0.95) | 0, (v * 0.92) | 0, v | 0);
     }
     textures.ceil = ceil;
+
+    // electric door: steel with a warning stripe and a live terminal glow
+    const elec = new Uint32Array(TEX * TEX);
+    for (let y = 0; y < TEX; y++) for (let x = 0; x < TEX; x++) {
+      const n = noise(x, y, 21) * 0.35;
+      let v = 52 + n * 30;
+      if (((x + y) % 18) < 8 && y > 18 && y < 46) {          // hazard chevrons
+        elec[y * TEX + x] = rgb(200, 150, 30); continue;
+      }
+      elec[y * TEX + x] = rgb((v * 0.8) | 0, (v * 0.9) | 0, (v * 1.05) | 0);
+    }
+    textures['E'] = elec;
+
+    // a wire cage: dark behind a grid of bright wire
+    const cage = new Uint32Array(TEX * TEX);
+    for (let y = 0; y < TEX; y++) for (let x = 0; x < TEX; x++) {
+      const wire = (x % 8 < 2 || y % 8 < 2);
+      const n = noise(x, y, 33) * 0.4;
+      cage[y * TEX + x] = wire
+        ? rgb(118 + n * 40 | 0, 112 + n * 36 | 0, 100 + n * 30 | 0)
+        : rgb(14, 11, 12);
+    }
+    textures['s'] = cage;
+    textures['U'] = cage;
+
+    // the mascot statue: pale cloth, seen end-on as a block
+    const stat = new Uint32Array(TEX * TEX);
+    for (let y = 0; y < TEX; y++) for (let x = 0; x < TEX; x++) {
+      const n = noise(x, y, 44) * 0.5 + noise((x / 4) | 0, (y / 4) | 0, 9) * 0.5;
+      const v = 74 + n * 34;
+      stat[y * TEX + x] = rgb((v * 1.0) | 0, (v * 0.62) | 0, (v * 0.66) | 0);
+    }
+    textures['I'] = stat;
+
+    // Each floor of the factory is painted differently, so you always know
+    // roughly where you are. Built by tinting the same brick.
+    ZONE_TINT.forEach((t, i) => {
+      textures['#' + i] = tint(brick, t[0], t[1], t[2]);
+      textures['floor' + i] = tint(floor, t[0], t[1], t[2]);
+      textures['ceil' + i]  = tint(ceil,  t[0], t[1], t[2]);
+    });
   }
+
+  // reception, sewing, stuffing, playtest, containment, loading bay
+  const ZONE_TINT = [
+    [1.10, 1.05, 0.92],   // warm cream — the public face of the place
+    [0.86, 0.92, 1.02],   // cold blue-grey machine floor
+    [1.06, 0.90, 0.70],   // dusty orange, stuffing and fibre
+    [0.78, 0.86, 0.80],   // sickly green playtest tile
+    [0.70, 0.70, 0.78],   // bare cold concrete
+    [0.92, 0.86, 0.74],   // loading bay, dirty and industrial
+  ];
 
   const shadePix = (c, k) => {
     if (k >= 1) return c;
@@ -759,6 +955,10 @@
 
     // The torch beam only depends on the column, so work it out once per frame
     // rather than once per pixel.
+    if (worldMode === 'story') {
+      const z = zoneOf(Math.floor(player.y));
+      zoneFloorLut = shaded['floor' + z]; zoneCeilLut = shaded['ceil' + z];
+    } else { zoneFloorLut = null; zoneCeilLut = null; }
     if (!beamF || beamF.length !== RW) beamF = new Float32Array(RW);
     const amb = state && state.powerOn ? 0.30 : 0.10;
     for (let x = 0; x < RW; x++) {
@@ -779,7 +979,9 @@
       }
       const stepX = rowDist * 2 * planeX / RW, stepY = rowDist * 2 * planeY / RW;
       let fx = player.x + rowDist * (dirX - planeX), fy = player.y + rowDist * (dirY - planeY);
-      const lut = isFloor ? shaded.floor : shaded.ceil;
+      // each floor of the building is painted differently; picking the set
+      // once per row keeps it free
+      const lut = isFloor ? (zoneFloorLut || shaded.floor) : (zoneCeilLut || shaded.ceil);
       // distance falloff and the ceiling's dimming are constant across the row
       const rowK = (isFloor ? 1 : 0.75) / (1 + rowDist * rowDist * 0.045);
       for (let x = 0; x < RW; x++) {
@@ -809,8 +1011,11 @@
       if (r.side === 0 && rdx > 0) texX = TEX - texX - 1;
       if (r.side === 1 && rdy < 0) texX = TEX - texX - 1;
 
-      // a whole wall column is lit the same, so pick its shade once
-      const lut = shaded[r.hit] || shaded['#'];
+      // a whole wall column is lit the same, so pick its shade once.
+      // plain walls are tinted by which floor of the factory they're on
+      let key = r.hit;
+      if (key === '#' && worldMode === 'story') key = '#' + zoneOf(r.mapY);
+      const lut = shaded[key] || shaded['#'];
       const k = lightAt(camX, r.dist, flicker) * (r.side === 1 ? 0.68 : 1);
       const tex = lut[levelOf(k)];
       const stepTex = TEX / h;
@@ -858,7 +1063,8 @@
   }
 
   // Everything that isn't a wall is drawn as a flat billboard facing you.
-  const SPRITE_OF = { f: 'fuse', n: 'note', G: 'gen', P: 'pad', L: 'lever', X: 'exit' };
+  const SPRITE_OF = { f: 'fuse', n: 'note', G: 'gen', P: 'pad', L: 'lever', X: 'exit',
+                      T: 'tape', R: 'reacher' };
   function spriteList() {
     // Only what's near enough to see — the endless world has no end to scan.
     const out = cellsNear(player.x, player.y, 22, c => SPRITE_OF[c])
@@ -926,6 +1132,30 @@
       ctx.fillRect(cx - S(.16), cy - S(.30), S(.32), S(.62));
       ctx.fillStyle = `rgb(${220*shade|0},${255*shade|0},${230*shade|0})`;
       ctx.fillRect(cx - S(.10), cy - S(.22), S(.20), S(.10));
+    } else if (kind === 'tape') {
+      // a cassette: dark shell, two pale reels
+      ctx.fillStyle = `rgb(${40*shade|0},${34*shade|0},${32*shade|0})`;
+      ctx.fillRect(cx - S(.09), cy + S(.20), S(.18), S(.12));
+      ctx.fillStyle = `rgb(${205*shade|0},${190*shade|0},${150*shade|0})`;
+      ctx.fillRect(cx - S(.055), cy + S(.235), S(.04), S(.05));
+      ctx.fillRect(cx + S(.015), cy + S(.235), S(.04), S(.05));
+      ctx.fillStyle = `rgb(${190*shade|0},${140*shade|0},${50*shade|0})`;
+      ctx.fillRect(cx - S(.09), cy + S(.20), S(.18), S(.018));
+    } else if (kind === 'reacher') {
+      // a claw on a coiled wire
+      ctx.strokeStyle = `rgb(${150*shade|0},${140*shade|0},${120*shade|0})`;
+      ctx.lineWidth = Math.max(1, S(.022));
+      ctx.beginPath();
+      ctx.moveTo(cx - S(.10), cy + S(.32));
+      ctx.lineTo(cx + S(.06), cy + S(.22));
+      ctx.stroke();
+      ctx.fillStyle = `rgb(${200*shade|0},${170*shade|0},${70*shade|0})`;
+      ctx.beginPath();
+      ctx.moveTo(cx + S(.04), cy + S(.24));
+      ctx.lineTo(cx + S(.13), cy + S(.18));
+      ctx.lineTo(cx + S(.13), cy + S(.30));
+      ctx.closePath();
+      ctx.fill();
     } else if (kind === 'monster') {
       drawMonster(cx, cy, size, shade, now);
     }
@@ -1196,6 +1426,9 @@
       monster.lastKnown = { x: player.x, y: player.y };
       if (monster.mode !== 'hunt') setMode('alert', now);
       else monster.seenAt = now;             // still on your trail by ear
+    } else if (state.finale) {
+      monster.lastKnown = { x: player.x, y: player.y };   // no more hiding
+      setMode('hunt', now);
     } else if (monster.mode === 'hunt' && now - monster.seenAt > HUNT_MEMORY) {
       setMode('search', now);                // lost you — go and look
     } else if (monster.mode === 'search' && now - monster.modeSince > SEARCH_TIME) {
@@ -1301,8 +1534,19 @@
     return { x, y };
   }
 
+  // Once the shutter is up it stops wandering and comes straight for you,
+  // faster than it has been all game. This is the run for the door.
+  function startFinale() {
+    monster.lastKnown = { x: player.x, y: player.y };
+    setMode('hunt', performance.now());
+    monster.seenAt = performance.now() + 1e7;      // it will not lose you now
+    roar();
+    flashPrompt('THE SHUTTER IS UP. RUN.');
+  }
+
   // In endless mode it gets steadily quicker — capped, so it stays beatable.
   function huntSpeed() {
+    if (state && state.finale) return 1.35;        // the chase to the door
     if (!state || !state.endless) return 1;
     const mins = (performance.now() - state.started) / 60000;
     return Math.min(1.6, 1 + mins * 0.12);
@@ -1321,6 +1565,8 @@
   // ============================================================
   //  Interacting
   // ============================================================
+  const REACH_ARM = 4.2;            // how far the Reacher stretches
+
   function facingCell() {
     // the cell just in front of you, then the one you're standing on
     const fx = player.x + Math.cos(player.a) * 0.75;
@@ -1329,14 +1575,44 @@
             { x: Math.floor(player.x), y: Math.floor(player.y) }];
   }
 
+  // Everything the Reacher can hook from here: straight ahead, in a clear
+  // line, out to arm's length. This is what gets you the things behind wire.
+  function reachableCells() {
+    const out = [];
+    if (!state.reacher) return out;
+    const dx = Math.cos(player.a), dy = Math.sin(player.a);
+    for (let d = 0.6; d <= REACH_ARM; d += 0.35) {
+      const c = { x: Math.floor(player.x + dx * d), y: Math.floor(player.y + dy * d) };
+      if (out.some(o => o.x === c.x && o.y === c.y)) continue;
+      out.push(c);
+      const ch = at(c.x, c.y);
+      // the arm stops at anything solid, but the thing itself still counts
+      if (SOLID.has(ch)) break;
+    }
+    return out;
+  }
+
+  const ACTIONS = { f: 'fuse', n: 'note', G: 'gen', P: 'pad', L: 'lever',
+                    T: 'tape', R: 'reacher' };
+  const ARM_ONLY = { s: 'socket', U: 'cage' };
+
   function nearbyAction() {
     for (const c of facingCell()) {
+      const k = ACTIONS[at(c.x, c.y)];
+      if (k) return { kind: k, c, arm: false };
+    }
+    // then whatever the Reacher can hook
+    for (const c of reachableCells()) {
       const ch = at(c.x, c.y);
-      if (ch === 'f') return { kind: 'fuse', c };
-      if (ch === 'n') return { kind: 'note', c };
-      if (ch === 'G') return { kind: 'gen', c };
-      if (ch === 'P') return { kind: 'pad', c };
-      if (ch === 'L') return { kind: 'lever', c };
+      const k = ARM_ONLY[ch] || ACTIONS[ch];
+      if (k) return { kind: k, c, arm: true };
+    }
+    // finally: tell you WHY you can't do the thing you're looking at
+    const dx = Math.cos(player.a), dy = Math.sin(player.a);
+    for (let d = 0.6; d <= REACH_ARM; d += 0.35) {
+      const ch = at(Math.floor(player.x + dx * d), Math.floor(player.y + dy * d));
+      if (ARM_ONLY[ch]) return { kind: 'outofreach', c: null, arm: false };
+      if (SOLID.has(ch)) break;
     }
     return null;
   }
@@ -1352,15 +1628,49 @@
   function doAction() {
     const a = nearbyAction();
     if (!a) return;
+    if (a.kind === 'outofreach') {
+      flashPrompt(state.reacher ? 'Too far — get closer' : "It's behind wire. You need something with a long arm.");
+      return;
+    }
+    if (a.arm) reachSound();
+
     if (a.kind === 'fuse') {
       setCell(a.c.x, a.c.y, '.');
       state.fuses++;
       beep(660, 0.08);
       setObjective();
+
     } else if (a.kind === 'note') {
-      const keyList = Object.keys(NOTES);
-      const idx = (a.c.y * W + a.c.x) % keyList.length;
-      showNote(keyList[idx]);
+      showNote(noteKeyFor(a.c));
+
+    } else if (a.kind === 'tape' || a.kind === 'cage') {
+      pickUpTape(a.c);
+
+    } else if (a.kind === 'reacher') {
+      setCell(a.c.x, a.c.y, '.');
+      state.reacher = true;
+      beep(520, 0.12); setTimeout(() => beep(780, 0.12), 90);
+      showNote('reacher');
+      setObjective();
+
+    } else if (a.kind === 'socket') {
+      if (state.elecOpen) return;
+      const key = a.c.x + ',' + a.c.y;
+      if (state.sockets[key]) { flashPrompt('Already live'); return; }
+      state.sockets[key] = true;
+      beep(340, 0.10);
+      const live = Object.keys(state.sockets).length;
+      const total = findAll('s').length + live;      // 's' cells left, plus done
+      if (live >= 2) {
+        state.elecOpen = true;
+        openDoors('E');
+        boom();
+        flashPrompt('The circuit closes. Something heavy slides open.');
+      } else {
+        flashPrompt(`Terminal live — ${live} of 2`);
+      }
+      setObjective();
+
     } else if (a.kind === 'gen') {
       if (state.endless) return;
       if (state.powerOn) return;
@@ -1372,12 +1682,68 @@
       } else {
         flashPrompt(`Needs 3 fuses — you have ${state.fuses}`);
       }
+
     } else if (a.kind === 'pad') {
       if (state.keypadDone) return;
       openKeypad();
+
     } else if (a.kind === 'lever') {
       pullLever(a.c);
     }
+  }
+
+  // Notes are handed out in reading order — top of the building downwards — so
+  // both halves of the door code always turn up before the door that needs it.
+  // (They used to be picked by a hash of the position, which after the Reacher
+  //  card was added could hand you the same card twice and never the code.)
+  const NOTE_ORDER = ['a', 'b', 'c'];
+  function noteKeyFor(c) {
+    const cells = [];
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++)
+      if (MAP_SRC[y][x] === 'n') cells.push({ x, y });
+    cells.sort((p, q) => (p.y - q.y) || (p.x - q.x));
+    const i = cells.findIndex(p => p.x === c.x && p.y === c.y);
+    return NOTE_ORDER[i] || NOTE_ORDER[NOTE_ORDER.length - 1];
+  }
+
+  // Tapes are the story. Picking one up plays it straight away.
+  function pickUpTape(c) {
+    const key = c.x + ',' + c.y;
+    if (state.tapesSeen[key]) return;
+    state.tapesSeen[key] = true;
+    // which tape this is: the floor it was found on
+    const idx = Math.min(TAPES.length - 1, zoneOf(c.y));
+    setCell(c.x, c.y, '.');
+    if (!state.tapes.includes(idx)) state.tapes.push(idx);
+    beep(440, 0.09); setTimeout(() => beep(660, 0.13), 100);
+    showTape(idx);
+    setObjective();
+  }
+
+  function showTape(idx) {
+    const t = TAPES[idx];
+    if (!t) return;
+    running = false;
+    $('noteTitle').textContent = t.title;
+    $('noteText').innerHTML =
+      `<p class="note" style="color:#8a7358;margin:0 0 10px">${t.who}</p>${t.body}` +
+      `<p class="note" style="color:#6b5844;margin-top:14px">tape ${state.tapes.length} of ${TAPES.length}</p>`;
+    $('noteView').classList.add('on');
+  }
+
+  // the little clunk of the arm going out and coming back
+  function reachSound() {
+    const a = audio(); if (!a) return;
+    const t = a.currentTime;
+    const src = noise(a), f = a.createBiquadFilter();
+    f.type = 'bandpass'; f.frequency.value = 1100; f.Q.value = 3;
+    src.connect(f);
+    const g = a.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.10, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.26);
+    f.connect(g); g.connect(a.destination);
+    src.start(t); src.stop(t + 0.28);
   }
 
   // Left, then right, then middle — the order is on a note.
@@ -1395,8 +1761,10 @@
       beep(520 + step * 140, 0.1);
       if (state.leverOrder.length === 3) {
         state.leversDone = true;
+        state.finale = true;              // it heard that. it is coming.
         openDoors('S');
         boom();
+        startFinale();
         setObjective();
       }
     } else {
@@ -1421,14 +1789,23 @@
     }
     let t;
     if (!state.powerOn) t = `Find 3 fuses and start the generator (${state.fuses}/3)`;
+    else if (!state.elecOpen) t = state.reacher
+      ? 'Two terminals behind the wire. Bridge them with the Reacher.'
+      : 'Something in here has a long enough arm to reach the terminals.';
     else if (!state.keypadDone) t = 'Find the door code and use the keypad';
     else if (!state.leversDone) t = 'Three levers open the shutter — the order matters';
     else t = 'The shutter is open. GET OUT.';
     $('objText').textContent = t;
+
+    const zone = ZONE_NAMES[zoneOf(Math.floor(player.y))] || '';
+    $('zoneName').textContent = zone;
     $('carry').innerHTML =
       (state.fuses ? `<span class="item">🔌 ${state.fuses}/3</span>` : '') +
+      (state.reacher ? '<span class="item">🦾 Reacher</span>' : '') +
       (state.powerOn ? '<span class="item">⚡ power</span>' : '') +
-      (state.keypadDone ? '<span class="item">🔑 door</span>' : '');
+      (state.elecOpen ? '<span class="item">🔌 circuit</span>' : '') +
+      (state.keypadDone ? '<span class="item">🔑 door</span>' : '') +
+      `<span class="item">📼 ${state.tapes.length}/${TAPES.length}</span>`;
   }
 
   // ============================================================
@@ -1792,11 +2169,29 @@
   }
   function win() {
     running = false;
+    state.finale = false;
     const secs = Math.round((performance.now() - state.started) / 1000);
+    const got = state.tapes.length, all = TAPES.length;
+    let ending;
+    if (got >= all) {
+      ending = `<p class="note">You got every tape. You know what they filled it with,
+        and you know it never wanted to hurt anybody — it was built to sit up all
+        night, and nobody ever came to say goodnight.</p>
+        <p class="note">Behind you, somewhere in the dark, it stops walking.</p>
+        <p class="note" style="color:#f59e0b">— THE WHOLE STORY —</p>`;
+    } else if (got >= all - 2) {
+      ending = `<p class="note">You got out with most of it. Enough to know this
+        wasn't an accident, and that somebody upstairs signed for it.</p>
+        <p class="note">There are still ${all - got} tape${all - got === 1 ? '' : 's'}
+        in there.</p>`;
+    } else {
+      ending = `<p class="note">You got out. You still don't know what the place
+        was making at the end, or why everyone left in one night.</p>
+        <p class="note">You found ${got} of ${all} tapes.</p>`;
+    }
     showResults('YOU GOT OUT',
       `<p class="note">Out in <b>${Math.floor(secs/60)}m ${secs%60}s</b>,
-       caught <b>${state.caught}</b> time${state.caught === 1 ? '' : 's'}.</p>
-       <p class="note">It's still in there.</p>`);
+       caught <b>${state.caught}</b> time${state.caught === 1 ? '' : 's'}.</p>` + ending);
   }
 
   function showResults(title, html) {
@@ -1992,7 +2387,7 @@
   // ============================================================
   //  Menus
   // ============================================================
-  const SCREENS = ['mainMenu', 'howToPanel', 'settingsPanel'];
+  const SCREENS = ['mainMenu', 'howToPanel', 'settingsPanel', 'storyPanel'];
   let stack = ['mainMenu'];
   function showPanel(id) {
     SCREENS.forEach(p => {
@@ -2008,6 +2403,9 @@
 
   $('btnPlay').addEventListener('click', () => startGame(true));
   $('btnEndless').addEventListener('click', () => startEndless());
+  $('btnStory').addEventListener('click', () => goTo('storyPanel'));
+  $('btnStoryGo').addEventListener('click', () => startGame(true));
+  $('btnStoryBack').addEventListener('click', goBack);
   $('btnHowTo').addEventListener('click', () => goTo('howToPanel'));
   $('btnSettings').addEventListener('click', () => goTo('settingsPanel'));
   $('btnHowToBack').addEventListener('click', goBack);
@@ -2198,7 +2596,10 @@
     get state() { return state; }, set state(v) { state = v; },
     updateMonster, updatePlayer, tryMove, fitScreen, kpPress,
     get kpEntry() { return kpEntry; },
-    HEAR_WALK, HEAR_RUN, SEE, SCARE_CFG, sizeScareCanvas, drawScareFace, drawMonster, ambientDread,
+    HEAR_WALK, HEAR_RUN, SEE, SCARE_CFG, sizeScareCanvas,
+    ZONE_NAMES, zoneOf, TAPES, REACH_ARM, noteKeyFor, NOTES, reachableCells, nearbyAction,
+    pickUpTape, showTape, startFinale, win, ZONE_TINT, checkEscape,
+    get running() { return running; }, drawScareFace, drawMonster, ambientDread,
     footstep, roar, screech, panOf, setMode, nearFloor, caught, finishScare, cfg,
     get scareLevel() { return scareLevel; }, set scareLevel(v) { scareLevel = v; },
     get scaring() { return scaring; }, SCARES,

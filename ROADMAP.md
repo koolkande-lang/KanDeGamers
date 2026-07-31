@@ -433,11 +433,12 @@ cancellation — so it now reads "+3 towards texture packs".
 A first-person horror game. You're locked in a toy factory; something is in
 there with you.
 
-**Three puzzles, in order**
+**Four puzzles, in order**
 
 1. **The power** — find 3 fuses, start the generator. Opens the first door.
-2. **The code** — a 4-digit code split across two notes. Opens the second door.
-3. **The shutter** — three levers, and the order matters. A third note has it.
+2. **The circuit** — two terminals behind wire. Needs the Reacher.
+3. **The code** — a 4-digit code split across two notes. Opens the office door.
+4. **The shutter** — three levers, and the order matters. A note has it.
 
 **How it's built**
 
@@ -533,6 +534,82 @@ image files at all, so it loads just as fast.
 > a single lookup instead of a pile of multiplications. That took it from
 > **141ms a frame to 12ms** — about **11× faster**, comfortably smooth. There's
 > now a test that fails if a frame ever creeps back over 40ms.
+
+### 🧸 Round 6 — the factory, the story and the Reacher
+
+The building is now a real place with a real story, told the way toy-factory
+horror games tell it — but with **our own factory, our own monster and our own
+plot**. None of it is borrowed.
+
+> **Why not just copy Poppy Playtime?** Because Huggy Wuggy, Poppy and the
+> GrabPack belong to MOB Games, and this site is going on the public internet
+> under your name. What we've done instead is use the same *ingredients* —
+> abandoned toy factory, mascot horror, collectible tapes, a reaching tool —
+> which is exactly how Poppy Playtime was built on top of the horror games
+> before it.
+>
+> ⚠️ **The Snake skins have the same problem.** Iron Man, Thor, Spider-Man,
+> Hulk, Superman and Ant-Man are Marvel and DC characters. Worth renaming
+> before the site goes live — the abilities can stay exactly as they are.
+
+**The place: Hushabye Toy Co., est. 1961, abandoned 2014.** It made the
+*Hushables* — soft friends who sit up all night so children can sleep. The
+flagship was **WINK**. The slogan was *"Wink never sleeps — so you can."*
+
+**Six floors, and each is locked.** The map went from 25×25 to **33×61**:
+
+| Floor | What's on it | What lets you leave |
+|---|---|---|
+| 1 · Reception | Mascot statues, the visitor tape | *(open)* |
+| 2 · The Sewing Floor | 3 fuses, the generator, WINK | ⚡ power door |
+| 3 · Stuffing & Filling | **The Reacher**, two caged terminals | 🔌 electric door |
+| 4 · The Playtest Room | The door code, the lever order | 🔑 keypad door |
+| 5 · Containment | Three levers | 🚪 the shutter |
+| 6 · The Loading Bay | The way out | — |
+
+Every floor is painted differently — walls, floor and ceiling are tinted per
+zone — so you always know where you are, and the HUD names the floor you're on.
+
+### 🦾 The Reacher
+
+A maintenance claw on a spring wire, found on the stuffing floor. It reaches
+**about four paces** in a straight line and stops at the first solid thing —
+it can't reach through walls. It's how you get at things behind wire: the two
+**power terminals** that open the electric door, and **three of the six tapes**,
+which are locked in cages.
+
+It's genuinely required, not decoration. A test stands the player on **every
+walkable square in the building** and confirms that without the Reacher there is
+nowhere at all you can touch a terminal from. Point at something out of reach
+without it and the game tells you why rather than doing nothing.
+
+### 📼 Six tapes
+
+One on every floor, found in order as you climb. They're the story: what the
+factory made, the night shift that found the machines running by themselves, the
+order to fill the big unit with *"something that stays awake"*, the playtest that
+got the programme cancelled, and the last night.
+
+**The ending changes with how many you found** — all six gets you the whole
+story, and there's a test for each ending.
+
+### 🏃 The final chase
+
+Pulling the third lever puts the shutter up **and tells WINK exactly where you
+are.** It stops wandering, stops losing you, and moves 1.35× faster. The run to
+the loading bay is the last thing you do.
+
+> ⚠️ **A bug the tests caught before you played it.** Notes used to be picked by
+> a hash of their position. When the Reacher's instruction card was added to the
+> same list, that maths could hand you the same note twice — and **never show
+> you the door code at all**, making the game impossible to finish. Notes are
+> now handed out in reading order, and a test checks that the two halves of the
+> code always appear on floors you reach *before* the door that needs them.
+
+**A full playthrough now runs as a test.** It walks from the front door to the
+loading bay doing every puzzle in order — 3 fuses, the generator, the Reacher,
+both terminals, the keypad, three levers in the right order, all six tapes, and
+out. 21 checks, and it fails if any single stage becomes unreachable.
 
 ### 👹 Round 5 — the monster
 
@@ -917,7 +994,7 @@ drag-to-look on a tablet.
 
 ## ⚠️ What still needs doing
 
-**Upload it, then play it with real people.** All **19 test suites — 951 checks
+**Upload it, then play it with real people.** All **20 test suites — 1,027 checks
 — pass**, but no human has actually played any of this yet. Things worth
 watching for:
 
