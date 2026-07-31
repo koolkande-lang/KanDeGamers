@@ -570,6 +570,53 @@ flagship was **WINK**. The slogan was *"Wink never sleeps — so you can."*
 Every floor is painted differently — walls, floor and ceiling are tinted per
 zone — so you always know where you are, and the HUD names the floor you're on.
 
+### 📺 Round 7 — nothing floats any more, and the tapes have somewhere to play
+
+**The floating was a real bug, and it affected everything.** A wall one square
+away fills the screen from `cy - size/2` to `cy + size/2`, so the floor line
+sits at `cy + size/2`. Every object was being drawn between `cy + size*0.14` and
+`cy + size*0.34` — which put the fuses, notes, tapes and the generator hovering
+at about knee height in mid-air. The monster's feet were off too.
+
+Everything now sits on the floor line, with a **contact shadow** underneath so it
+reads as resting on something. There's a test that draws each object at three
+distances and checks its lowest pixel actually reaches the floor.
+
+**Anything bolted to a building is now part of the wall.** The generator, the
+keypad, the levers and the televisions used to be flat billboards that turned to
+face you — which is why the generator looked like it was floating. They're now
+**solid cells with their own wall textures**, set into a niche with one open
+face you stand at. A billboard can float; a wall cannot.
+
+The map was regenerated to place them properly: 11 wall fixtures, each verified
+to have a face you can reach at the right stage of the game.
+
+**The objects were redrawn properly:**
+
+| | Before | Now |
+|---|---|---|
+| Fuse | two grey rectangles | ceramic cartridge, brass end caps, printed rating band, catches the torchlight |
+| Note | one pale rectangle | a printed card lying at an angle, curled edge, lines of type, a red stamp |
+| Tape | three rectangles | a video cassette — shell, handwritten paper label, window with two reels of tape visible |
+| Reacher | a line and a triangle | a claw resting on its coiled cable, two jaws |
+| Generator | a floating grey box | a cabinet set into the wall: louvred vents, a gauge with a needle, a red switch, a warning lamp, bolts |
+| Keypad | a floating slab | a steel plate in the wall with a lit display and twelve buttons |
+| Lever | two rectangles | a slot in a steel plate with the handle standing in it |
+
+### 📼 Televisions
+
+**Six television sets, one on every floor**, each with a video player slung
+underneath and static on the screen.
+
+The tape flow changed to match. Picking a tape up now only **puts it in your
+bag** — a prompt tells you to find a set. To actually watch it you walk to a
+television and put it in. It plays the earliest tape you're carrying that you
+haven't seen, so the story still unfolds in order.
+
+That's a deliberate piece of horror design: watching a tape means **standing
+still in the dark with the sound up**, which is exactly when WINK finds you.
+The ending now counts what you **watched**, not what you picked up.
+
 ### 🦾 The Reacher
 
 A maintenance claw on a spring wire, found on the stuffing floor. It reaches
@@ -994,7 +1041,7 @@ drag-to-look on a tablet.
 
 ## ⚠️ What still needs doing
 
-**Upload it, then play it with real people.** All **20 test suites — 1,027 checks
+**Upload it, then play it with real people.** All **20 test suites — 1,099 checks
 — pass**, but no human has actually played any of this yet. Things worth
 watching for:
 

@@ -203,6 +203,10 @@
     font-family:'Courier New',monospace;font-size:clamp(.75rem,1.9vh,.95rem);line-height:1.7;
     box-shadow:0 20px 60px rgba(0,0,0,.8);transform:rotate(-1deg);
   }
+  .tvbar{
+    background:#141210;border-left:3px solid var(--amber);color:var(--amber);
+    font-size:.66rem;letter-spacing:.14em;padding:5px 9px;margin:0 0 12px;
+  }
   #noteBox h3{margin:0 0 10px;font-size:1em;letter-spacing:.1em;text-transform:uppercase}
   .hidden{display:none !important}
 </style>
@@ -255,9 +259,13 @@
       </p>
       <p class="lbl">The tapes</p>
       <p class="note" style="text-align:left">
-        There are <b>six cassette tapes</b>, one on every floor. They tell you
-        what this place made, and why everybody left in one night. You can get
-        out without them — but you won't know what happened.
+        There are <b>six video tapes</b>, one on every floor. Picking one up only
+        puts it in your bag — to watch it you have to find a <b>television</b>,
+        and there is one on every floor too.<br><br>
+        That means standing still in the dark with the sound up. Which is
+        exactly when it finds you.<br><br>
+        You can get out without watching any of them — but you won't know what
+        happened here.
       </p>
       <button class="ghost" id="btnHowToBack">◀ BACK</button>
     </div>
@@ -352,9 +360,12 @@
   //  I  mascot statue     +  power door       E  electric door
   //  K  keypad door       S  shutter          X  way out
   //  @  you               M  WINK             f  fuse
-  //  n  note              G  generator        P  keypad panel
-  //  L  lever             T  tape             U  tape locked in a cage
-  //  s  power terminal, behind wire — only the Reacher gets to these
+  //  n  note              T  tape             R  the Reacher
+  //
+  //  Set into a wall, so nothing is ever left standing in mid-air:
+  //  G  generator         P  keypad panel     L  lever
+  //  V  television + video player
+  //  s  power terminal behind wire, U  tape in a cage — Reacher only
   //
   //  Six floors of the Hushabye Toy Co., stacked up the building. Each floor
   //  is a perfect maze so everything inside it is guaranteed reachable, and
@@ -362,65 +373,65 @@
   //  mapgen.js rather than drawn by hand — the hand-drawn one was unplayable.
   const MAP_SRC = [
     '#################################',
-    '#...#.....#.........#.....#.....#',
-    '##..#.###.#.##..#..##.###.#..##.#',
-    '#.#.....#.....#.#.#.....#.....#.#',
-    '#.#####.#####.#.###.###########@#',
-    '#.....#...#...#.......#....I#...#',
-    '#.#.#####.#.#########.#.###.#.#.#',
-    '#.#.#.....#.#......I#.#...#.#.#.#',
-    '#.###.#.#.###.#####.#####.#.#...#',
-    '#.....#.......#...........#T..#.#',
-    '####.############################',
-    '#.#.......#f..#...#.....#.......#',
-    '#.#.#####.#.#.#.###.#...###.###.#',
-    '#.#...#.#f#.#.#.....#.#.M..n#.#.#',
-    '#.#.#.#.#.#.#.#####.#.####.##.#.#',
-    '#.#.#.#...#.#.....#.#.#.......#.#',
-    '#.###.#.#.#.#.###..##.#.###.###.#',
-    '#...#..T#.......#.#...#...#.....#',
-    '###.###.#.#####.#.#.#####.#######',
-    '#.......#G......#...#...f.......#',
-    '###################+#############',
-    '#..T..#.........#.........#.....#',
-    '#####.#.#.#####.#.#####.#.###.#.#',
-    '#...#.#.#.....#.#...#...#...#.#.#',
-    '#.##s.#.#####.#.####..#####.#.#.#',
-    '#...#.#.#.....#R......#...#.#.#.#',
-    '###.#.#.#.#.#.s########.#.#.#.###',
-    '#...#.#.#.#.#.#.....#...#.#.#...#',
-    '#.###.#.#.#.#.#.#####.###...###.#',
-    '#.........#...#.........#.......#',
-    '#####################E###########',
-    '#.#.........#.....P.......#.....#',
-    '#.#.#.####..#####.#####.#.#n#.###',
-    '#.#.#.....#.....#.#.....#.#.#...#',
-    '#..##.#.#.##U##.#.#.#####.#n###.#',
-    '#.......#...#...#.#.#.#...#...#.#',
-    '#.#.###.###.#.#####.#.#.#######.#',
-    '#...#.......#.......#...#.....#.#',
-    '#####.#####.#########.###.###.#.#',
-    '#.........#...............#.....#',
-    '#K###############################',
-    '#.....#.......#...#.......#.....#',
-    '####..#..##.#.#.###.###.#.##..#.#',
-    '#...#.#...#.#.#.....#...#...#.#.#',
-    '#.###.#####.#.#######.#####.#.#.#',
-    '#...#.......#.......#.#...#...#.#',
-    '#.#.###############.#.#.#.#.#.#.#',
-    '#.#...#.L.........#...#.#.#.#...#',
-    '#.###.#.#.########U##.#.#.#L###.#',
-    '#...#..I#.............L.#.......#',
+    '#...........#...........#.......#',
+    '########.##.###.###.###.#.#####.#',
+    '#.....#...#...#...#...#.#.#...#.#',
+    '#.###.#.#.###.#.###.#.#.#.#.#.#.#',
+    '#...#...#.....#.#.....#.#...#.#.#',
+    '###.I############.#####.V###I##.#',
+    '#.#.#.T...........#.....#.......#',
+    '#.#.###.#######.###.#####..####.#',
+    '#.......#.@.....................#',
+    '###.#############################',
+    '#.......#.#.......#.....#.......#',
+    '#######.#.#.#.###.#.#.##..#####.#',
+    '#.....#.#...#...#...#.........#.#',
+    '#.#.###.#.#####.####G#########V.#',
+    '#f#.....#f....#...#..M....#...#.#',
+    '#.########....###.#.#####.#.#.#.#',
+    '#.#........T#.....#.#...#...#...#',
+    '#.###.#####.#######.#.#.###.#.#.#',
+    '#.....#.....f.......#.#.....n...#',
+    '############################+####',
+    '#.#..R............#.......#.....#',
+    '#.###.#######.###.#####.#.#####.#',
+    '#...#...#...#...#T......#.......#',
+    '###.#.###.#.###.V###.#s########.#',
+    '#.#.#.....#.....#.....#...#...#.#',
+    '#.#.#.#############.#.#.#.#.#.#.#',
+    '#.#...#...#.........#...#.#.#...#',
+    '#.#####.###.#####.#.####s#..#####',
+    '#...............#...............#',
+    '#######################E#########',
+    '#...#...#.......#.#.........#...#',
+    '###.#.#.#.#####.#.#.###.###.###.#',
+    '#.#...#...#.....#.....#.#.......#',
+    '#.####V###U.###.##P##.#.#########',
+    '#.........#...#...#..n..........#',
+    '#.#######..##.#.#.#############.#',
+    '#.......#...#...#...............#',
+    '#.#####.################..##.##.#',
+    '#.....#.........n...............#',
+    '#########K#######################',
+    '#.#.....#.........#.....#.......#',
+    '#.#.###.#.#.###.#.#.###.#.#.##..#',
+    '#.#.#...#.#.....#.....#...#.#...#',
+    '#.#.#.###.##L#######U#V##.#.#.###',
+    '#...#.#.....#.......#...#.#.#...#',
+    '#####.##I##.#.#####.#.#.##L.#####',
+    '#.......#...#.#...#...#...#.....#',
+    '#.#####.#####.#.#.####L##..####.#',
+    '#.............#.#...............#',
     '#############################S###',
-    '#.#...#...#.....#...#...#...#...#',
-    '#.#.#.#.#...#.#.#.#X#.#.#.#.###.#',
-    '#...#.#.#...#.#...#.#.#...#.#...#',
-    '#####.#.#####.####U.#.#####.#.###',
-    '#...#.#.#...#.....#.#...#...#...#',
-    '#.###.#.#.#.#####.#.#.#.##..###.#',
-    '#.....#...#...#...#...#...#...#.#',
-    '#.#############.###.#####.##..#.#',
-    '#...............#.........#.....#',
+    '#.......#.........#.............#',
+    '#######.#.#####.###.####U##.#####',
+    '#.......#.....#.#...#...#.#.....#',
+    '#.#######.###.###.#.#.#.#.##.##.#',
+    '#...........#.........#.....#...#',
+    '#######.####.#####.##.V####.#.###',
+    '#.....#.......#.....#.#...#.#...#',
+    '#.#####X#.###.#.###.###...##.##.#',
+    '#.........#.....#.......#.......#',
     '#################################'
   ];
 
@@ -434,7 +445,7 @@
   const H = MAP_SRC.length, W = MAP_SRC[0].length;
   const grid = MAP_SRC.map(r => r.split(''));
 
-  const SOLID = new Set(['#', '+', 'E', 'K', 'S', 'I', 's', 'U']);
+  const SOLID = new Set(['#', '+', 'E', 'K', 'S', 'I', 's', 'U', 'G', 'P', 'L', 'V']);
 
   // ============================================================
   //  The world — a fixed building, or an endless one
@@ -647,7 +658,7 @@
       reacher: false,            // have you found it yet
       sockets: {},               // which power terminals you've bridged
       elecOpen: false,
-      tapes: [], tapesSeen: {},  // the story you've pieced together
+      tapes: [], tapesSeen: {}, tapesPlayed: [],   // carried, and watched
       finale: false              // the shutter is up and it knows
     };
   }
@@ -887,6 +898,81 @@
     }
     textures['I'] = stat;
 
+    // ---- wall fixtures. These are drawn INTO the wall face, which is what
+    // stops them floating in mid-air the way a billboard sprite does. ----
+    const panel = (base, draw) => {
+      const t = new Uint32Array(TEX * TEX);
+      for (let y = 0; y < TEX; y++) for (let x = 0; x < TEX; x++) {
+        const n = noise(x, y, base) * 0.4;
+        const v = 40 + n * 26;
+        t[y * TEX + x] = rgb((v * 0.95) | 0, (v * 0.93) | 0, (v * 0.9) | 0);
+      }
+      const px = (x, y, c) => { if (x >= 0 && y >= 0 && x < TEX && y < TEX) t[y * TEX + x] = c; };
+      const box = (x0, y0, w, h, c) => {
+        for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) px(x, y, c);
+      };
+      draw(px, box);
+      return t;
+    };
+
+    // the generator: a heavy grey cabinet with louvred vents, a dial and a lamp
+    textures['G'] = panel(51, (px, box) => {
+      box(6, 8, 52, 50, rgb(62, 66, 68));            // cabinet
+      box(6, 8, 52, 3, rgb(88, 92, 94));             // top lip
+      for (let i = 0; i < 7; i++)                    // vent louvres
+        box(11, 15 + i * 4, 20, 2, rgb(30, 32, 34));
+      box(36, 16, 18, 16, rgb(34, 36, 38));          // gauge recess
+      box(38, 18, 14, 12, rgb(140, 150, 120));       // gauge face
+      box(44, 20, 1, 8, rgb(30, 20, 20));            // needle
+      box(36, 38, 18, 14, rgb(40, 42, 44));          // switch plate
+      box(40, 42, 10, 6, rgb(150, 60, 40));          // big red switch
+      box(12, 44, 8, 8, rgb(70, 60, 30));            // lamp housing
+      box(14, 46, 4, 4, rgb(210, 170, 60));          // lamp
+      for (let i = 0; i < 4; i++) {                  // bolts holding it on
+        box(8, 10 + i * 15, 2, 2, rgb(120, 122, 120));
+        box(54, 10 + i * 15, 2, 2, rgb(120, 122, 120));
+      }
+    });
+
+    // the keypad: a small steel plate with a lit display and buttons
+    textures['P'] = panel(52, (px, box) => {
+      box(20, 16, 24, 34, rgb(58, 60, 62));
+      box(20, 16, 24, 2, rgb(88, 90, 92));
+      box(23, 19, 18, 7, rgb(24, 30, 24));           // display
+      box(25, 21, 14, 3, rgb(120, 200, 120));
+      for (let r = 0; r < 4; r++) for (let c = 0; c < 3; c++)
+        box(24 + c * 6, 29 + r * 5, 4, 3, rgb(96, 98, 100));
+    });
+
+    // a lever: a slot in a steel plate with the handle standing in it
+    textures['L'] = panel(53, (px, box) => {
+      box(22, 18, 20, 32, rgb(56, 58, 60));
+      box(30, 22, 4, 24, rgb(26, 28, 30));           // slot
+      box(29, 24, 6, 4, rgb(150, 152, 150));         // handle shaft
+      box(27, 20, 10, 5, rgb(190, 70, 45));          // red grip
+      box(24, 20, 2, 2, rgb(120, 122, 120));
+      box(38, 20, 2, 2, rgb(120, 122, 120));
+    });
+
+    // a television on a bracket, with the video player slung under it
+    textures['V'] = panel(54, (px, box) => {
+      box(10, 10, 44, 34, rgb(46, 44, 42));          // set
+      box(10, 10, 44, 2, rgb(74, 72, 70));
+      box(14, 14, 36, 25, rgb(20, 24, 26));          // screen recess
+      for (let y = 15; y < 38; y++) for (let x = 15; x < 49; x++) {
+        // static — different every pixel, so it reads as a live screen
+        const v = 60 + ((x * 37 + y * 91) % 90);
+        px(x, y, rgb(v, v, v + 6));
+      }
+      for (let y = 16; y < 38; y += 3)               // scan lines
+        for (let x = 15; x < 49; x++) px(x, y, rgb(30, 32, 36));
+      box(12, 46, 40, 12, rgb(38, 36, 34));          // the video player
+      box(18, 50, 22, 3, rgb(16, 16, 16));           // tape slot
+      box(44, 50, 3, 3, rgb(200, 70, 50));           // record light
+      box(8, 44, 4, 4, rgb(110, 108, 104));          // wall bracket
+      box(52, 44, 4, 4, rgb(110, 108, 104));
+    });
+
     // Each floor of the factory is painted differently, so you always know
     // roughly where you are. Built by tinting the same brick.
     ZONE_TINT.forEach((t, i) => {
@@ -1063,8 +1149,9 @@
   }
 
   // Everything that isn't a wall is drawn as a flat billboard facing you.
-  const SPRITE_OF = { f: 'fuse', n: 'note', G: 'gen', P: 'pad', L: 'lever', X: 'exit',
-                      T: 'tape', R: 'reacher' };
+  // Only loose things lying on the floor get a sprite; anything bolted to a
+  // wall is drawn as part of the wall, which is why it can no longer float.
+  const SPRITE_OF = { f: 'fuse', n: 'note', X: 'exit', T: 'tape', R: 'reacher' };
   function spriteList() {
     // Only what's near enough to see — the endless world has no end to scan.
     const out = cellsNear(player.x, player.y, 22, c => SPRITE_OF[c])
@@ -1098,64 +1185,136 @@
   function drawSprite(kind, cx, size, shade, now) {
     const cy = horizonY || RH / 2;
     const S = (v) => size * v;
+    // A wall one square away fills the screen from cy-size/2 to cy+size/2, so
+    // the FLOOR is at cy + size/2. Everything used to be drawn around
+    // cy + size*0.2, which is why it all hovered at knee height in mid-air.
+    const ground = cy + S(0.5);
+    const C = (r, g, b) => `rgb(${r*shade|0},${g*shade|0},${b*shade|0})`;
+
+    // a soft contact shadow, so it is sitting on something
+    const shadow = (w) => {
+      ctx.save();
+      ctx.globalAlpha = 0.5 * Math.min(1, shade * 2);
+      ctx.fillStyle = '#000';
+      ctx.beginPath();
+      ctx.ellipse(cx, ground, w, w * 0.28, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    };
+
     ctx.save();
     if (kind === 'fuse') {
-      ctx.fillStyle = `rgb(${230*shade|0},${170*shade|0},${40*shade|0})`;
-      ctx.fillRect(cx - S(.06), cy + S(.18), S(.12), S(.16));
-      ctx.fillStyle = `rgb(${90*shade|0},${70*shade|0},${50*shade|0})`;
-      ctx.fillRect(cx - S(.03), cy + S(.14), S(.06), S(.05));
+      // a ceramic cartridge fuse: white barrel, brass caps, printed band
+      shadow(S(.075));
+      const w = S(.135), h = S(.052), x0 = cx - w / 2, y0 = ground - h;
+      ctx.fillStyle = C(198, 186, 162);                       // ceramic body
+      ctx.fillRect(x0 + w * 0.16, y0, w * 0.68, h);
+      ctx.fillStyle = C(216, 206, 186);                       // highlight
+      ctx.fillRect(x0 + w * 0.16, y0, w * 0.68, h * 0.3);
+      ctx.fillStyle = C(176, 138, 58);                        // brass end caps
+      ctx.fillRect(x0, y0 - h * 0.06, w * 0.18, h * 1.12);
+      ctx.fillRect(x0 + w * 0.82, y0 - h * 0.06, w * 0.18, h * 1.12);
+      ctx.fillStyle = C(120, 40, 34);                         // rating band
+      ctx.fillRect(x0 + w * 0.44, y0, w * 0.09, h);
+      // it catches the torchlight, so you can spot one across a room
+      ctx.fillStyle = `rgba(255,225,150,${0.18 * shade})`;
+      ctx.fillRect(x0 + w * 0.16, y0 + h * 0.1, w * 0.68, h * 0.14);
+
     } else if (kind === 'note') {
-      ctx.fillStyle = `rgb(${225*shade|0},${215*shade|0},${190*shade|0})`;
-      ctx.fillRect(cx - S(.07), cy + S(.16), S(.14), S(.18));
-    } else if (kind === 'gen') {
-      ctx.fillStyle = `rgb(${70*shade|0},${75*shade|0},${80*shade|0})`;
-      ctx.fillRect(cx - S(.22), cy - S(.1), S(.44), S(.55));
-      ctx.fillStyle = state.powerOn
-        ? `rgb(${60*shade|0},${220*shade|0},${90*shade|0})`
-        : `rgb(${200*shade|0},${50*shade|0},${40*shade|0})`;
-      ctx.fillRect(cx - S(.06), cy - S(.02), S(.12), S(.08));
-    } else if (kind === 'pad') {
-      ctx.fillStyle = `rgb(${55*shade|0},${55*shade|0},${60*shade|0})`;
-      ctx.fillRect(cx - S(.13), cy - S(.08), S(.26), S(.34));
-      ctx.fillStyle = state.keypadDone
-        ? `rgb(${60*shade|0},${220*shade|0},${90*shade|0})`
-        : `rgb(${240*shade|0},${180*shade|0},${40*shade|0})`;
-      ctx.fillRect(cx - S(.08), cy - S(.04), S(.16), S(.09));
-    } else if (kind === 'lever') {
-      ctx.fillStyle = `rgb(${80*shade|0},${70*shade|0},${65*shade|0})`;
-      ctx.fillRect(cx - S(.05), cy + S(.05), S(.1), S(.3));
-      ctx.fillStyle = `rgb(${210*shade|0},${60*shade|0},${40*shade|0})`;
-      ctx.fillRect(cx - S(.08), cy + S(.02), S(.16), S(.07));
+      // a printed card, curled, leaning against the floor
+      shadow(S(.07));
+      const w = S(.13), h = S(.17);
+      ctx.save();
+      ctx.translate(cx, ground);
+      ctx.rotate(-0.12);
+      ctx.fillStyle = C(38, 34, 30);
+      ctx.fillRect(-w / 2 + S(.008), -h + S(.006), w, h);     // its own shadow
+      ctx.fillStyle = C(226, 218, 196);                       // paper
+      ctx.fillRect(-w / 2, -h, w, h);
+      ctx.fillStyle = C(202, 192, 168);                       // curled edge
+      ctx.fillRect(w / 2 - w * 0.13, -h, w * 0.13, h);
+      ctx.fillStyle = C(96, 88, 76);                          // lines of type
+      for (let i = 0; i < 5; i++)
+        ctx.fillRect(-w * 0.34, -h + h * (0.18 + i * 0.14), w * (i === 4 ? 0.36 : 0.68), h * 0.045);
+      ctx.fillStyle = C(150, 60, 40);                         // a red stamp
+      ctx.fillRect(-w * 0.34, -h + h * 0.06, w * 0.30, h * 0.06);
+      ctx.restore();
+
+    } else if (kind === 'tape') {
+      // a video cassette lying flat: label, window, two reels of tape
+      shadow(S(.10));
+      const w = S(.20), h = S(.115), x0 = cx - w / 2, y0 = ground - h;
+      ctx.fillStyle = C(26, 24, 24);                          // shell
+      ctx.fillRect(x0, y0, w, h);
+      ctx.fillStyle = C(44, 41, 40);                          // top bevel
+      ctx.fillRect(x0, y0, w, h * 0.12);
+      ctx.fillStyle = C(214, 205, 178);                       // paper label
+      ctx.fillRect(x0 + w * 0.07, y0 + h * 0.16, w * 0.86, h * 0.34);
+      ctx.fillStyle = C(120, 110, 96);                        // handwriting
+      ctx.fillRect(x0 + w * 0.12, y0 + h * 0.24, w * 0.58, h * 0.07);
+      ctx.fillRect(x0 + w * 0.12, y0 + h * 0.36, w * 0.40, h * 0.07);
+      ctx.fillStyle = C(16, 15, 15);                          // window
+      ctx.fillRect(x0 + w * 0.14, y0 + h * 0.58, w * 0.72, h * 0.30);
+      ctx.fillStyle = C(58, 46, 38);                          // spooled tape
+      ctx.beginPath();
+      ctx.ellipse(x0 + w * 0.30, y0 + h * 0.73, w * 0.10, h * 0.11, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(x0 + w * 0.70, y0 + h * 0.73, w * 0.10, h * 0.11, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = C(190, 150, 60);                        // spine stripe
+      ctx.fillRect(x0, y0 + h * 0.90, w, h * 0.10);
+
+    } else if (kind === 'reacher') {
+      // the claw, resting on its coiled wire
+      shadow(S(.10));
+      const y0 = ground;
+      ctx.strokeStyle = C(120, 116, 104);                     // coiled cable
+      ctx.lineWidth = Math.max(1, S(.016));
+      ctx.beginPath();
+      for (let i = 0; i <= 16; i++) {
+        const t = i / 16;
+        const x = cx - S(.13) + t * S(.16);
+        const y = y0 - S(.012) - Math.abs(Math.sin(t * Math.PI * 3)) * S(.028);
+        i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+      }
+      ctx.stroke();
+      ctx.fillStyle = C(52, 50, 48);                          // handle
+      ctx.fillRect(cx - S(.02), y0 - S(.055), S(.10), S(.038));
+      ctx.fillStyle = C(196, 158, 56);                        // the two jaws
+      ctx.beginPath();
+      ctx.moveTo(cx + S(.08), y0 - S(.050));
+      ctx.lineTo(cx + S(.155), y0 - S(.082));
+      ctx.lineTo(cx + S(.150), y0 - S(.062));
+      ctx.lineTo(cx + S(.085), y0 - S(.036));
+      ctx.closePath(); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(cx + S(.08), y0 - S(.020));
+      ctx.lineTo(cx + S(.155), y0 + S(.002));
+      ctx.lineTo(cx + S(.150), y0 - S(.018));
+      ctx.lineTo(cx + S(.085), y0 - S(.034));
+      ctx.closePath(); ctx.fill();
+
     } else if (kind === 'exit') {
       // a lit doorway — the only green thing in the building
-      ctx.fillStyle = `rgb(${40*shade|0},${200*shade|0},${90*shade|0})`;
-      ctx.fillRect(cx - S(.16), cy - S(.30), S(.32), S(.62));
-      ctx.fillStyle = `rgb(${220*shade|0},${255*shade|0},${230*shade|0})`;
-      ctx.fillRect(cx - S(.10), cy - S(.22), S(.20), S(.10));
-    } else if (kind === 'tape') {
-      // a cassette: dark shell, two pale reels
-      ctx.fillStyle = `rgb(${40*shade|0},${34*shade|0},${32*shade|0})`;
-      ctx.fillRect(cx - S(.09), cy + S(.20), S(.18), S(.12));
-      ctx.fillStyle = `rgb(${205*shade|0},${190*shade|0},${150*shade|0})`;
-      ctx.fillRect(cx - S(.055), cy + S(.235), S(.04), S(.05));
-      ctx.fillRect(cx + S(.015), cy + S(.235), S(.04), S(.05));
-      ctx.fillStyle = `rgb(${190*shade|0},${140*shade|0},${50*shade|0})`;
-      ctx.fillRect(cx - S(.09), cy + S(.20), S(.18), S(.018));
-    } else if (kind === 'reacher') {
-      // a claw on a coiled wire
-      ctx.strokeStyle = `rgb(${150*shade|0},${140*shade|0},${120*shade|0})`;
-      ctx.lineWidth = Math.max(1, S(.022));
+      const w = S(.34), h = S(.72);
+      ctx.fillStyle = C(18, 40, 24);
+      ctx.fillRect(cx - w / 2, ground - h, w, h);
+      ctx.fillStyle = `rgb(${40*shade|0},${205*shade|0},${95*shade|0})`;
+      ctx.fillRect(cx - w / 2, ground - h, w, h * 0.10);
+      ctx.fillRect(cx - w / 2, ground - h, w * 0.10, h);
+      ctx.fillRect(cx + w / 2 - w * 0.10, ground - h, w * 0.10, h);
+      ctx.fillStyle = `rgb(${210*shade|0},${255*shade|0},${225*shade|0})`;
+      ctx.fillRect(cx - w * 0.24, ground - h * 0.86, w * 0.48, h * 0.13);
+      // light spilling onto the floor
+      ctx.save();
+      ctx.globalAlpha = 0.30 * shade;
+      ctx.fillStyle = '#5bf59b';
       ctx.beginPath();
-      ctx.moveTo(cx - S(.10), cy + S(.32));
-      ctx.lineTo(cx + S(.06), cy + S(.22));
-      ctx.stroke();
-      ctx.fillStyle = `rgb(${200*shade|0},${170*shade|0},${70*shade|0})`;
-      ctx.beginPath();
-      ctx.moveTo(cx + S(.04), cy + S(.24));
-      ctx.lineTo(cx + S(.13), cy + S(.18));
-      ctx.lineTo(cx + S(.13), cy + S(.30));
-      ctx.closePath();
+      ctx.ellipse(cx, ground, w * 0.7, w * 0.20, 0, 0, Math.PI * 2);
       ctx.fill();
+      ctx.restore();
+
     } else if (kind === 'monster') {
       drawMonster(cx, cy, size, shade, now);
     }
@@ -1210,9 +1369,11 @@
     const bob = Math.abs(Math.cos(p)) * S(0.02) * gait;
     const lean = (m.mode === 'hunt' ? 0.10 : 0.02) + m.lunge * 0.16;
 
-    const hipY  = cy + S(0.30) - bob;
-    const shldY = cy - S(0.26) - bob;
-    const headY = cy - S(0.44) - bob;
+    // the floor is at cy + size/2; stand it ON that, not floating above it
+    const gy = cy + S(0.50);
+    const hipY  = gy - S(0.30) - bob;      // legs are 0.30 long, so feet land on gy
+    const shldY = gy - S(0.86) - bob;
+    const headY = gy - S(1.04) - bob;
 
     ctx.save();
 
@@ -1220,7 +1381,7 @@
     ctx.globalAlpha = 0.45 * Math.min(1, shade * 2);
     ctx.fillStyle = '#000';
     ctx.beginPath();
-    ctx.ellipse(cx, cy + S(0.55), S(0.26), S(0.06), 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, gy, S(0.26), S(0.06), 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalAlpha = 1;
 
@@ -1593,7 +1754,7 @@
   }
 
   const ACTIONS = { f: 'fuse', n: 'note', G: 'gen', P: 'pad', L: 'lever',
-                    T: 'tape', R: 'reacher' };
+                    T: 'tape', R: 'reacher', V: 'tv' };
   const ARM_ONLY = { s: 'socket', U: 'cage' };
 
   function nearbyAction() {
@@ -1683,6 +1844,9 @@
         flashPrompt(`Needs 3 fuses — you have ${state.fuses}`);
       }
 
+    } else if (a.kind === 'tv') {
+      useTV();
+
     } else if (a.kind === 'pad') {
       if (state.keypadDone) return;
       openKeypad();
@@ -1706,16 +1870,34 @@
     return NOTE_ORDER[i] || NOTE_ORDER[NOTE_ORDER.length - 1];
   }
 
-  // Tapes are the story. Picking one up plays it straight away.
+  // ------------------------------------------------------------
+  //  Tapes and televisions
+  //
+  //  Picking a tape up puts it in your bag. To actually watch it you have to
+  //  find a working set — there is one on every floor — and put the tape in.
+  //  That means standing still in the dark for a minute with the sound up,
+  //  which is exactly when it finds you.
+  // ------------------------------------------------------------
   function pickUpTape(c) {
     const key = c.x + ',' + c.y;
     if (state.tapesSeen[key]) return;
     state.tapesSeen[key] = true;
-    // which tape this is: the floor it was found on
     const idx = Math.min(TAPES.length - 1, zoneOf(c.y));
     setCell(c.x, c.y, '.');
     if (!state.tapes.includes(idx)) state.tapes.push(idx);
     beep(440, 0.09); setTimeout(() => beep(660, 0.13), 100);
+    flashPrompt(`Tape ${idx + 1} — find a television to play it`);
+    setObjective();
+  }
+
+  // Use a TV: play the first tape you're carrying that you haven't watched.
+  function useTV() {
+    const unwatched = state.tapes.filter(i => !state.tapesPlayed.includes(i));
+    if (!state.tapes.length) { flashPrompt('The set hums. You have no tape to put in.'); return; }
+    if (!unwatched.length) { flashPrompt("You've watched everything you're carrying."); return; }
+    const idx = unwatched.sort((a, b) => a - b)[0];
+    state.tapesPlayed.push(idx);
+    tvClunk();
     showTape(idx);
     setObjective();
   }
@@ -1726,9 +1908,34 @@
     running = false;
     $('noteTitle').textContent = t.title;
     $('noteText').innerHTML =
-      `<p class="note" style="color:#8a7358;margin:0 0 10px">${t.who}</p>${t.body}` +
-      `<p class="note" style="color:#6b5844;margin-top:14px">tape ${state.tapes.length} of ${TAPES.length}</p>`;
+      `<div class="tvbar">▶ PLAYING &nbsp;·&nbsp; ${t.who}</div>${t.body}` +
+      `<p class="note" style="color:#6b5844;margin-top:14px">` +
+      `watched ${state.tapesPlayed.length} of ${TAPES.length} &nbsp;·&nbsp; ` +
+      `carrying ${state.tapes.length}</p>`;
     $('noteView').classList.add('on');
+  }
+
+  // the clunk of a tape going in and the deck spinning up
+  function tvClunk() {
+    const a = audio(); if (!a) return;
+    const t = a.currentTime;
+    const src = noise(a), f = a.createBiquadFilter();
+    f.type = 'lowpass'; f.frequency.value = 500;
+    src.connect(f);
+    const g = a.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.14, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+    f.connect(g); g.connect(a.destination);
+    src.start(t); src.stop(t + 0.4);
+    const o = a.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(70, t);
+    o.frequency.exponentialRampToValueAtTime(150, t + 0.5);
+    const g2 = a.createGain();
+    g2.gain.setValueAtTime(0.05, t);
+    g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
+    o.connect(g2); g2.connect(a.destination);
+    o.start(t); o.stop(t + 0.6);
   }
 
   // the little clunk of the arm going out and coming back
@@ -1805,7 +2012,9 @@
       (state.powerOn ? '<span class="item">⚡ power</span>' : '') +
       (state.elecOpen ? '<span class="item">🔌 circuit</span>' : '') +
       (state.keypadDone ? '<span class="item">🔑 door</span>' : '') +
-      `<span class="item">📼 ${state.tapes.length}/${TAPES.length}</span>`;
+      `<span class="item">📼 ${state.tapesPlayed.length}/${TAPES.length}</span>` +
+      (state.tapes.length > state.tapesPlayed.length
+        ? `<span class="item">🎞️ ${state.tapes.length - state.tapesPlayed.length} to watch</span>` : '');
   }
 
   // ============================================================
@@ -2171,7 +2380,7 @@
     running = false;
     state.finale = false;
     const secs = Math.round((performance.now() - state.started) / 1000);
-    const got = state.tapes.length, all = TAPES.length;
+    const got = state.tapesPlayed.length, all = TAPES.length;
     let ending;
     if (got >= all) {
       ending = `<p class="note">You got every tape. You know what they filled it with,
@@ -2597,8 +2806,9 @@
     updateMonster, updatePlayer, tryMove, fitScreen, kpPress,
     get kpEntry() { return kpEntry; },
     HEAR_WALK, HEAR_RUN, SEE, SCARE_CFG, sizeScareCanvas,
-    ZONE_NAMES, zoneOf, TAPES, REACH_ARM, noteKeyFor, NOTES, reachableCells, nearbyAction,
-    pickUpTape, showTape, startFinale, win, ZONE_TINT, checkEscape,
+    ZONE_NAMES, zoneOf, TAPES, REACH_ARM, noteKeyFor, NOTES, SPRITE_OF, ACTIONS,
+    drawSprite, reachableCells, nearbyAction,
+    pickUpTape, showTape, useTV, startFinale, win, ZONE_TINT, checkEscape,
     get running() { return running; }, drawScareFace, drawMonster, ambientDread,
     footstep, roar, screech, panOf, setMode, nearFloor, caught, finishScare, cfg,
     get scareLevel() { return scareLevel; }, set scareLevel(v) { scareLevel = v; },
