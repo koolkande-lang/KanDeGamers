@@ -570,6 +570,47 @@ flagship was **WINK**. The slogan was *"Wink never sleeps — so you can."*
 Every floor is painted differently — walls, floor and ceiling are tinted per
 zone — so you always know where you are, and the HUD names the floor you're on.
 
+### 📼 Round 9 — the tapes actually play
+
+Watching a tape used to show a sheet of paper with the words on it. Now it
+plays on a television.
+
+**Six animated scenes, drawn in code** — no video files, so the page still
+downloads in one piece:
+
+| Tape | What you watch |
+|---|---|
+| 1 · Welcome | The company film — WINK waving on a little stage under the logo |
+| 2 · The Night Shift | A sewing machine running by itself in the dark, needle going, cloth feeding through |
+| 3 · Filling | A hopper pouring into a limp body on a moving conveyor |
+| 4 · Playtest | The observation booth. A child in a chair. WINK opposite — and six seconds in, its head turns to face her |
+| 5 · The Last Night | The containment cage, door swinging open from the inside, alarm light pulsing |
+| 6 · Goodnight | WINK's face, close up, leaning slowly into the lens for fourteen seconds. It blinks |
+
+**On top of it goes the VHS treatment:** the picture takes a moment to lock on
+through the snow, a tracking bar rolls slowly up the screen dragging noise with
+it, scan lines, red/cyan colour bleed at the edges, and the curve of the glass.
+The deck's own overlay shows **▶ PLAY**, a **running timecode** and the tape
+label. The words appear as **subtitles, one line at a time**, and there's a flat
+**tape hiss** for as long as it runs.
+
+**The sets in the factory are switched on too.** Each television wall texture is
+built in four frames with different static, cycled by the renderer, so the
+screens flicker as you walk past. A test checks that only the screen area
+changes between frames — the cabinet around it must stay put.
+
+Once you've watched everything, the sets **replay the tapes in order**, so you
+can go back and watch one again.
+
+> ⚠️ **A second bug, found while testing this one.** `pressQuit()` began with
+> `if (!running) return;` — and every overlay pauses the round. So the **Quit
+> button silently did nothing** whenever a note, tape or keypad was open. Worse,
+> my earlier stuck-state test had "passed" on this: it checked `running` was
+> false after quitting, which was already true because the note had paused it.
+> The test was passing for the wrong reason. It now checks what quitting is
+> actually meant to do — put you back on the menu — and there are six new checks
+> that you can quit with each overlay on screen.
+
 ### 🧊 Round 8 — the freeze
 
 **You reported the game kept pausing. It was a real bug, and a bad one.**
@@ -1079,7 +1120,7 @@ drag-to-look on a tablet.
 
 ## ⚠️ What still needs doing
 
-**Upload it, then play it with real people.** All **21 test suites — 1,180 checks
+**Upload it, then play it with real people.** All **21 test suites — 1,209 checks
 — pass**, but no human has actually played any of this yet. Things worth
 watching for:
 

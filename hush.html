@@ -208,6 +208,31 @@
     font-size:.66rem;letter-spacing:.14em;padding:5px 9px;margin:0 0 12px;
   }
   #noteBox h3{margin:0 0 10px;font-size:1em;letter-spacing:.1em;text-transform:uppercase}
+
+  /* ---- the video player ---- */
+  #tapeView{
+    position:fixed;inset:0;display:none;align-items:center;justify-content:center;
+    background:rgba(0,0,0,.93);z-index:41;padding:16px;
+  }
+  #tapeView.on{display:flex}
+  #tapeBox{
+    display:flex;flex-direction:column;align-items:center;gap:12px;
+    max-width:min(94vw,760px);max-height:94vh;
+  }
+  /* the set itself: a dark bezel round the picture */
+  #tapeScreen{
+    width:min(88vw,620px);max-height:56vh;aspect-ratio:4/3;height:auto;
+    background:#000;border:clamp(6px,1.4vh,12px) solid #1c1a18;border-radius:10px;
+    box-shadow:0 0 0 2px #000, 0 18px 60px rgba(0,0,0,.9), inset 0 0 40px rgba(0,0,0,.9);
+    image-rendering:pixelated;display:block;
+  }
+  #tapeInfo{
+    background:#e8dcc0;color:#2a1f18;padding:14px 18px;border-radius:3px;
+    font-family:'Courier New',monospace;font-size:clamp(.68rem,1.7vh,.88rem);line-height:1.65;
+    max-width:min(90vw,620px);max-height:30vh;overflow:auto;
+  }
+  #tapeInfo h3{margin:0 0 8px;font-size:1em;letter-spacing:.1em}
+  #tapeFoot{color:#6b5844;margin:12px 0 0}
   .hidden{display:none !important}
 </style>
 </head>
@@ -262,8 +287,9 @@
         There are <b>six video tapes</b>, one on every floor. Picking one up only
         puts it in your bag — to watch it you have to find a <b>television</b>,
         and there is one on every floor too.<br><br>
-        That means standing still in the dark with the sound up. Which is
-        exactly when it finds you.<br><br>
+        The tapes really play — a picture on the screen, subtitles, a timecode
+        and the hiss of the tape running. That means standing still in the dark
+        with the sound up, which is exactly when it finds you.<br><br>
         You can get out without watching any of them — but you won't know what
         happened here.
       </p>
@@ -346,6 +372,15 @@
   <h3 id="noteTitle">NOTE</h3>
   <div id="noteText"></div>
   <p class="note" style="color:#6b5844;margin-top:14px">tap anywhere to close</p>
+</div></div>
+
+<div id="tapeView"><div id="tapeBox">
+  <canvas id="tapeScreen" width="480" height="360"></canvas>
+  <div id="tapeInfo">
+    <h3 id="tapeTitle">TAPE</h3>
+    <div id="tapeText"></div>
+    <p class="note" id="tapeFoot">tap anywhere to stop the tape</p>
+  </div>
 </div></div>
 
 <script>
@@ -658,7 +693,7 @@
       reacher: false,            // have you found it yet
       sockets: {},               // which power terminals you've bridged
       elecOpen: false,
-      tapes: [], tapesSeen: {}, tapesPlayed: [],   // carried, and watched
+      tapes: [], tapesSeen: {}, tapesPlayed: [], replayAt: 0,  // carried, watched
       finale: false              // the shutter is up and it knows
     };
   }
@@ -811,6 +846,7 @@
 
   // ---- procedural textures, 64x64, built once at startup ----
   const TEX = 64, TEXMASK = TEX - 1;
+  const TV_FRAMES = 4;          // how many frames of screen static we cycle
   const textures = {};
   const rgb = (r, g, b) => (255 << 24) | (b << 16) | (g << 8) | r;   // little-endian RGBA
 
@@ -900,7 +936,7 @@
 
     // ---- wall fixtures. These are drawn INTO the wall face, which is what
     // stops them floating in mid-air the way a billboard sprite does. ----
-    const panel = (base, draw) => {
+    const panel = (base, draw, seedOffset) => {
       const t = new Uint32Array(TEX * TEX);
       for (let y = 0; y < TEX; y++) for (let x = 0; x < TEX; x++) {
         const n = noise(x, y, base) * 0.4;
@@ -911,7 +947,7 @@
       const box = (x0, y0, w, h, c) => {
         for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) px(x, y, c);
       };
-      draw(px, box);
+      draw(px, box, seedOffset || 0);
       return t;
     };
 
@@ -954,14 +990,16 @@
       box(38, 20, 2, 2, rgb(120, 122, 120));
     });
 
-    // a television on a bracket, with the video player slung under it
-    textures['V'] = panel(54, (px, box) => {
+    // A television on a bracket, with the video player slung under it.
+    // Four frames of it, cycled by the renderer, so the screen actually
+    // flickers instead of being a frozen photograph of static.
+    const tvFrame = seedOffset => panel(54, (px, box) => {
       box(10, 10, 44, 34, rgb(46, 44, 42));          // set
       box(10, 10, 44, 2, rgb(74, 72, 70));
       box(14, 14, 36, 25, rgb(20, 24, 26));          // screen recess
       for (let y = 15; y < 38; y++) for (let x = 15; x < 49; x++) {
-        // static — different every pixel, so it reads as a live screen
-        const v = 60 + ((x * 37 + y * 91) % 90);
+        // static — a different pattern in each frame, so it crawls
+        const v = 60 + ((x * 37 + y * 91 + seedOffset * 53) % 90);
         px(x, y, rgb(v, v, v + 6));
       }
       for (let y = 16; y < 38; y += 3)               // scan lines
@@ -971,7 +1009,9 @@
       box(44, 50, 3, 3, rgb(200, 70, 50));           // record light
       box(8, 44, 4, 4, rgb(110, 108, 104));          // wall bracket
       box(52, 44, 4, 4, rgb(110, 108, 104));
-    });
+    }, seedOffset);
+    for (let i = 0; i < TV_FRAMES; i++) textures['V' + i] = tvFrame(i);
+    textures['V'] = textures['V0'];                  // the still, for anything static
 
     // Each floor of the factory is painted differently, so you always know
     // roughly where you are. Built by tinting the same brick.
@@ -1101,6 +1141,7 @@
       // plain walls are tinted by which floor of the factory they're on
       let key = r.hit;
       if (key === '#' && worldMode === 'story') key = '#' + zoneOf(r.mapY);
+      else if (key === 'V') key = 'V' + (((now / 90) | 0) % TV_FRAMES);   // live screen
       const lut = shaded[key] || shaded['#'];
       const k = lightAt(camX, r.dist, flicker) * (r.side === 1 ? 0.68 : 1);
       const tex = lut[levelOf(k)];
@@ -1892,27 +1933,326 @@
 
   // Use a TV: play the first tape you're carrying that you haven't watched.
   function useTV() {
-    const unwatched = state.tapes.filter(i => !state.tapesPlayed.includes(i));
     if (!state.tapes.length) { flashPrompt('The set hums. You have no tape to put in.'); return; }
-    if (!unwatched.length) { flashPrompt("You've watched everything you're carrying."); return; }
-    const idx = unwatched.sort((a, b) => a - b)[0];
-    state.tapesPlayed.push(idx);
+    const unwatched = state.tapes.filter(i => !state.tapesPlayed.includes(i));
+    let idx;
+    if (unwatched.length) {
+      idx = unwatched.sort((a, b) => a - b)[0];
+      state.tapesPlayed.push(idx);
+    } else {
+      // seen them all — the sets will play them again, in order
+      const order = state.tapes.slice().sort((a, b) => a - b);
+      idx = order[state.replayAt % order.length];
+      state.replayAt++;
+    }
     tvClunk();
     showTape(idx);
     setObjective();
   }
 
+  // ------------------------------------------------------------
+  //  The video player
+  //
+  //  Each tape is a little animated scene drawn in code — no video files, so
+  //  the page still downloads in one go. On top of it goes the VHS treatment:
+  //  scan lines, a tracking bar rolling up the picture, colour bleed, a
+  //  timecode, and the words on screen as subtitles.
+  // ------------------------------------------------------------
+  let tapeRAF = 0, tapePlaying = -1, tapeT0 = 0;
+
   function showTape(idx) {
     const t = TAPES[idx];
     if (!t) return;
     pauseRound();
-    $('noteTitle').textContent = t.title;
-    $('noteText').innerHTML =
-      `<div class="tvbar">▶ PLAYING &nbsp;·&nbsp; ${t.who}</div>${t.body}` +
-      `<p class="note" style="color:#6b5844;margin-top:14px">` +
-      `watched ${state.tapesPlayed.length} of ${TAPES.length} &nbsp;·&nbsp; ` +
-      `carrying ${state.tapes.length}</p>`;
-    $('noteView').classList.add('on');
+    tapePlaying = idx;
+    tapeT0 = performance.now();
+    $('tapeTitle').textContent = t.title;
+    $('tapeText').innerHTML =
+      `<p class="note" style="color:#8a7358;margin:0 0 8px">${t.who}</p>${t.body}`;
+    $('tapeView').classList.add('on');
+    tvHiss(true);
+    const step = () => {
+      if (tapePlaying !== idx) return;
+      drawTapeFrame(idx, (performance.now() - tapeT0) / 1000);
+      tapeRAF = requestAnimationFrame(step);
+    };
+    step();
+  }
+
+  function closeTape() {
+    tapePlaying = -1;
+    cancelAnimationFrame(tapeRAF);
+    tvHiss(false);
+    $('tapeView').classList.remove('on');
+    resumeRound();
+  }
+
+  // ---- the picture ----
+  const TSUB = [
+    ['WELCOME TO HUSHABYE TOY CO.', 'WHERE EVERY CHILD SLEEPS SOUNDLY',
+     'SAY GOODNIGHT TO WINK', 'WINK NEVER SLEEPS — SO YOU CAN'],
+    ['MACHINE 4 — 03:12', 'RUNNING WITH NOBODY AT IT',
+     'THIRD NIGHT THIS WEEK', 'BUILDINGS DO NOT THREAD THEMSELVES'],
+    ['FILLING BAY — SHIFT LOG', 'ORDER FROM UPSTAIRS: DO NOT USE WADDING',
+     'USE THE MATERIAL FROM CONTAINMENT', 'THEY SAID IT STAYS AWAKE'],
+    ['PLAYTEST — SESSION 41', 'ONE CHILD. ONE UNIT. ONE HOUR.',
+     'SHE ASKED IT TO STOP LOOKING AT HER', 'IT STOPPED LOOKING AT HER'],
+    ['CONTAINMENT — 23:40', 'THE CAGE IS OPEN FROM THE INSIDE',
+     'EVERYONE OUT THROUGH THE LOADING BAY', 'DO NOT SAY GOODNIGHT TO IT'],
+    ['[NO LABEL]', 'HELLO?', 'NOBODY CAME TO BE LOOKED AFTER',
+     'ARE YOU GOING TO SLEEP NOW?'],
+  ];
+
+  function drawTapeFrame(idx, t) {
+    const c = $('tapeScreen'), g = c.getContext('2d');
+    const W = c.width, H = c.height;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.fillStyle = '#07080a';
+    g.fillRect(0, 0, W, H);
+
+    // the first moment of any tape is snow, before the picture locks on
+    const lockOn = Math.min(1, Math.max(0, (t - 0.55) / 0.7));
+    g.save();
+    g.globalAlpha = lockOn;
+    TAPE_SCENES[idx] ? TAPE_SCENES[idx](g, W, H, t) : TAPE_SCENES[0](g, W, H, t);
+    g.restore();
+
+    // ---- VHS treatment ----
+    // snow, heaviest at the start and whenever the tracking bar passes
+    const bar = ((t * 0.22) % 1.6) * H - H * 0.3;
+    const snow = (1 - lockOn) * 0.75 + 0.05;
+    g.globalAlpha = 1;
+    for (let i = 0; i < 220; i++) {
+      const y = Math.random() * H;
+      const near = Math.abs(y - bar) < 26 ? 3 : 1;
+      if (Math.random() > snow * near) continue;
+      const v = 120 + Math.random() * 135;
+      g.fillStyle = `rgba(${v|0},${v|0},${v|0},${0.35 + Math.random() * 0.5})`;
+      g.fillRect(Math.random() * W, y, 1 + Math.random() * 5, 1);
+    }
+    // the tracking bar: a smeared band rolling slowly up the picture
+    g.fillStyle = 'rgba(200,210,255,0.055)';
+    g.fillRect(0, bar - 12, W, 24);
+    g.fillStyle = 'rgba(0,0,0,0.22)';
+    g.fillRect(0, bar + 10, W, 3);
+    // scan lines
+    g.fillStyle = 'rgba(0,0,0,0.16)';
+    for (let y = 0; y < H; y += 3) g.fillRect(0, y, W, 1);
+    // colour bleed at the edges of the tube
+    g.globalAlpha = 0.10;
+    g.fillStyle = '#ff2d2d'; g.fillRect(-2, 0, W, H);
+    g.fillStyle = '#2dffe0'; g.fillRect(2, 0, W, H);
+    g.globalAlpha = 1;
+    // the curve of the glass
+    const vig = g.createRadialGradient(W/2, H/2, H*0.25, W/2, H/2, H*0.78);
+    vig.addColorStop(0, 'rgba(0,0,0,0)');
+    vig.addColorStop(1, 'rgba(0,0,0,0.72)');
+    g.fillStyle = vig; g.fillRect(0, 0, W, H);
+
+    // ---- the player's own overlay ----
+    g.font = `bold ${Math.round(H * 0.05)}px 'Courier New',monospace`;
+    g.textBaseline = 'top';
+    g.fillStyle = 'rgba(235,235,225,0.85)';
+    g.fillText('▶  PLAY', W * 0.05, H * 0.05);
+    const tot = Math.floor(t);
+    const tc = `${String((tot / 60) | 0).padStart(2, '0')}:${String(tot % 60).padStart(2, '0')}`;
+    g.textAlign = 'right';
+    g.fillText(tc, W * 0.95, H * 0.05);
+    g.textAlign = 'left';
+    g.fillStyle = 'rgba(235,235,225,0.55)';
+    g.font = `${Math.round(H * 0.042)}px 'Courier New',monospace`;
+    g.fillText(`SP  HUSHABYE TOY CO.`, W * 0.05, H * 0.895);
+
+    // ---- subtitles, one line at a time ----
+    const lines = TSUB[idx] || TSUB[0];
+    const each = 3.6;
+    const li = Math.min(lines.length - 1, Math.floor(Math.max(0, t - 1.2) / each));
+    const into = Math.max(0, t - 1.2) - li * each;
+    if (t > 1.2 && into < each - 0.35) {
+      g.textAlign = 'center';
+      g.font = `bold ${Math.round(H * 0.055)}px 'Courier New',monospace`;
+      const txt = lines[li];
+      g.fillStyle = 'rgba(0,0,0,0.72)';
+      let tw;
+      try { const m = g.measureText(txt); tw = (m && m.width) || 0; } catch (e) { tw = 0; }
+      if (!tw) tw = txt.length * H * 0.033;             // if the browser won't say
+      const w = Math.min(W * 0.94, tw + H * 0.03);
+      g.fillRect(W / 2 - w / 2, H * 0.775, w, H * 0.075);
+      g.fillStyle = '#f2ecd8';
+      g.fillText(txt, W / 2, H * 0.79);
+      g.textAlign = 'left';
+    }
+  }
+
+  // Six scenes. Simple shapes, but they move — which is what sells it.
+  const TAPE_SCENES = [
+    // 1 — the welcome film: a logo card and WINK waving
+    (g, W, H, t) => {
+      g.fillStyle = '#241a2e'; g.fillRect(0, 0, W, H);
+      g.fillStyle = '#3a2a48';
+      g.fillRect(0, H * 0.62, W, H * 0.38);                   // a stage floor
+      tapeWink(g, W * 0.5, H * 0.62, H * 0.42, t, Math.sin(t * 2) * 0.5, 0.25);
+      g.fillStyle = 'rgba(245,200,90,0.92)';
+      g.font = `bold ${Math.round(H * 0.10)}px 'Trebuchet MS',sans-serif`;
+      g.textAlign = 'center';
+      g.fillText('HUSHABYE', W / 2, H * 0.10);
+      g.font = `${Math.round(H * 0.055)}px 'Trebuchet MS',sans-serif`;
+      g.fillText('T O Y   C O .', W / 2, H * 0.22);
+      g.textAlign = 'left';
+    },
+    // 2 — a sewing machine running by itself in the dark
+    (g, W, H, t) => {
+      g.fillStyle = '#0e1216'; g.fillRect(0, 0, W, H);
+      g.fillStyle = '#1a2028';
+      g.fillRect(W * 0.1, H * 0.58, W * 0.8, H * 0.10);       // bench
+      g.fillStyle = '#2c343e';
+      g.fillRect(W * 0.32, H * 0.30, W * 0.36, H * 0.28);     // machine head
+      g.fillRect(W * 0.30, H * 0.50, W * 0.42, H * 0.08);
+      const stroke = Math.abs(Math.sin(t * 9)) * H * 0.10;
+      g.strokeStyle = '#cdd6e0'; g.lineWidth = Math.max(1, H * 0.008);
+      g.beginPath();                                          // the needle
+      g.moveTo(W * 0.50, H * 0.44);
+      g.lineTo(W * 0.50, H * 0.48 + stroke);
+      g.stroke();
+      g.fillStyle = '#e6dcc4';                                // cloth, feeding through
+      const off = (t * 40) % (W * 0.12);
+      for (let i = -1; i < 9; i++)
+        g.fillRect(W * 0.16 + i * W * 0.12 - off, H * 0.555, W * 0.07, H * 0.02);
+      g.fillStyle = 'rgba(255,220,140,0.10)';                 // one lamp
+      g.beginPath(); g.ellipse(W * 0.5, H * 0.45, W * 0.28, H * 0.30, 0, 0, Math.PI * 2); g.fill();
+    },
+    // 3 — the filling bay: a hopper pouring into a body on the belt
+    (g, W, H, t) => {
+      g.fillStyle = '#141017'; g.fillRect(0, 0, W, H);
+      g.fillStyle = '#2a2230';
+      g.fillRect(0, H * 0.66, W, H * 0.12);                   // the belt
+      for (let i = 0; i < 14; i++) {                          // belt slats moving
+        const x = (i * W * 0.09 + (t * 55) % (W * 0.09)) - W * 0.09;
+        g.fillStyle = '#3a3040'; g.fillRect(x, H * 0.66, W * 0.02, H * 0.12);
+      }
+      g.fillStyle = '#4a3a24';                                // hopper
+      g.beginPath();
+      g.moveTo(W * 0.34, H * 0.06); g.lineTo(W * 0.66, H * 0.06);
+      g.lineTo(W * 0.56, H * 0.34); g.lineTo(W * 0.44, H * 0.34);
+      g.closePath(); g.fill();
+      for (let i = 0; i < 26; i++) {                          // the pour
+        const p = ((t * 0.9 + i / 26) % 1);
+        g.fillStyle = `rgba(120,96,70,${0.75 - p * 0.5})`;
+        g.fillRect(W * (0.48 + Math.sin(i * 3 + t) * 0.015), H * (0.34 + p * 0.30),
+                   W * 0.012, H * 0.02);
+      }
+      tapeWink(g, W * 0.5, H * 0.70, H * 0.34, 0, 0, 0.0);    // the body, limp
+    },
+    // 4 — the playtest room, seen from the observation booth
+    (g, W, H, t) => {
+      g.fillStyle = '#12180f'; g.fillRect(0, 0, W, H);
+      g.fillStyle = '#1c2416'; g.fillRect(0, H * 0.66, W, H * 0.34);
+      g.fillStyle = '#2a3420';                                // a small chair
+      g.fillRect(W * 0.20, H * 0.44, W * 0.09, H * 0.24);
+      g.fillRect(W * 0.19, H * 0.40, W * 0.11, H * 0.05);
+      // the child: a small still shape
+      g.fillStyle = '#8d8468';
+      g.fillRect(W * 0.215, H * 0.46, W * 0.06, H * 0.16);
+      g.beginPath(); g.ellipse(W * 0.245, H * 0.44, W * 0.032, H * 0.045, 0, 0, Math.PI * 2); g.fill();
+      // WINK, opposite — its head turns to face her partway through
+      const turn = t < 6 ? 0 : Math.min(1, (t - 6) / 1.6);
+      tapeWink(g, W * 0.70, H * 0.68, H * 0.40, 0, -turn * 1.0, 0.05);
+      g.strokeStyle = 'rgba(180,200,160,0.18)';               // booth glass
+      g.lineWidth = Math.max(1, H * 0.012);
+      g.strokeRect(W * 0.03, H * 0.05, W * 0.94, H * 0.90);
+    },
+    // 5 — containment, the cage standing open
+    (g, W, H, t) => {
+      g.fillStyle = '#0c0d10'; g.fillRect(0, 0, W, H);
+      g.fillStyle = '#171a1f'; g.fillRect(0, H * 0.70, W, H * 0.30);
+      g.strokeStyle = '#5a5f68'; g.lineWidth = Math.max(1, H * 0.011);
+      for (let i = 0; i <= 8; i++) {                          // the cage
+        const x = W * (0.14 + i * 0.055);
+        g.beginPath(); g.moveTo(x, H * 0.16); g.lineTo(x, H * 0.70); g.stroke();
+      }
+      for (let i = 0; i <= 4; i++) {
+        const y = H * (0.16 + i * 0.135);
+        g.beginPath(); g.moveTo(W * 0.14, y); g.lineTo(W * 0.58, y); g.stroke();
+      }
+      g.save();                                               // the door, swinging
+      g.translate(W * 0.58, H * 0.42);
+      g.rotate(0.5 + Math.sin(t * 0.9) * 0.16);
+      g.strokeStyle = '#6b7079';
+      for (let i = 0; i <= 4; i++) {
+        const x = i * W * 0.055;
+        g.beginPath(); g.moveTo(x, -H * 0.26); g.lineTo(x, H * 0.28); g.stroke();
+      }
+      g.restore();
+      g.fillStyle = 'rgba(200,60,40,' + (0.35 + Math.abs(Math.sin(t * 2.4)) * 0.5) + ')';
+      g.beginPath(); g.ellipse(W * 0.88, H * 0.14, W * 0.022, H * 0.028, 0, 0, Math.PI * 2); g.fill();
+    },
+    // 6 — WINK, close up, leaning slowly into the lens
+    (g, W, H, t) => {
+      g.fillStyle = '#0a0808'; g.fillRect(0, 0, W, H);
+      const push = Math.min(1, t / 14);
+      tapeWink(g, W * 0.5, H * (0.98 + push * 0.5), H * (1.05 + push * 0.75),
+               0, Math.sin(t * 0.5) * 0.25, 0.02, t);
+    },
+  ];
+
+  // WINK as it appears on the tapes: the same patchwork toy, drawn flat.
+  function tapeWink(g, cx, groundY, size, sway, headTurn, jaw, t) {
+    const S = v => size * v;
+    g.save();
+    g.fillStyle = '#6d2a37';                                   // legs
+    g.fillRect(cx - S(.13), groundY - S(.30), S(.10), S(.30));
+    g.fillRect(cx + S(.03), groundY - S(.30), S(.10), S(.30));
+    g.fillStyle = '#7c3040';                                   // torso
+    g.fillRect(cx - S(.17), groundY - S(.78), S(.34), S(.50));
+    g.save();                                                  // arms
+    g.translate(cx - S(.17), groundY - S(.74)); g.rotate(-0.2 + sway * 0.5);
+    g.fillRect(-S(.09), 0, S(.10), S(.44)); g.restore();
+    g.save();
+    g.translate(cx + S(.17), groundY - S(.74)); g.rotate(0.2 - sway * 0.5);
+    g.fillRect(-S(.01), 0, S(.10), S(.44)); g.restore();
+    g.fillStyle = '#5a2230';                                   // seam
+    g.fillRect(cx - S(.17), groundY - S(.56), S(.34), S(.03));
+    g.save();                                                  // head
+    g.translate(cx, groundY - S(.90)); g.rotate(headTurn * 0.10);
+    g.fillStyle = '#87374a';
+    g.beginPath(); g.ellipse(0, 0, S(.22), S(.19), 0, 0, Math.PI * 2); g.fill();
+    const ex = headTurn * S(.04);
+    // it blinks, but only on the last tape, and rarely
+    const shut = (t !== undefined && Math.sin(t * 1.7) > 0.985) ? 0.15 : 1;
+    g.fillStyle = '#ffeeb4';
+    g.beginPath(); g.ellipse(-S(.09) + ex, -S(.04), S(.055), S(.048) * shut, 0, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.ellipse( S(.09) + ex, -S(.03), S(.068), S(.060) * shut, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#140a0c';
+    g.beginPath(); g.ellipse(-S(.09) + ex * 1.6, -S(.04), S(.020), S(.024) * shut, 0, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.ellipse( S(.09) + ex * 1.6, -S(.03), S(.024), S(.028) * shut, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#160a0d';                                   // mouth
+    g.beginPath(); g.ellipse(0, S(.085), S(.105), S(.012) + S(.07) * jaw, 0, 0, Math.PI * 2); g.fill();
+    g.restore();
+    g.restore();
+  }
+
+  // the flat hiss of tape running past the head, for as long as it plays
+  let hissSrc = null, hissGain = null;
+  function tvHiss(on) {
+    const a = audio(); if (!a) return;
+    if (on) {
+      if (hissSrc) return;
+      const src = noise(a), f = a.createBiquadFilter();
+      f.type = 'bandpass'; f.frequency.value = 2600; f.Q.value = 0.6;
+      src.connect(f);
+      const g = a.createGain();
+      g.gain.setValueAtTime(0.0001, a.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.035, a.currentTime + 0.25);
+      f.connect(g); g.connect(a.destination);
+      src.start(a.currentTime);
+      hissSrc = src; hissGain = g;
+    } else if (hissSrc) {
+      try {
+        hissGain.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + 0.15);
+        hissSrc.stop(a.currentTime + 0.2);
+      } catch (e) {}
+      hissSrc = null; hissGain = null;
+    }
   }
 
   // the clunk of a tape going in and the deck spinning up
@@ -2468,6 +2808,7 @@
     resumeRound();
   }
   $('noteView').addEventListener('click', closeNote);
+  $('tapeView').addEventListener('click', closeTape);
 
   // ============================================================
   //  Loop
@@ -2499,7 +2840,11 @@
     } else p.classList.remove('on');
     rafId = requestAnimationFrame(loop);
   }
-  function stopLoop() { if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null; } running = false; }
+  function stopLoop() {
+    if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null; }
+    running = false;
+    if (tapePlaying >= 0) { tapePlaying = -1; cancelAnimationFrame(tapeRAF); tvHiss(false); }
+  }
 
   // ---- pausing for an overlay ----
   // Reading a note, watching a tape or working the keypad all stop the round.
@@ -2525,8 +2870,19 @@
     lastT = performance.now();             // don't jump: the clock stood still
     if (rafId === null) rafId = requestAnimationFrame(loop);
   }
+  // shut everything that pauses the round, without resuming it
+  function closeOverlays() {
+    tapePlaying = -1; cancelAnimationFrame(tapeRAF); tvHiss(false);
+    $('tapeView').classList.remove('on');
+    $('noteView').classList.remove('on');
+    $('keypad').classList.remove('on');
+    if (state) state.keypadOpen = false;
+    pausedForOverlay = false;
+  }
   function anyOverlayOpen() {
-    return $('noteView').classList.contains('on') || $('keypad').classList.contains('on');
+    return $('noteView').classList.contains('on')
+        || $('tapeView').classList.contains('on')
+        || $('keypad').classList.contains('on');
   }
 
   function startGame(fresh) {
@@ -2539,6 +2895,7 @@
     running = true; lastT = performance.now();
     pausedForOverlay = false;              // a fresh round is never mid-overlay
     $('noteView').classList.remove('on');
+    $('tapeView').classList.remove('on');
     $('keypad').classList.remove('on');
     $('menu').style.display = 'none';
     $('results').classList.add('hidden');
@@ -2715,10 +3072,13 @@
   let quitArmed = false, quitAt = 0;
   function disarmQuit() { quitArmed = false; quitAt = 0; quitBtn.textContent = '✕ Quit'; quitBtn.classList.remove('armed'); }
   function pressQuit() {
-    if (!running) return;
+    // You must be able to quit while a note, a tape or the keypad is up —
+    // those pause the round, and checking `running` alone meant the Quit
+    // button silently did nothing whenever an overlay was open.
+    if (!running && !pausedForOverlay) return;
     const t = performance.now();
     if (quitArmed && t - quitAt <= 3000) {
-      disarmQuit(); stopLoop();
+      disarmQuit(); closeOverlays(); stopLoop();
       $('game').style.display = 'none';
       document.body.classList.remove('playing');
       $('menu').style.display = '';
@@ -2846,11 +3206,13 @@
     get state() { return state; }, set state(v) { state = v; },
     updateMonster, updatePlayer, tryMove, fitScreen, kpPress,
     get kpEntry() { return kpEntry; },
-    HEAR_WALK, HEAR_RUN, SEE, SCARE_CFG, sizeScareCanvas,
+    HEAR_WALK, HEAR_RUN, SEE, SCARE_CFG, sizeScareCanvas, TV_FRAMES,
     ZONE_NAMES, zoneOf, TAPES, REACH_ARM, noteKeyFor, NOTES, SPRITE_OF, ACTIONS,
     drawSprite, reachableCells, nearbyAction,
-    pickUpTape, showTape, useTV, startFinale, showNote, closeNote,
-    pauseRound, resumeRound, openKeypad, closeKeypad, loop,
+    pickUpTape, showTape, closeTape, drawTapeFrame, TAPE_SCENES, TSUB, tapeWink,
+    useTV, startFinale, showNote, closeNote,
+    get tapePlaying() { return tapePlaying; },
+    pauseRound, resumeRound, openKeypad, closeKeypad, loop, closeOverlays, pressQuit,
     get pausedForOverlay() { return pausedForOverlay; }, win, ZONE_TINT, checkEscape,
     get running() { return running; }, drawScareFace, drawMonster, ambientDread,
     footstep, roar, screech, panOf, setMode, nearFloor, caught, finishScare, cfg,
