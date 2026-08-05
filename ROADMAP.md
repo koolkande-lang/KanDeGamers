@@ -2,21 +2,46 @@
 
 **Three games now.** Nothing is uploaded yet.
 
-## 📁 The site is now four files
+## 📁 The site is now five files
 
 | File | What it is |
 |---|---|
 | `index.html` | **KanDe Bros hub** — the front page listing all three games |
+| `about.html` | **All About KanDe Bros** — the second tab |
 | `snake.html` | Snake & Candy (this used to be `index.html`) |
 | `wuzzle.html` | Wuzzle, the word game |
 | `hush.html` | Hush, the first-person horror game |
 
-⚠️ **Upload all four together.** Snake has *moved* — if you upload the new
+⚠️ **Upload all five together.** Snake has *moved* — if you upload the new
 `index.html` without `snake.html`, the hub's Play button will 404.
 
 > 📌 **Upload this file to your GitHub repo** (same place as `index.html`).
 > Then it lives with the project forever, and next time we work together I can
 > read it straight from the repo and pick up exactly where we left off.
+
+---
+
+## 🏷️ The About page
+
+A second tab across the top of the site: **ALL ABOUT KANDE BROS**
+(`about.html`).
+
+It covers what the three games are, and how they're built — one file per game,
+nothing downloaded, online play that goes device-to-device with no server, and
+the fact that everything is tested before anyone plays it. It's honest about the
+bugs, too: the Hush door code that could never appear, the renderer that ran at
+7 frames a second, and the 1934 dictionary in Wuzzle.
+
+**Deliberately, there is nothing personal on it** — no names, no age, no school,
+no town. It's a public page, so it's about the games and the making, and it's
+signed *Made by KanDe Bros*. There's a test that fails if a personal name or
+anything identifying ever creeps in.
+
+**Every number on the page is checked against the code.** `abouttest.js` decodes
+Wuzzle's dictionary and counts it (64,783), counts the skins, trails, fruits,
+floors and tapes in the actual game files, verifies there isn't a single image
+or sound file anywhere on the site, and confirms every link points at a file
+that exists. If a number on the page ever stops being true, the tests fail.
 
 ---
 
@@ -1161,7 +1186,7 @@ drag-to-look on a tablet.
 
 ## ⚠️ What still needs doing
 
-**Upload it, then play it with real people.** All **21 test suites — 1,249 checks
+**Upload it, then play it with real people.** All **22 test suites — 1,282 checks
 — pass**, but no human has actually played any of this yet. Things worth
 watching for:
 

@@ -32,6 +32,19 @@
   }
   .tag{ margin:8px 0 0; font-size:clamp(.58rem,1.5vh,.76rem); letter-spacing:.24em; color:var(--dim); }
 
+  /* tabs across the top */
+  #tabs{
+    display:flex; justify-content:center; gap:clamp(14px,4vw,30px);
+    margin-top:clamp(8px,1.8vh,14px);
+  }
+  #tabs a{
+    color:var(--dim); text-decoration:none; letter-spacing:.18em;
+    font-size:clamp(.55rem,1.4vh,.68rem); padding:5px 2px;
+    border-bottom:2px solid transparent;
+  }
+  #tabs a:hover{ color:var(--ink); }
+  #tabs a.here{ color:var(--ink); border-bottom-color:var(--snake1); }
+
   #games{ display:grid; gap:clamp(9px,1.8vh,16px); grid-template-columns:1fr; }
   @media (min-width:760px){ #games{ grid-template-columns:repeat(3,1fr); } }
 
@@ -93,6 +106,10 @@
   <header>
     <h1>KANDE BROS</h1>
     <p class="tag">FREE GAMES · NO SIGN-UP · PLAY ANYWHERE</p>
+    <nav id="tabs">
+      <a href="index.html" class="here">GAMES</a>
+      <a href="about.html">ALL ABOUT KANDE BROS</a>
+    </nav>
   </header>
 
   <main id="games">

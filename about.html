@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>All About KanDe Bros</title>
+<meta name="description" content="Free browser games made by KanDe Bros. No downloads, no accounts, no ads.">
+<style>
+  :root{
+    --ink:#f2ecff; --dim:rgba(242,236,255,.58); --faint:rgba(242,236,255,.34);
+    --snake1:#ff5da2; --snake2:#c084fc;
+    --wuz1:#38bdf8;  --wuz2:#a78bfa;
+    --hush1:#c2410c; --hush2:#7f1d1d;
+    --line:#3a2a55;
+    --pad:clamp(14px,3vh,26px);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;min-height:100%;
+    background:
+      radial-gradient(900px 550px at 12% -8%, #3b1d5c 0%, transparent 55%),
+      radial-gradient(800px 500px at 92% 108%, #10365c 0%, transparent 55%),
+      linear-gradient(165deg,#1a0f2b,#080510);
+    background-attachment:fixed;
+    font-family:'Trebuchet MS',system-ui,sans-serif;color:var(--ink);
+    line-height:1.65;
+  }
+  .wrap{max-width:840px;margin:0 auto;padding:clamp(18px,4vh,40px) clamp(16px,4vw,28px) 60px}
+
+  /* ---- top bar ---- */
+  nav{
+    display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+    padding-bottom:14px;border-bottom:1px solid var(--line);margin-bottom:var(--pad);
+  }
+  nav a{
+    color:var(--dim);text-decoration:none;font-size:clamp(.62rem,1.6vh,.76rem);
+    letter-spacing:.18em;padding:5px 0;border-bottom:2px solid transparent;
+  }
+  nav a:hover{color:var(--ink)}
+  nav a.here{color:var(--ink);border-bottom-color:var(--snake1)}
+  nav .sp{flex:1}
+
+  header{text-align:center;margin-bottom:calc(var(--pad) * 1.4)}
+  h1{
+    margin:0;font-size:clamp(1.6rem,6vh,2.9rem);letter-spacing:.2em;font-weight:800;
+    background:linear-gradient(90deg,var(--snake1),var(--snake2),var(--wuz1));
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .kicker{margin:12px 0 0;font-size:clamp(.72rem,2vh,.95rem);color:var(--dim);font-style:italic}
+
+  h2{
+    font-size:clamp(.78rem,2vh,.95rem);letter-spacing:.24em;color:var(--snake1);
+    margin:calc(var(--pad) * 1.5) 0 12px;font-weight:800;
+  }
+  p{margin:0 0 14px;font-size:clamp(.82rem,2vh,.98rem);color:rgba(242,236,255,.86)}
+  .lead{font-size:clamp(.88rem,2.2vh,1.06rem)}
+  strong{color:#fff}
+
+  /* ---- the numbers strip ---- */
+  .stats{
+    display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:var(--pad) 0;
+  }
+  @media(min-width:620px){ .stats{grid-template-columns:repeat(4,1fr)} }
+  .stat{
+    border:1px solid var(--line);border-radius:12px;padding:14px 12px;text-align:center;
+    background:linear-gradient(160deg,rgba(32,20,50,.9),rgba(12,8,20,.94));
+  }
+  .stat b{display:block;font-size:clamp(1.15rem,3.4vh,1.7rem);color:#fff;letter-spacing:.02em}
+  .stat span{font-size:clamp(.55rem,1.4vh,.66rem);letter-spacing:.14em;color:var(--faint)}
+
+  /* ---- game cards ---- */
+  .game{
+    display:flex;gap:16px;align-items:flex-start;
+    border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:12px;
+    background:linear-gradient(160deg,rgba(32,20,50,.9),rgba(12,8,20,.94));
+    position:relative;overflow:hidden;text-decoration:none;color:inherit;
+    transition:transform .16s ease,border-color .16s ease;
+  }
+  .game::before{
+    content:'';position:absolute;top:0;left:0;right:0;height:2px;
+    background:linear-gradient(90deg,transparent,var(--g1),var(--g2),transparent);
+  }
+  .game:hover{transform:translateY(-3px);border-color:var(--g1)}
+  .game .ico{
+    width:clamp(44px,8vh,62px);height:clamp(44px,8vh,62px);flex:none;border-radius:12px;
+    display:grid;place-items:center;font-size:clamp(1.2rem,3.2vh,1.8rem);
+    background:linear-gradient(150deg,var(--g1),var(--g2));
+  }
+  .game h3{margin:0 0 4px;font-size:clamp(.86rem,2.1vh,1.02rem);letter-spacing:.12em}
+  .game p{margin:0 0 8px;font-size:clamp(.72rem,1.8vh,.85rem);color:var(--dim)}
+  .game .facts{display:flex;flex-wrap:wrap;gap:5px}
+  .game .f{
+    font-size:.56rem;letter-spacing:.08em;padding:3px 8px;border-radius:20px;
+    background:rgba(255,255,255,.08);color:var(--dim);
+  }
+  .snake{--g1:var(--snake1);--g2:var(--snake2)}
+  .wuz  {--g1:var(--wuz1);  --g2:var(--wuz2)}
+  .hush {--g1:var(--hush1); --g2:var(--hush2)}
+
+  /* ---- rules list ---- */
+  .rules{list-style:none;padding:0;margin:0}
+  .rules li{
+    padding:12px 0 12px 30px;border-bottom:1px solid rgba(58,42,85,.5);position:relative;
+    font-size:clamp(.8rem,1.95vh,.94rem);
+  }
+  .rules li:last-child{border-bottom:0}
+  .rules li::before{
+    content:'▹';position:absolute;left:6px;top:12px;color:var(--snake1);font-size:1.05em;
+  }
+  .rules b{color:#fff}
+
+  blockquote{
+    margin:var(--pad) 0;padding:14px 18px;border-left:3px solid var(--wuz1);
+    background:rgba(56,189,248,.07);border-radius:0 8px 8px 0;
+    font-size:clamp(.78rem,1.9vh,.92rem);color:rgba(242,236,255,.86);
+  }
+  blockquote p:last-child{margin-bottom:0}
+
+  .cta{
+    display:inline-block;margin-top:8px;padding:11px 22px;border-radius:24px;
+    background:linear-gradient(135deg,var(--snake1),var(--snake2));color:#150a22;
+    text-decoration:none;font-weight:800;letter-spacing:.1em;
+    font-size:clamp(.68rem,1.7vh,.8rem);
+  }
+
+  footer{
+    margin-top:calc(var(--pad) * 2);padding-top:18px;border-top:1px solid var(--line);
+    text-align:center;font-size:clamp(.58rem,1.4vh,.68rem);color:var(--faint);line-height:1.9;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <nav>
+    <a href="index.html">← GAMES</a>
+    <a href="about.html" class="here">ALL ABOUT KANDE BROS</a>
+    <span class="sp"></span>
+  </nav>
+
+  <header>
+    <h1>ALL ABOUT KANDE BROS</h1>
+    <p class="kicker">"Free games that just work — on whatever you've already got."</p>
+  </header>
+
+  <p class="lead">
+    <strong>KanDe Bros</strong> make browser games. You click a link and you're
+    playing. There is nothing to install, nothing to sign up for, nothing to pay,
+    and no adverts anywhere.
+  </p>
+  <p>
+    Everything here was built from scratch. Not from a game-making kit — the
+    snake, the word grid, the 3D corridors and the monster that walks down them
+    are all written by hand and drawn by code.
+  </p>
+
+  <div class="stats">
+    <div class="stat"><b>3</b><span>GAMES</span></div>
+    <div class="stat"><b>0</b><span>DOWNLOADS</span></div>
+    <div class="stat"><b>0</b><span>ADVERTS</span></div>
+    <div class="stat"><b>1,282</b><span>TESTS THAT PASS</span></div>
+  </div>
+
+  <h2>THE GAMES</h2>
+
+  <a class="game snake" href="snake.html">
+    <div class="ico">🐍</div>
+    <div>
+      <h3>SNAKE &amp; CANDY</h3>
+      <p>Slither, gobble fruit, dodge everyone else. Unlock superhero skins with
+         real powers and glowing trails as you score.</p>
+      <div class="facts"><span class="f">1–6 PLAYERS</span><span class="f">ONLINE</span>
+        <span class="f">8 SKINS</span><span class="f">6 TRAILS</span>
+        <span class="f">5 FRUITS</span><span class="f">BOTS &amp; TEAMS</span></div>
+    </div>
+  </a>
+
+  <a class="game wuz" href="wuzzle.html">
+    <div class="ico">🔤</div>
+    <div>
+      <h3>WUZZLE</h3>
+      <p>Trace words through a grid of letters before the clock runs out.
+         Everyone races the same board — but words you both found score nothing.</p>
+      <div class="facts"><span class="f">1–8 PLAYERS</span><span class="f">ONLINE</span>
+        <span class="f">64,783 WORDS</span><span class="f">3×3 · 4×4 · 5×5</span>
+        <span class="f">7 TEXTURE PACKS</span></div>
+    </div>
+  </a>
+
+  <a class="game hush" href="hush.html">
+    <div class="ico">🔦</div>
+    <div>
+      <h3>HUSH</h3>
+      <p>You're locked in an abandoned toy factory. Fix the power, bridge the
+         circuit, crack the code, raise the shutter — while something hunts you
+         by sound.</p>
+      <div class="facts"><span class="f">1 PLAYER</span><span class="f">FIRST PERSON</span>
+        <span class="f">6 FLOORS</span><span class="f">6 VIDEO TAPES</span>
+        <span class="f">ENDLESS MODE</span></div>
+    </div>
+  </a>
+
+  <h2>HOW WE BUILD THINGS</h2>
+
+  <ul class="rules">
+    <li><b>One file per game.</b> Each game is a single web page. Nothing to
+        install, nothing to update, nothing that stops working next year.</li>
+    <li><b>Nothing gets downloaded.</b> Every picture and every sound is made by
+        the code as the game runs — there isn't a single image or audio file in
+        the whole site. That's why it loads instantly, even on school wifi.</li>
+    <li><b>Playing together doesn't need a server.</b> When you play online your
+        devices talk <b>straight to each other</b>. No accounts, no logins, and
+        nothing about you is stored anywhere.</li>
+    <li><b>It has to work on the thing you own.</b> Phone, tablet or computer.
+        Touch controls and keyboard controls both, every time — and it fits your
+        screen without scrolling.</li>
+    <li><b>It gets tested before anyone plays it.</b> There are <b>22 sets of
+        automatic tests</b> that run the games and check them. If something
+        breaks, the tests say so before you ever see it.</li>
+  </ul>
+
+  <h2>WHY THE TESTS MATTER</h2>
+
+  <p>
+    It's not showing off — it's because we kept finding real problems. A few the
+    tests caught before anybody played:
+  </p>
+
+  <blockquote>
+    <p>In <b>Hush</b>, the notes were handed out by a piece of maths that could
+    give you the same note twice — and <b>never show you the door code</b>. The
+    game would have been impossible to finish.</p>
+    <p>Also in Hush: the first version of the new graphics ran at about
+    <b>7 frames a second</b>. Unplayable. It's about eleven times faster now.</p>
+    <p>In <b>Wuzzle</b>, the word list turned out to come from a dictionary
+    written in <b>1934</b>. It didn't know <i>yay</i>, <i>okay</i>, <i>taco</i>
+    or <i>email</i>. It knows them now.</p>
+  </blockquote>
+
+  <p>
+    And some things only a real person finds. Hush used to <b>freeze completely</b>
+    when you finished watching a video tape — that one got reported by a player,
+    not by a test. So a new set of tests was written specifically to hunt for it
+    happening again.
+  </p>
+
+  <h2>WHAT'S NEXT</h2>
+  <p>
+    More games, and more to do in the ones that already exist. If you play
+    something and it breaks, feels unfair, or just isn't fun — that's the most
+    useful thing you can tell us.
+  </p>
+
+  <p><a class="cta" href="index.html">PLAY SOMETHING ▶</a></p>
+
+  <footer>
+    Made by KanDe Bros<br>
+    Free to play · No accounts · No adverts · Works on phones, tablets and computers
+  </footer>
+
+</div>
+</body>
+</html>
