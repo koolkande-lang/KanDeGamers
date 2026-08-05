@@ -570,6 +570,47 @@ flagship was **WINK**. The slogan was *"Wink never sleeps — so you can."*
 Every floor is painted differently — walls, floor and ceiling are tinted per
 zone — so you always know where you are, and the HUD names the floor you're on.
 
+### 🗣️ Round 10 — the tapes talk
+
+The tapes are now **read aloud**, using the browser's own speech synthesis. No
+sound files, so the page still downloads in one piece.
+
+**Six speakers, told apart by how they talk:**
+
+| Tape | Who | How they sound |
+|---|---|---|
+| 1 | The announcer | bright and salesy — fast, high |
+| 2 | The night worker | tired — slower, flat |
+| 3 | The supervisor | ashamed — slowest, lowest of the humans |
+| 4 | The researcher | clinical, even |
+| 5 | The last night | frightened — fastest, pitched up |
+| 6 | **WINK** | very slow, very low |
+
+The script is written out properly rather than reading the captions aloud —
+"Machine four. Twelve minutes past three." instead of `MACHINE 4 — 03:12`.
+
+**The subtitles follow the voice.** Each line is spoken as its own utterance,
+and the caption on screen switches when the voice does, so the words you read
+are the words you hear. If there's no voice available the subtitles fall back to
+a steady timer, so the tape is still watchable.
+
+**It degrades properly.** Speech synthesis isn't on every device, `getVoices()`
+is often empty until it loads, and some people just don't want it. So:
+
+- a **Tape voices: On / Off** setting, remembered between visits
+- turning **sound off** silences the voices too
+- if the device has no voice at all, nothing throws — the tapes play with
+  subtitles, and Settings says so
+- closing a tape, or quitting mid-sentence, **cancels the speech** rather than
+  leaving a disembodied voice talking over the menu
+
+> ⚡ **A performance fix fell out of this.** Adding the four TV static frames
+> pushed the pre-built shading tables to about **36MB**, and the test suite —
+> which builds ~50 game instances — ground to a halt. The tables are now built
+> **on demand**: only the surfaces you actually look at get shaded. Heap dropped
+> from ~36MB to **7MB**, which matters much more on an old iPad than it does on
+> a test runner.
+
 ### 📼 Round 9 — the tapes actually play
 
 Watching a tape used to show a sheet of paper with the words on it. Now it
@@ -1120,7 +1161,7 @@ drag-to-look on a tablet.
 
 ## ⚠️ What still needs doing
 
-**Upload it, then play it with real people.** All **21 test suites — 1,209 checks
+**Upload it, then play it with real people.** All **21 test suites — 1,249 checks
 — pass**, but no human has actually played any of this yet. Things worth
 watching for:
 

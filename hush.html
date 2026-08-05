@@ -287,8 +287,10 @@
         There are <b>six video tapes</b>, one on every floor. Picking one up only
         puts it in your bag — to watch it you have to find a <b>television</b>,
         and there is one on every floor too.<br><br>
-        The tapes really play — a picture on the screen, subtitles, a timecode
-        and the hiss of the tape running. That means standing still in the dark
+        The tapes really play — a picture on the screen, a voice reading them
+        out, subtitles, a timecode and the hiss of the tape running. (If your
+        device has no voice, or you turn voices off in Settings, the subtitles
+        carry on by themselves.) That means standing still in the dark
         with the sound up, which is exactly when it finds you.<br><br>
         You can get out without watching any of them — but you won't know what
         happened here.
@@ -321,6 +323,9 @@
       <p class="note" id="scareNote"></p>
       <p class="lbl">Sound</p>
       <div class="row" id="soundRow"></div>
+      <p class="lbl">Tape voices</p>
+      <div class="row" id="voiceRow"></div>
+      <p class="note" id="voiceNote"></p>
       <button class="ghost" id="btnSettingsBack">◀ BACK</button>
     </div>
   </div>
@@ -613,6 +618,7 @@
   try {
     const s = localStorage.getItem('hushScare'); if (s) scareLevel = s;
     const so = localStorage.getItem('hushSound'); if (so !== null) soundOn = so === '1';
+    const vo = localStorage.getItem('hushVoices'); if (vo !== null) voicesOn = vo === '1';
   } catch (e) {}
 
   const NOTES = {
@@ -1041,22 +1047,34 @@
 
   // Shading every one of ~150,000 pixels a frame with real multiplies was
   // costing more than everything else put together. Instead each texture is
-  // pre-darkened into LEVELS copies once at startup, so drawing a pixel is a
-  // single array read. 64 steps is fine enough that no banding shows.
+  // pre-darkened into LEVELS copies, so drawing a pixel is a single array
+  // read. 64 steps is fine enough that no banding shows.
+  //
+  // These are built ON DEMAND. Building all of them up front came to about
+  // 36MB and a noticeable pause at startup — and most of it is for surfaces
+  // you may never look at, like the floor tint of a room you never enter.
   const LEVELS = 64;
   const shaded = {};
-  function buildShadeTables() {
-    for (const key in textures) {
-      const src = textures[key], out = new Array(LEVELS);
-      for (let l = 0; l < LEVELS; l++) {
-        const k = (l + 0.5) / LEVELS, dst = new Uint32Array(src.length);
-        for (let i = 0; i < src.length; i++) dst[i] = shadePix(src[i], k);
-        out[l] = dst;
-      }
-      shaded[key] = out;
+  function shadeSet(key) {
+    let set = shaded[key];
+    if (set) return set;
+    const src = textures[key];
+    if (!src) return null;
+    set = new Array(LEVELS);
+    for (let l = 0; l < LEVELS; l++) {
+      const k = (l + 0.5) / LEVELS, dst = new Uint32Array(src.length);
+      for (let i = 0; i < src.length; i++) dst[i] = shadePix(src[i], k);
+      set[l] = dst;
     }
+    shaded[key] = set;
+    return set;
   }
   const levelOf = k => k <= 0 ? 0 : k >= 1 ? LEVELS - 1 : (k * LEVELS) | 0;
+
+  // just the surfaces you see in the first frame, so nothing stutters on entry
+  function buildShadeTables() {
+    ['#', '#0', 'floor', 'floor0', 'ceil', 'ceil0'].forEach(shadeSet);
+  }
 
   // How lit something is: a flashlight cone that falls away with distance,
   // plus a little ambient once the power is on.
@@ -1083,7 +1101,7 @@
     // rather than once per pixel.
     if (worldMode === 'story') {
       const z = zoneOf(Math.floor(player.y));
-      zoneFloorLut = shaded['floor' + z]; zoneCeilLut = shaded['ceil' + z];
+      zoneFloorLut = shadeSet('floor' + z); zoneCeilLut = shadeSet('ceil' + z);
     } else { zoneFloorLut = null; zoneCeilLut = null; }
     if (!beamF || beamF.length !== RW) beamF = new Float32Array(RW);
     const amb = state && state.powerOn ? 0.30 : 0.10;
@@ -1107,7 +1125,7 @@
       let fx = player.x + rowDist * (dirX - planeX), fy = player.y + rowDist * (dirY - planeY);
       // each floor of the building is painted differently; picking the set
       // once per row keeps it free
-      const lut = isFloor ? (zoneFloorLut || shaded.floor) : (zoneCeilLut || shaded.ceil);
+      const lut = isFloor ? (zoneFloorLut || shadeSet('floor')) : (zoneCeilLut || shadeSet('ceil'));
       // distance falloff and the ceiling's dimming are constant across the row
       const rowK = (isFloor ? 1 : 0.75) / (1 + rowDist * rowDist * 0.045);
       for (let x = 0; x < RW; x++) {
@@ -1142,7 +1160,7 @@
       let key = r.hit;
       if (key === '#' && worldMode === 'story') key = '#' + zoneOf(r.mapY);
       else if (key === 'V') key = 'V' + (((now / 90) | 0) % TV_FRAMES);   // live screen
-      const lut = shaded[key] || shaded['#'];
+      const lut = shadeSet(key) || shadeSet('#');
       const k = lightAt(camX, r.dist, flicker) * (r.side === 1 ? 0.68 : 1);
       const tex = lut[levelOf(k)];
       const stepTex = TEX / h;
@@ -1958,7 +1976,77 @@
   //  scan lines, a tracking bar rolling up the picture, colour bleed, a
   //  timecode, and the words on screen as subtitles.
   // ------------------------------------------------------------
-  let tapeRAF = 0, tapePlaying = -1, tapeT0 = 0;
+  let tapeRAF = 0, tapePlaying = -1, tapeT0 = 0, spokenTape = false;
+
+  // ------------------------------------------------------------
+  //  Voices
+  //
+  //  The browser's own speech synthesis, so the tapes can talk without the
+  //  page having to download a single sound file. It is not available
+  //  everywhere and it can be switched off, so nothing depends on it: if
+  //  there is no voice, the subtitles simply run on a timer instead.
+  // ------------------------------------------------------------
+  let voicesOn = true;
+  let speakingLine = -1;         // which line is being said right now
+  let speakQueue = null;         // cancelled by setting this to null
+
+  const canSpeak = () => {
+    try {
+      return voicesOn && soundOn
+        && typeof speechSynthesis !== 'undefined' && speechSynthesis
+        && typeof SpeechSynthesisUtterance === 'function';
+    } catch (e) { return false; }
+  };
+
+  // Pick something that sounds like a person rather than a robot, if we can.
+  function pickVoice() {
+    try {
+      const all = speechSynthesis.getVoices() || [];
+      if (!all.length) return null;              // often empty until it loads
+      const en = all.filter(v => /^en/i.test(v.lang || ''));
+      const pool = en.length ? en : all;
+      const nice = pool.find(v => /natural|neural|enhanced|premium/i.test(v.name || ''));
+      return nice || pool.find(v => v.localService) || pool[0];
+    } catch (e) { return null; }
+  }
+
+  function stopSpeech() {
+    speakQueue = null;
+    speakingLine = -1;
+    try { if (typeof speechSynthesis !== 'undefined' && speechSynthesis) speechSynthesis.cancel(); }
+    catch (e) {}
+  }
+
+  // Say the lines one after another, telling us which one is being said so the
+  // subtitle on screen matches the voice.
+  function speakTape(idx) {
+    if (!canSpeak()) return false;
+    const lines = TVOICE[idx] || [];
+    if (!lines.length) return false;
+    const style = TVOICE_STYLE[idx] || { rate: 1, pitch: 1 };
+    const voice = pickVoice();
+    const me = {};
+    speakQueue = me;
+    let i = 0;
+    const next = () => {
+      if (speakQueue !== me) return;             // the tape was stopped
+      if (i >= lines.length) { speakingLine = lines.length; return; }
+      speakingLine = i;
+      let u;
+      try { u = new SpeechSynthesisUtterance(lines[i]); }
+      catch (e) { speakQueue = null; return; }
+      if (voice) u.voice = voice;
+      u.rate = style.rate; u.pitch = style.pitch;
+      u.volume = 1;
+      u.onend = () => { i++; setTimeout(next, 420); };
+      u.onerror = () => { i++; setTimeout(next, 420); };
+      try { speechSynthesis.speak(u); }
+      catch (e) { speakQueue = null; }
+    };
+    // a beat of tape hiss before the first word, while the picture locks on
+    setTimeout(() => { if (speakQueue === me) next(); }, 900);
+    return true;
+  }
 
   function showTape(idx) {
     const t = TAPES[idx];
@@ -1971,6 +2059,8 @@
       `<p class="note" style="color:#8a7358;margin:0 0 8px">${t.who}</p>${t.body}`;
     $('tapeView').classList.add('on');
     tvHiss(true);
+    speakingLine = -1;
+    spokenTape = speakTape(idx);        // false if this browser has no voice
     const step = () => {
       if (tapePlaying !== idx) return;
       drawTapeFrame(idx, (performance.now() - tapeT0) / 1000);
@@ -1982,6 +2072,7 @@
   function closeTape() {
     tapePlaying = -1;
     cancelAnimationFrame(tapeRAF);
+    stopSpeech();
     tvHiss(false);
     $('tapeView').classList.remove('on');
     resumeRound();
@@ -2001,6 +2092,45 @@
      'EVERYONE OUT THROUGH THE LOADING BAY', 'DO NOT SAY GOODNIGHT TO IT'],
     ['[NO LABEL]', 'HELLO?', 'NOBODY CAME TO BE LOOKED AFTER',
      'ARE YOU GOING TO SLEEP NOW?'],
+  ];
+
+  // What each speaker actually says. One entry per subtitle line, so the words
+  // on screen are the words you hear.
+  const TVOICE = [
+    ['Welcome to Hushabye Toy Company.',
+     'Where every child sleeps soundly.',
+     'Say goodnight to Wink.',
+     'Wink never sleeps, so you can.'],
+    ['Machine four. Twelve minutes past three.',
+     "It's running, and there is nobody at it.",
+     "That's the third night this week.",
+     "Buildings do not thread themselves."],
+    ['Filling bay. Shift log.',
+     'Order from upstairs. Do not use wadding.',
+     'Use the material from containment.',
+     'I asked what it was. They said it stays awake.'],
+    ['Playtest. Session forty one.',
+     'One child. One unit. One hour.',
+     'She asked it to stop looking at her.',
+     'It stopped. We never gave it eyes that move.'],
+    ['Containment. Twenty three forty.',
+     'The cage is open. From the inside.',
+     'Everyone out through the loading bay.',
+     'Do not say goodnight to it.'],
+    ['Hello?',
+     'Nobody came to be looked after.',
+     'I stayed up. I am very good at staying up.',
+     'Are you going to sleep now?'],
+  ];
+
+  // Six speakers, told apart by how fast and how low they talk.
+  const TVOICE_STYLE = [
+    { rate: 1.05, pitch: 1.25 },   // the announcer, bright and salesy
+    { rate: 0.90, pitch: 0.95 },   // the night worker, tired
+    { rate: 0.85, pitch: 0.80 },   // the supervisor, ashamed
+    { rate: 0.95, pitch: 1.05 },   // the researcher, clinical
+    { rate: 1.15, pitch: 1.15 },   // the last night, frightened
+    { rate: 0.62, pitch: 0.55 },   // WINK
   ];
 
   function drawTapeFrame(idx, t) {
@@ -2063,12 +2193,23 @@
     g.font = `${Math.round(H * 0.042)}px 'Courier New',monospace`;
     g.fillText(`SP  HUSHABYE TOY CO.`, W * 0.05, H * 0.895);
 
-    // ---- subtitles, one line at a time ----
+    // ---- subtitles ----
+    // If a voice is reading it, follow the voice, so the words on screen are
+    // the words being said. Otherwise fall back to a steady timer.
     const lines = TSUB[idx] || TSUB[0];
-    const each = 3.6;
-    const li = Math.min(lines.length - 1, Math.floor(Math.max(0, t - 1.2) / each));
-    const into = Math.max(0, t - 1.2) - li * each;
-    if (t > 1.2 && into < each - 0.35) {
+    let li, show;
+    if (spokenTape && speakingLine >= 0) {
+      li = Math.min(lines.length - 1, speakingLine);
+      show = speakingLine < lines.length;
+    } else if (spokenTape) {
+      li = 0; show = false;                       // hasn't started talking yet
+    } else {
+      const each = 3.6;
+      li = Math.min(lines.length - 1, Math.floor(Math.max(0, t - 1.2) / each));
+      const into = Math.max(0, t - 1.2) - li * each;
+      show = t > 1.2 && into < each - 0.35;
+    }
+    if (show) {
       g.textAlign = 'center';
       g.font = `bold ${Math.round(H * 0.055)}px 'Courier New',monospace`;
       const txt = lines[li];
@@ -2843,7 +2984,9 @@
   function stopLoop() {
     if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null; }
     running = false;
-    if (tapePlaying >= 0) { tapePlaying = -1; cancelAnimationFrame(tapeRAF); tvHiss(false); }
+    if (tapePlaying >= 0) {
+      tapePlaying = -1; cancelAnimationFrame(tapeRAF); stopSpeech(); tvHiss(false);
+    }
   }
 
   // ---- pausing for an overlay ----
@@ -2872,7 +3015,7 @@
   }
   // shut everything that pauses the round, without resuming it
   function closeOverlays() {
-    tapePlaying = -1; cancelAnimationFrame(tapeRAF); tvHiss(false);
+    tapePlaying = -1; cancelAnimationFrame(tapeRAF); stopSpeech(); tvHiss(false);
     $('tapeView').classList.remove('on');
     $('noteView').classList.remove('on');
     $('keypad').classList.remove('on');
@@ -3044,6 +3187,19 @@
       });
       r.appendChild(b);
     });
+    const vr = $('voiceRow'); vr.innerHTML = '';
+    [['on', '🗣️ On'], ['off', '🔇 Off']].forEach(([k, label]) => {
+      const b = document.createElement('button');
+      b.textContent = label; b.dataset.key = k;
+      b.addEventListener('click', () => {
+        voicesOn = k === 'on';
+        if (!voicesOn) stopSpeech();
+        try { localStorage.setItem('hushVoices', voicesOn ? '1' : '0'); } catch (e) {}
+        refreshSettings();
+      });
+      vr.appendChild(b);
+    });
+
     const s = $('soundRow'); s.innerHTML = '';
     [['on','🔊 On'],['off','🔇 Off']].forEach(([k, label]) => {
       const b = document.createElement('button');
@@ -3061,8 +3217,14 @@
       b.classList.toggle('active', b.dataset.key === scareLevel));
     Array.from($('soundRow').children).forEach(b =>
       b.classList.toggle('active', b.dataset.key === (soundOn ? 'on' : 'off')));
+    Array.from($('voiceRow').children).forEach(b =>
+      b.classList.toggle('active', b.dataset.key === (voicesOn ? 'on' : 'off')));
     const found = SCARES.find(s => s[0] === scareLevel);
     $('scareNote').textContent = found ? found[2] : '';
+    $('voiceNote').textContent = canSpeak()
+      ? 'The tapes are read aloud by your device.'
+      : (voicesOn ? "This device has no voice — the tapes still play with subtitles."
+                  : 'The tapes play with subtitles only.');
   }
 
   // ============================================================
@@ -3190,7 +3352,7 @@
   window.__hush = {
     MAP_SRC, W, H, SOLID, NOTES, CH,
     setCell, cellsNear, buildChunk, chunkAt, startEndless, huntSpeed,
-    castRayDir, makeTextures, allocBuffers, buildShadeTables, shaded, LEVELS,
+    castRayDir, makeTextures, allocBuffers, buildShadeTables, shadeSet, shaded, LEVELS,
     sizeView, noteFrameTime, setBig, toggleBig, fitScreen, MAX_PIXELS,
     get bigMode() { return bigMode; }, get planeScale() { return planeScale; },
     get resScale() { return resScale; },
@@ -3210,6 +3372,10 @@
     ZONE_NAMES, zoneOf, TAPES, REACH_ARM, noteKeyFor, NOTES, SPRITE_OF, ACTIONS,
     drawSprite, reachableCells, nearbyAction,
     pickUpTape, showTape, closeTape, drawTapeFrame, TAPE_SCENES, TSUB, tapeWink,
+    TVOICE, TVOICE_STYLE, speakTape, stopSpeech, canSpeak, pickVoice,
+    get speakingLine() { return speakingLine; }, set speakingLine(v) { speakingLine = v; },
+    get spokenTape() { return spokenTape; }, set spokenTape(v) { spokenTape = v; },
+    get voicesOn() { return voicesOn; }, set voicesOn(v) { voicesOn = !!v; },
     useTV, startFinale, showNote, closeNote,
     get tapePlaying() { return tapePlaying; },
     pauseRound, resumeRound, openKeypad, closeKeypad, loop, closeOverlays, pressQuit,
