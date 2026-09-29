@@ -1,9 +1,6 @@
 # KanDe Bros — Roadmap
 
-**Three games, live at https://kandebros.com.**
-
-> 🆕 **Latest: Hush Round 11 — the music box.** Only `hush.html` and this
-> `ROADMAP.md` changed. Upload just those two.
+**Three games now.** Nothing is uploaded yet.
 
 ## 📁 The site is now five files
 
@@ -461,14 +458,12 @@ cancellation — so it now reads "+3 towards texture packs".
 A first-person horror game. You're locked in a toy factory; something is in
 there with you.
 
-**Five puzzles, in order**
+**Four puzzles, in order**
 
 1. **The power** — find 3 fuses, start the generator. Opens the first door.
 2. **The circuit** — two terminals behind wire. Needs the Reacher.
 3. **The code** — a 4-digit code split across two notes. Opens the office door.
-4. **The music box** — play Wink's lullaby from a card. Unlocks the levers.
-   The game doesn't pause while you play, and every note is a noise.
-5. **The shutter** — three levers, and the order matters. A note has it.
+4. **The shutter** — three levers, and the order matters. A note has it.
 
 **How it's built**
 
@@ -600,56 +595,43 @@ flagship was **WINK**. The slogan was *"Wink never sleeps — so you can."*
 Every floor is painted differently — walls, floor and ceiling are tinted per
 zone — so you always know where you are, and the HUD names the floor you're on.
 
-### 🎵 Round 11 — the music box
+### 🕯️ Round 11 — WINK gets properly frightening
 
-Containment used to be three levers and nothing else. Now the levers are
-**locked to a tune**, and the only thing that plays it is a music box.
+Five changes, and none of them are just "make it faster".
 
-**Where things are.** The box sits on a shelf at the end of the short
-dead-end nook on the east side of Containment. A **lullaby card** is pinned in
-the little dead end near the keypad door, so you find the song before the box.
-Try a lever before you've played it and it tells you it's locked
-(*"PLAY ME TO SLEEP"*).
+**1 · It will not let you watch it move.** Look straight at it from across a
+room and it **stops dead** and stares back. Look away — even for a second — and
+it is suddenly much closer. While your back is turned it moves up to 45% faster.
+This only happens beyond about four and a half squares, so it can never freeze
+in your face and look broken; up close it just keeps coming, and staring at it
+won't save you.
 
-**How it plays.** Five brass keys — ☾ moon, ★ star, ☁ cloud, ♥ heart,
-✿ flower — keys **1–5** on a keyboard, or tap them. The card shows a
-six-note tune, and it's **different every game** (never the same note three
-times running, so it always sounds like a tune). A wrong note clangs and sends
-you back to the start.
+**2 · It cuts you off.** In a chase it now sometimes paths to where you are
+*about to be* rather than where you are, so it comes round a corner to meet you
+instead of always trailing behind.
 
-**Why it's scary.** It's the first thing in Hush that **doesn't pause the
-game.** The box panel sits low and see-through so you can still see the
-corridor, you can't walk while your hands are on it, but you *can* turn to look
-behind you. And every note is a sound:
+**3 · It talks to you.** Seven quiet lines — *"There you are."*, *"You are still
+awake."*, *"Say goodnight."* — spoken in the **same voice as tape six**, so the
+first time you hear it in a corridor you already know exactly who is speaking.
+Rare, and only when it's within six squares.
 
-| Sound | WINK hears it from | Compared with |
-|---|---|---|
-| A right note | 6.5 cells | quieter than running (9) |
-| A wrong note | 12 cells | louder than running |
-| The last chord | 16 cells | most of the floor |
+**4 · The music box.** A little lullaby starts up when it's hunting you — this
+was a toy factory, after all. It plays **faster and further out of tune the
+closer it gets**, so you can hear it coming before you see it, and it stops the
+moment it loses you. An original eight-note motif, made with oscillators.
 
-Each note also resets WINK's "alert" timer, so it keeps coming instead of
-giving up. The box is at the end of a dead end, so if it does come, there's
-only one way out. Getting caught takes your hands off the box and the song
-has to be played again; doors you'd already opened stay open.
+**5 · Your torch gives out when it's near.** The light flickers harder the
+closer it gets and occasionally drops out altogether, and the dark squeezes in
+as your fear rises. The light itself becomes a warning you learn to read.
 
-It also fits the story: tape 5 says WINK *opened the cage from the inside* after
-watching the staff do it for eleven years. This is what they did.
+**All of it is on a dial.** `DREAD` scales every one of these by scare level —
+**Mild switches the whole lot off**: no stalking, no whispering, no music box,
+no failing torch. Tests confirm each one.
 
-**Also fixed while I was in there:** the on-screen prompt said **"Pull the
-lever"** for everything it didn't have a word for — tapes, the Reacher,
-terminals, cages and televisions. Each one now says what it does.
-
-**Tested:** `mbtest.js` boots the real page and runs **60 checks** — the map
-(box set into a wall, one face to stand at, reachable only after the keypad,
-not past the shutter), the card showing this game's tune, 5,000 random tunes,
-levers locked until the song, keyboard and tap input, wrong notes resetting,
-the hearing distances above, getting caught mid-song, finishing the song, the
-levers and finale afterwards, escaping, a frame drawn with the box on screen,
-and endless mode still running.
-
-**Numbers to tune if it's too hard or too easy:** `BOX_NOTE_HEAR`,
-`BOX_WRONG_HEAR`, `BOX_DONE_HEAR` and `TUNE_LEN` near the music box code.
+> **Is it still fair?** A test plays 2,500 steps on **Nightmare** with
+> everything on, and checks you don't just get caught over and over. And the
+> stalk-distance floor is tested from close range, so the freeze can never look
+> like a bug.
 
 ### 🗣️ Round 10 — the tapes talk
 
@@ -945,9 +927,304 @@ generated chunks never once ended up inside a wall.
 
 ---
 
+## ⚠️ What still needs doing### 🤖 Bots and team modes
+
+**Game mode** and **Computer players** pickers sit on the main menu.
+
+| Mode | Snakes | How it works |
+|---|---|---|
+| Free for all | you + 0–5 bots | Last snake alive wins |
+| 1 v 1 | 2 | Two teams of one |
+| 2 v 2 | 4 | Two teams of two |
+| 3 v 3 | 6 | Two teams of three |
+
+- **Empty seats fill with bots automatically** in team modes. Play 3v3 on your
+  own if you like — you get five bots.
+- Humans are dealt out **alternately**, so two friends land on opposite teams
+  rather than both on one side.
+- **Team colour beats personal colour.** In team games the glow around your
+  snake shows 🔴 Red or 🔵 Blue, because which side someone's on matters more
+  than which colour they picked.
+- **No friendly fire.** Thor's hammer skips teammates and Iron Man's laser
+  passes straight through them to hit the enemy behind. You *can* still crash
+  into a teammate's body — that's just part of the game.
+- A team is out when all its snakes have crashed. If both teams fall on the same
+  tick, the higher **team total** wins.
+- Bots get **random skins**, so they use abilities too. They obey the same 15
+  second cooldown as you — tested.
+
+**Bot difficulty**
+
+| Level | How it plays |
+|---|---|
+| 🙂 Easy | Wanders, makes a mistake about a third of the time, rarely uses abilities |
+| 😐 Medium | Chases the nearest fruit, avoids danger, uses abilities sensibly |
+| 😈 Hard | Also runs a flood-fill to check it isn't sealing itself into a pocket, and uses abilities aggressively |
+
+### 📊 How hard are the bots really? (simulated 1v1, 150 rounds)
+
+Modelling "you" as a beginner who misreacts half the time:
+
+| Bot level | You win | Your score | Bot's score |
+|---|---|---|---|
+| 🙂 Easy | **51%** | 156 | 206 |
+| 😐 Medium | **13%** | 190 | 354 |
+| 😈 Hard | **8%** | 179 | 371 |
+
+- **Easy is a genuinely fair match** for a beginner — near enough a coin flip.
+- **Medium already wins 87% of the time**, and Hard is only a little above that.
+  The big jump is easy→medium, not medium→hard.
+- The bots aren't cheating to do it. They see exactly what you see and share
+  your cooldowns; they're just consistent. The flood-fill is what stops Hard
+  bots trapping themselves, which is how most snake bots die.
+
+If Medium feels brutal, raise its `mistake` value (0.12) in `BOT_LEVELS` near
+the top of the file — that one number is most of the difficulty.
+
+---
+
+# 🔤 WUZZLE
+
+A Boggle-style word game. Trace words through a 4×4 grid of letters before the
+clock runs out.
+
+**Rules** (real Boggle)
+
+- Drag through **touching** letters — sideways, up, down or diagonally
+- No square twice in the same word · 3 letters minimum
+- **Qu** is one square but counts as two letters
+- **Points = letters − 2.** 3 letters = 1, 4 = 2, 5 = 3, 6 = 4, and so on.
+  Every extra letter is worth one more point
+- **If two players find the same word, nobody scores it.** That's the real rule,
+  and it's what makes the game about finding words others won't
+
+**Scoring**
+
+`points = letters − 2`, so 3→1, 4→2, 5→3, 6→4, 7→5, 8→6…
+
+Boggle's real ladder is 1/1/2/3/5/11, which jumps around and is hard to explain.
+The linear rule is easier to hold in your head and always rewards a longer word.
+
+Side effect worth knowing: **scores are about 40% higher** than before, because
+4-letter words (the most common kind) went from 1 point to 2. That makes texture
+packs unlock faster:
+
+| | first pack | all seven |
+|---|---|---|
+| beginner (~5 pts/round) | round 3 | round 17 |
+| decent (~15 pts/round) | round 2 | round 8 |
+| strong (~30 pts/round) | round 2 | round 3 |
+
+If a strong player getting everything in three rounds feels too quick, raise the
+`unlockAt` numbers in `THEMES` — they're the only thing that would need changing.
+
+**Board sizes** (Solo → Board size, or Settings for the default)
+
+| Size | Squares | Words hiding on it | Feel |
+|---|---|---|---|
+| 3 × 3 | 9 | ~69 | Quick. Extra vowels in the dice, or a small board starves |
+| 4 × 4 | 16 | ~187 | Classic Boggle |
+| 5 × 5 | 25 | ~413 | Big Boggle — far more to find |
+
+- Each size uses a **real dice set**: the standard 16 for 4×4, the Big Boggle 25
+  for 5×5, and a 9-dice set picked from the 4×4 dice with the vowel share
+  raised to 46%.
+- **Duds are rejected.** A raw random roll produced a 3×3 board with a *single
+  word* in testing. Boards are now re-rolled until they clear a minimum (25 / 70 / 150 words). Solving costs under 5ms, so it's free.
+- Online, the **host's size applies to everyone**. Guests are only sent the
+  letters and work the size out from how many there are, so the two can never
+  disagree.
+- Tiles and gaps resize per board, so 5×5 still fits without scrolling.
+
+> ⚠️ **A crash this caused.** `rollPlayableBoard()` rolled a board at the new
+> size but solved it against the *old* neighbour map — so choosing 5×5 while the
+> game was on 4×4 crashed on Start. Fixed at the root, and `solve()` now works
+> the grid out from the board it's handed rather than trusting the current size.
+
+**Modes**
+
+- **Solo** — 1, 1½ or 3 minutes, then it shows you every word you missed and
+  what percentage of the board's points you got
+- **Online** — up to 8 players on the **identical board**, racing the same
+  clock. Live "words found" counts while you play, full scores at the end
+
+**The dictionary**
+
+- Stored **front-coded**: an uppercase letter says how many characters this word
+  shares with the previous one, then the rest. 306 KB → 135 KB, and 69 KB
+  gzipped over the wire
+
+**🎨 Texture packs** (Settings → Texture pack)
+
+Six looks for the board. Cosmetic only — same words, same scores, same rules.
+
+| Pack | Look |
+|---|---|
+| 🌊 Ocean | The original deep blue. Default. |
+| ☀️ Sunny | Warm daylight — cream tiles on amber, dark brown letters |
+| 🍃 Windy | Pale and airy — white/mint tiles, teal letters |
+| ⛈️ Stormy | Dark and moody — near-black tiles, glowing violet letters |
+| ❄️ Frosty | Icy — white-blue tiles, deep blue letters |
+| 🪵 Sturdy | Stone and wood — brown tiles, mossy green selection |
+
+- A pack is just **11 CSS variables**. Adding one means adding a row of colours
+  to the `THEMES` list — no new CSS, no new markup.
+- Your choice is saved on the device and the board **fades** between packs
+  rather than snapping.
+- **Every pack is contrast-checked in the tests.** The first attempt looked fine
+  on the unselected tiles but five of six packs had barely-readable letters
+  *while selected* — which is exactly when you're staring at them mid-drag. The
+  test now requires 4.5:1 (the standard for normal text) for both the resting
+  and the selected state, and every pack clears it.
+
+**Fitting on one screen**
+
+Nothing in Wuzzle or the hub ever scrolls. Two things make that true:
+
+1. **Everything is sized in `vh`/`clamp()`** — text, padding, the board and the
+   word list all shrink on a short screen before anything else happens.
+2. **A measured fit-to-screen scale as a safety net.** After layout, the page
+   measures its own content and applies a CSS `scale()` if it still doesn't fit.
+   It never scales *up* (that would blur things), only down.
+
+`html,body{overflow:hidden}` means a mistake shows up as clipped content rather
+than a silent scrollbar — much easier to notice and fix.
+
+> ⚠️ On a **phone held sideways** there's very little height, so the scale can
+> get small. If that reads badly, the fix is a two-column landscape layout
+> rather than loosening the no-scroll rule.
+
+**Who's playing, and who's winning**
+
+- In the lobby and during the game, everyone sees **the list of players' names**
+  — so you know who you're up against.
+- **Nobody sees anyone else's score or word count until the round ends.** The
+  host doesn't get a peek either. An earlier version broadcast live counts;
+  that's now removed and `pushLive()` is a deliberate no-op with a comment
+  saying why.
+
+**⚠️ The one that got away — tracing stopped working**
+
+While restyling, the letter squares were renamed from `.tile` to `.tileL` (to
+stop them clashing with the home-screen menu tiles). The place that *creates*
+them was updated; the place that *hit-tests* them was not. `tileAt()` went on
+looking for `.tile`, never matched anything, and **dragging silently did
+nothing at all**.
+
+Two things stop it happening again:
+
+- The class name now lives in a single `TILE_CLASS` constant, declared at the
+  top of the file, used by both the renderer and the hit-test.
+- `dragtest.js` drives the **real pointer handlers** with real coordinates —
+  pointerdown, a series of pointermoves across squares, pointerup — and asserts
+  the word is accepted. Verified by putting the bug back: the test fails.
+
+The deeper cause was a **gap in the test harness**, not the game. The fake DOM
+never connected `.className` to `.classList`, so a class-name mismatch was
+invisible to every test. It does now.
+
+**Things worth knowing**
+
+- Boards use the **real 16 Boggle dice**, not random letters. Random letters
+  give unplayable consonant soup; these average ~86 findable words per board,
+  and the worst of 50 test boards still had 23.
+- The **host re-checks every word** a guest claims — that it's real, and that it
+  can actually be traced on that board. A guest can send anything.
+- During play only *counts* go over the wire, never the words themselves —
+  otherwise you could read your opponents' answers off the network.
+
+---
+
+## 🐞 Bug sweep
+
+A pass over both games looking for anything broken. Four real bugs found, all in
+Wuzzle — Snake came through clean.
+
+| Bug | What went wrong |
+|---|---|
+| **Quitting wiped your points** | Wuzzle threw away everything you'd scored when you left mid-round. Snake had always banked it. Now both do. |
+| **Stale word counter** | `updateScore()` rebuilt a `<span id="foundCount">` that already existed in the markup — so the page had **two elements with the same id** and the original sat on "0 words" forever. |
+| **"New pack!" banner shown twice** | A guest's results screen redraws (once waiting, once when the host's tally lands), and the unlock banner reappeared each time. |
+| **Host tallied too early** | The host added up the instant its own clock hit zero. Guests' clocks start when the "start" message lands, so a word sent in the final moment could miss the count. The host now waits 700ms. |
+
+Also clarified confusing wording: the results screen said "+3 to your total"
+next to a table showing 2. Those are different numbers on purpose — pack
+progress counts **your own words**, the match score applies the duplicate
+cancellation — so it now reads "+3 towards texture packs".
+
+**Two new test suites came out of this:**
+
+- `wzonline.js` — boots **two (and three) complete copies of Wuzzle** wired by a
+  fake network, and plays a real match: same board for everyone, words traced by
+  dragging, duplicates cancelling, cheat attempts rejected, host leaving. This
+  path had never been tested end to end.
+- `structuretest.js` — checks all three pages for duplicate ids, unbalanced CSS,
+  elements the code reaches for that don't exist, broken links, and ids created
+  in JavaScript that clash with the markup. That last check is what would have
+  caught the `foundCount` bug on day one.
+
+> ⚠️ Both scanners produced **false alarms** first time by reading ids out of
+> comments, CSS selectors and template strings. They now strip `<script>`,
+> `<style>` and comments before looking. A test that cries wolf is worse than no
+> test.
+
+---
+
+# 🔦 HUSH
+
+A first-person horror game. You're locked in a toy factory; something is in
+there with you.
+
+**Three puzzles, in order**
+
+1. **The power** — find 3 fuses, start the generator. Opens the first door.
+2. **The code** — a 4-digit code split across two notes. Opens the second door.
+3. **The shutter** — three levers, and the order matters. A third note has it.
+
+**How it's built**
+
+No 3D library. It's a **raycaster** — for each of 480 screen columns it walks a
+ray through the grid until it hits a wall, and draws that column at a height
+based on distance. Same technique as the original Wolfenstein. That means:
+
+- **Nothing to download** beyond the page itself
+- The maths is **testable** — 720 rays cast from two positions all land on a
+  wall, none escape the building, none run forever
+- It runs on anything, including an old iPad
+
+**The monster** hunts by **sound**. Walking is heard from ~3.5 cells, running
+from ~9, and it sees ~11 cells if nothing's in the way. It finds you with a
+breadth-first search over the grid, re-planned about three times a second.
+Walk when it's close.
+
+**The map is generated, not hand-drawn.** My first attempt was drawn by hand and
+was badly broken — of the things you need, almost nothing was reachable. It's
+now built as four zones stacked up the building, each sealed by one door, with a
+perfect maze carved inside each zone so everything within is guaranteed
+reachable. A test walks the whole building at every stage and checks both that
+you *can* reach what you need, and that you *can't* reach the next puzzle early.
+
+**Scares.** Default is "Spooky" — tense chases, a cartoonish patchwork toy, a
+sudden loud reveal when it catches you. **No blood, no gore.** Settings has
+**Mild** (no jumpscares at all) and **Tense**, plus a sound toggle. Getting
+caught keeps your progress: doors you opened stay open.
+
+**Controls** work both ways — WASD + mouse-look on a laptop, on-screen stick and
+drag-to-look on a tablet.
+
+> ⚠️ **Two bugs the tests caught before you ever played it:**
+> 1. `flashPrompt()` was called but never written — so trying the generator
+>    without enough fuses **crashed the game**. That's the most likely first
+>    thing anyone does.
+> 2. The keypad cleared a wrong code on a `setTimeout`. Type fast, or let the
+>    timer slip, and the pad jammed with four dead digits. It now clears on the
+>    next keypress instead of trusting a timer.
+
+---
+
 ## ⚠️ What still needs doing
 
-**Upload it, then play it with real people.** All **22 test suites — 1,282 checks
+**Upload it, then play it with real people.** All **22 test suites — 1,313 checks
 — pass**, but no human has actually played any of this yet. Things worth
 watching for:
 
@@ -978,9 +1255,7 @@ watching for:
   judge without playing.
 - Is the monster too aggressive, or too easy to lose? `HEAR_RUN`, `SEE` and its
   speed are the three numbers to turn.
-- Do the five puzzles read clearly, or do people wander lost?
-- Is the music box too punishing at the end of a dead end? Does anyone
-  actually turn round to look while they play?
+- Do the three puzzles read clearly, or do people wander lost?
 - Does the raycaster hold 60fps on an older iPad?
 - Are Easy bots actually beatable for a real beginner, and is Medium too big a
   jump? The simulation says easy→medium is a cliff.
@@ -1007,7 +1282,7 @@ Any of those are easy to tune — they're just numbers in the file.
 
 ## 📝 Notes for next time
 
-- Live site: **https://kandebros.com** (GitHub Pages, custom domain)
+- Live site: **https://koolkande-lang.github.io/KanDeGamers/**
 - Repo: **github.com/koolkande-lang/KanDeGamers**
 - One single file, `index.html` — HTML, CSS and JavaScript all together
 - Online play uses **PeerJS** from a CDN. Devices talk directly to each other;

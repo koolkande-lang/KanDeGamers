@@ -193,33 +193,6 @@
     background:#2a1f18;color:var(--ink);border:1px solid var(--line)}
   #kpGrid button:active{background:var(--rust)}
 
-  /* The music box does NOT pause the round, so it sits low and see-through:
-     you keep the corridor in view while you play. */
-  #musicBox{
-    position:fixed;left:0;right:0;bottom:0;display:none;justify-content:center;
-    padding:0 10px max(10px,env(safe-area-inset-bottom));z-index:39;pointer-events:none;
-  }
-  #musicBox.on{display:flex}
-  #mbBox{
-    pointer-events:auto;background:rgba(40,18,16,.86);border:2px solid #8a5a2b;border-radius:10px;
-    padding:12px 14px 8px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.7);
-  }
-  #mbSlots{display:flex;gap:6px;justify-content:center;margin-bottom:10px}
-  #mbSlots .slot{width:34px;height:34px;line-height:34px;border-radius:50%;
-    background:#1a0d0b;border:1px solid #5b3a1e;color:#6b5844;font-size:1.1rem}
-  #mbSlots .slot.full{color:#f6d68a;border-color:#c9a24a}
-  #mbSlots .slot.bad{border-color:#ef4444;background:#3b0d0d}
-  #mbKeys{display:flex;gap:8px;justify-content:center}
-  #mbKeys button{width:clamp(48px,11vw,62px);height:clamp(56px,12vw,70px);border-radius:8px;
-    background:linear-gradient(180deg,#e9d9a8,#b9974f);color:#3b2412;border:1px solid #6b4a1e;
-    display:flex;flex-direction:column;align-items:center;justify-content:center;touch-action:none}
-  #mbKeys button:active{filter:brightness(1.25);transform:translateY(2px)}
-  #mbKeys .sym{font-size:1.5rem;line-height:1}
-  #mbKeys .num{font-size:.6rem;opacity:.6;margin-top:3px}
-  #mbHint{margin:8px 0 0}
-  #mbClose{margin:6px auto 0;width:auto;padding:6px 18px}
-  #noteBox .tune{font-size:1.9em;letter-spacing:.25em;line-height:1.6}
-
   #noteView{
     position:fixed;inset:0;display:none;align-items:center;justify-content:center;
     background:rgba(0,0,0,.85);z-index:40;padding:20px;
@@ -302,15 +275,15 @@
       <p class="lbl">What you're doing</p>
       <p class="note" style="text-align:left">
         You are climbing six floors of a toy factory, and each one is locked.
-        The <b>power</b>, two <b>terminals</b>, a <b>door code</b>, a
-        <b>music box</b> and the <b>shutter</b> stand between you and the
-        loading bay.<br><br>
-        The music box plays <b>out loud</b>. The game keeps going while you
-        play it, so keep an ear out.<br><br>
+        The <b>power</b>, two <b>terminals</b>, a <b>door code</b> and the
+        <b>shutter</b> stand between you and the loading bay.<br><br>
         Read every <b>note</b> — the codes are written down somewhere. Find the
         <b>Reacher</b> on the stuffing floor; it gets you things behind wire.<br><br>
         <b>WINK is in here with you.</b> It hunts by sound. Walk when it's close,
-        and it will lose you.
+        and it will lose you.<br><br>
+        It will not let you watch it move. Look straight at it from across a
+        room and it stops dead — look away, and it is suddenly much nearer.
+        If you can hear the music box, it has already found you.
       </p>
       <p class="lbl">The tapes</p>
       <p class="note" style="text-align:left">
@@ -403,13 +376,6 @@
   <button class="ghost" id="kpClose" style="margin-top:10px">CLOSE</button>
 </div></div>
 
-<div id="musicBox"><div id="mbBox">
-  <div id="mbSlots"></div>
-  <div id="mbKeys"></div>
-  <p class="note" id="mbHint"></p>
-  <button class="ghost" id="mbClose">STEP AWAY</button>
-</div></div>
-
 <div id="noteView"><div id="noteBox">
   <h3 id="noteTitle">NOTE</h3>
   <div id="noteText"></div>
@@ -441,7 +407,7 @@
   //
   //  Set into a wall, so nothing is ever left standing in mid-air:
   //  G  generator         P  keypad panel     L  lever
-  //  V  television + video player    B  the music box
+  //  V  television + video player
   //  s  power terminal behind wire, U  tape in a cage — Reacher only
   //
   //  Six floors of the Hushabye Toy Co., stacked up the building. Each floor
@@ -494,9 +460,9 @@
     '#.#.###.#.#.###.#.#.###.#.#.##..#',
     '#.#.#...#.#.....#.....#...#.#...#',
     '#.#.#.###.##L#######U#V##.#.#.###',
-    '#...#.#.....#.......#...#.#.#...B',
+    '#...#.#.....#.......#...#.#.#...#',
     '#####.##I##.#.#####.#.#.##L.#####',
-    '#.......#n..#.#...#...#...#.....#',
+    '#.......#...#.#...#...#...#.....#',
     '#.#####.#####.#.#.####L##..####.#',
     '#.............#.#...............#',
     '#############################S###',
@@ -522,7 +488,7 @@
   const H = MAP_SRC.length, W = MAP_SRC[0].length;
   const grid = MAP_SRC.map(r => r.split(''));
 
-  const SOLID = new Set(['#', '+', 'E', 'K', 'S', 'I', 's', 'U', 'G', 'P', 'L', 'V', 'B']);
+  const SOLID = new Set(['#', '+', 'E', 'K', 'S', 'I', 's', 'U', 'G', 'P', 'L', 'V']);
 
   // ============================================================
   //  The world — a fixed building, or an endless one
@@ -673,13 +639,6 @@
          'Loading bay shutter needs all three levers.<br>' +
          'Left first. Then right. Then the middle one.<br>' +
          'Get it wrong and it resets. Get it right and RUN.' },
-    // Written out fresh each game, because the tune is different every game.
-    d: { title: 'PINNED TO THE CAGE — CONTAINMENT', body: () =>
-         'Wink\'s song. The one we play it to sleep with.<br>' +
-         'The levers stay locked until the box has played it through.<br><br>' +
-         '<span class="tune">' + state.tune.map(i => MB_KEYS[i].sym).join(' ') + '</span><br>' +
-         'Wrong note and it starts again from the top.<br><br>' +
-         '<b>It is LOUD.</b> Look behind you before you start.' },
     reacher: { title: 'THE REACHER', body:
          'A maintenance claw on a spring wire. The line workers used them to ' +
          'fish parts out of the machines without stopping the belt.<br><br>' +
@@ -739,7 +698,6 @@
       fuses: 0, powerOn: false, doorOpen: false,
       code: '4712', keypadOpen: false, keypadDone: false,
       leverOrder: [], leversDone: false,
-      tune: makeTune(), boxEntry: [], boxDone: false, boxOpen: false,   // the music box
       notesRead: {}, caught: 0, started: 0, fear: 0,
       reacher: false,            // have you found it yet
       sockets: {},               // which power terminals you've bridged
@@ -777,7 +735,7 @@
       mode: 'wander', lastKnown: null, modeSince: 0, listenUntil: 0,
       stepPhase: 0, headTurn: 0, jaw: 0, lunge: 0, moved: 0, seenAt: 0 };
     if (full) state = freshState();
-    else { state.leverOrder = []; state.boxEntry = []; state.boxOpen = false; state.fear = 0; }
+    else { state.leverOrder = []; state.fear = 0; }
     // put already-solved things back the way they were
     if (state.powerOn) openDoors('+');
     if (state.keypadDone) openDoors('K');
@@ -1041,27 +999,6 @@
       box(38, 20, 2, 2, rgb(120, 122, 120));
     });
 
-    // The music box: a painted wooden box on a wall shelf, lid open, a brass
-    // comb inside, the winding key on the side and a tiny Wink on the lid.
-    textures['B'] = panel(55, (px, box) => {
-      box(8, 44, 48, 4, rgb(70, 52, 36));            // shelf
-      box(10, 48, 4, 8, rgb(60, 44, 30));            // brackets
-      box(50, 48, 4, 8, rgb(60, 44, 30));
-      box(12, 28, 40, 16, rgb(128, 48, 52));         // box body, faded red
-      box(12, 28, 40, 2, rgb(160, 70, 70));
-      for (let i = 0; i < 5; i++) box(16 + i * 7, 36, 4, 4, rgb(206, 176, 96)); // painted stars
-      box(14, 30, 36, 3, rgb(176, 150, 80));         // brass comb
-      for (let i = 0; i < 12; i++) box(15 + i * 3, 33, 1, 2, rgb(200, 180, 110));
-      box(12, 12, 40, 16, rgb(110, 40, 44));         // open lid, leaning back
-      box(14, 14, 36, 12, rgb(70, 26, 30));          // lid lining
-      box(28, 16, 8, 7, rgb(150, 124, 92));          // tiny Wink: body
-      box(29, 12, 6, 5, rgb(170, 140, 104));         // head
-      box(30, 13, 1, 1, rgb(20, 20, 20));            // button eyes
-      box(33, 13, 1, 1, rgb(20, 20, 20));
-      box(52, 32, 4, 2, rgb(180, 160, 90));          // winding key
-      box(55, 29, 2, 8, rgb(200, 176, 100));
-    });
-
     // A television on a bracket, with the video player slung under it.
     // Four frames of it, cycled by the renderer, so the screen actually
     // flickers instead of being a frozen photograph of static.
@@ -1154,7 +1091,18 @@
   function render(now) {
     if (!img) allocBuffers();
     // the torch is old; it wavers
-    const flicker = 0.93 + Math.sin(now / 70) * 0.03 + Math.sin(now / 13) * 0.02;
+    // The torch is old and it wavers. It also gives out badly when the thing
+    // is close — which makes the light itself a warning you learn to read.
+    let flicker = 0.93 + Math.sin(now / 70) * 0.03 + Math.sin(now / 13) * 0.02;
+    if (monster && state && !state.endless) {
+      const near = Math.max(0, 1 - Math.hypot(player.x - monster.x, player.y - monster.y) / 9);
+      const panic = near * dread();
+      if (panic > 0.05) {
+        flicker *= 1 - panic * 0.35 * (0.5 + Math.abs(Math.sin(now / 41)) * 0.5);
+        // and every so often it drops out altogether for a moment
+        if (Math.sin(now / 137) > 0.985 - panic * 0.02) flicker *= 0.25;
+      }
+    }
     const bob = Math.sin(player.bob) * RH * 0.008;
     const horizon = (RH / 2 + bob) | 0;
     horizonY = horizon;
@@ -1616,9 +1564,11 @@
     for (let i = 0; i < n; i++) {
       ctx.fillRect((Math.random() * RW) | 0, (Math.random() * RH) | 0, 1, 1);
     }
-    const v = ctx.createRadialGradient(RW/2, RH/2, RH*0.2, RW/2, RH/2, RH*0.85);
+    // the dark squeezes in as the fear rises, so you can see less and less
+    const inner = RH * (0.20 - state.fear * 0.11 * dread());
+    const v = ctx.createRadialGradient(RW/2, RH/2, Math.max(1, inner), RW/2, RH/2, RH*0.85);
     v.addColorStop(0, 'rgba(0,0,0,0)');
-    v.addColorStop(1, `rgba(0,0,0,${0.55 + state.fear * 0.35})`);
+    v.addColorStop(1, `rgba(0,0,0,${Math.min(0.97, 0.55 + state.fear * 0.35 + state.fear * 0.12 * dread())})`);
     ctx.fillStyle = v;
     ctx.fillRect(0, 0, RW, RH);
     if (state.fear > 0.55) {
@@ -1640,13 +1590,6 @@
   }
 
   function updatePlayer(dt) {
-    if (state && state.boxOpen) {
-      player.speed = 0;                     // standing still, hands on the box
-      if (keys['arrowleft']) player.a -= 2.2 * dt;
-      if (keys['arrowright']) player.a += 2.2 * dt;
-      player.a += look; look = 0;
-      return;
-    }
     let fx = 0, fy = 0;
     if (keys['w'] || keys['arrowup']) fy += 1;
     if (keys['s'] || keys['arrowdown']) fy -= 1;
@@ -1691,9 +1634,27 @@
   //  The nastiest part is `search`: it doesn't magically know you moved, so
   //  hiding actually works — and it lingers, so you daren't come out.
   // ------------------------------------------------------------
+  // How much of the nastier behaviour each setting turns on. Mild gets none
+  // of it — no stalking, no whispering, no lullaby.
+  const DREAD = { mild: 0, spooky: 0.6, tense: 0.85, nightmare: 1 };
+  const dread = () => DREAD[scareLevel] !== undefined ? DREAD[scareLevel] : 0.6;
+
   const HUNT_MEMORY = 2600;   // how long it keeps chasing after losing sight
   const SEARCH_TIME = 9000;   // how long it pokes around before giving up
   const LUNGE_RANGE = 3.2;
+  const STALK_MIN = 4.5;      // never freezes closer than this — that'd feel broken
+
+  // Is it in your view, right now, with nothing in the way? This is what the
+  // stalking below hangs on — it will not let you watch it move.
+  function playerCanSee(m) {
+    const d = Math.hypot(m.x - player.x, m.y - player.y);
+    if (d > SEE + 4) return false;
+    let rel = Math.atan2(m.y - player.y, m.x - player.x) - player.a;
+    while (rel > Math.PI) rel -= 2 * Math.PI;
+    while (rel < -Math.PI) rel += 2 * Math.PI;
+    if (Math.abs(rel) > FOV * 0.62) return false;
+    return lineOfSight(player.x, player.y, m.x, m.y);
+  }
 
   function setMode(m, now) {
     if (monster.mode === m) return;
@@ -1731,6 +1692,24 @@
     }
     monster.hunting = monster.mode === 'hunt' || monster.mode === 'alert';
 
+    // ---- it will not be seen moving ----
+    // Look straight at it from across the room and it stops dead. Look away,
+    // even for a moment, and it is suddenly a lot closer. Only ever at a
+    // distance, so it can never freeze in your face and feel broken.
+    const watched = playerCanSee(monster);
+    const canStalk = dread() > 0 && !state.finale && monster.mode === 'hunt';
+    monster.stalking = canStalk && watched && dist > STALK_MIN;
+    if (monster.stalking) {
+      monster.headTurn += (0 - monster.headTurn) * Math.min(1, dt * 6);
+      monster.jaw += (0.18 - monster.jaw) * Math.min(1, dt * 3);
+      monster.a = Math.atan2(player.y - monster.y, player.x - monster.x);
+      monster.moved = 0;
+      settleFear(dt, dist, sees);
+      whisper(now, dist);
+      if (dist < 0.55) caught();
+      return;                                  // perfectly still, watching you
+    }
+
     // ---- stand still and listen now and then; much creepier than pacing ----
     if (now < monster.listenUntil) {
       monster.headTurn = Math.sin(now / 320) * 0.9;
@@ -1750,7 +1729,14 @@
       const from = { x: Math.floor(monster.x), y: Math.floor(monster.y) };
       let target;
       if (monster.mode === 'hunt') {
-        target = { x: Math.floor(player.x), y: Math.floor(player.y) };
+        // Sometimes it heads for where you are ABOUT to be rather than where
+        // you are, so it comes round a corner to meet you.
+        const lead = (Math.random() < 0.45 * dread()) ? 3.5 * Math.min(1, player.speed) : 0;
+        const ax = player.x + Math.cos(player.a) * lead;
+        const ay = player.y + Math.sin(player.a) * lead;
+        const cut = { x: Math.floor(ax), y: Math.floor(ay) };
+        target = (lead && !SOLID.has(at(cut.x, cut.y))) ? cut
+               : { x: Math.floor(player.x), y: Math.floor(player.y) };
       } else if (monster.mode === 'alert' && monster.lastKnown) {
         target = { x: Math.floor(monster.lastKnown.x), y: Math.floor(monster.lastKnown.y) };
       } else if (monster.mode === 'search') {
@@ -1769,6 +1755,8 @@
     let mult = monster.mode === 'hunt' ? 1.5
              : monster.mode === 'alert' ? 1.0
              : monster.mode === 'search' ? 0.8 : 0.55;
+    // the moment your back is turned it makes up ground
+    if (monster.mode === 'hunt' && !watched) mult *= 1 + 0.45 * dread();
     // a last-moment burst when it's nearly on you
     monster.lunge = (monster.mode === 'hunt' && dist < LUNGE_RANGE)
       ? Math.min(1, monster.lunge + dt * 3) : Math.max(0, monster.lunge - dt * 2);
@@ -1802,6 +1790,7 @@
     monster.jaw += (jawWant - monster.jaw) * Math.min(1, dt * 6);
 
     settleFear(dt, dist, sees);
+    whisper(now, dist);
     if (dist < 0.55) caught();
   }
 
@@ -1886,7 +1875,7 @@
   }
 
   const ACTIONS = { f: 'fuse', n: 'note', G: 'gen', P: 'pad', L: 'lever',
-                    T: 'tape', R: 'reacher', V: 'tv', B: 'musicbox' };
+                    T: 'tape', R: 'reacher', V: 'tv' };
   const ARM_ONLY = { s: 'socket', U: 'cage' };
 
   function nearbyAction() {
@@ -1985,10 +1974,6 @@
 
     } else if (a.kind === 'lever') {
       pullLever(a.c);
-
-    } else if (a.kind === 'musicbox') {
-      if (state.boxDone) { flashPrompt('It has played its song. The levers are free.'); return; }
-      openMusicBox();
     }
   }
 
@@ -1996,7 +1981,7 @@
   // both halves of the door code always turn up before the door that needs it.
   // (They used to be picked by a hash of the position, which after the Reacher
   //  card was added could hand you the same card twice and never the code.)
-  const NOTE_ORDER = ['a', 'b', 'c', 'd'];
+  const NOTE_ORDER = ['a', 'b', 'c'];
   function noteKeyFor(c) {
     const cells = [];
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++)
@@ -2514,13 +2499,6 @@
   // Left, then right, then middle — the order is on a note.
   function pullLever(c) {
     if (state.leversDone) return;
-    if (!state.boxDone) {
-      beep(110, 0.18);
-      flashPrompt(state.notesRead.d
-        ? 'Locked. The music box has to play Wink\'s song first.'
-        : 'Locked. A brass plate on it says: PLAY ME TO SLEEP.', 2200);
-      return;
-    }
     const all = [];
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++)
       if (MAP_SRC[y][x] === 'L') all.push({ x, y });
@@ -2547,148 +2525,6 @@
   }
 
   // ============================================================
-  //  The music box
-  //
-  //  Five keys, a six-note tune on a card, and the round does NOT pause while
-  //  you play. Every note is a sound WINK can hear. A wrong note is a clang it
-  //  can hear from much further off, and it sends you back to the start.
-  //  Playing the whole song unlocks the levers — and the last chord carries
-  //  across most of the floor.
-  // ============================================================
-  const MB_KEYS = [
-    { sym: '☾\uFE0E', name: 'moon',   hz: 523.25 },
-    { sym: '★\uFE0E', name: 'star',   hz: 587.33 },
-    { sym: '☁\uFE0E', name: 'cloud',  hz: 659.25 },
-    { sym: '♥\uFE0E', name: 'heart',  hz: 783.99 },
-    { sym: '✿\uFE0E', name: 'flower', hz: 880.00 },
-  ];
-  const TUNE_LEN = 6;
-  const BOX_NOTE_HEAR = 6.5;     // a right note: about as loud as a brisk walk
-  const BOX_WRONG_HEAR = 12;     // a wrong note: louder than running
-  const BOX_DONE_HEAR = 16;      // the last chord: most of the floor
-
-  // A new tune every game. Never the same key three times running, so it
-  // always sounds like a tune rather than a stuck key.
-  function makeTune() {
-    const t = [];
-    while (t.length < TUNE_LEN) {
-      const k = (Math.random() * MB_KEYS.length) | 0;
-      if (t.length >= 2 && t[t.length - 1] === k && t[t.length - 2] === k) continue;
-      t.push(k);
-    }
-    return t;
-  }
-
-  // Something made a noise at (x, y). If WINK is in earshot, it comes to look.
-  function noiseAt(x, y, radius) {
-    if (!monster) return false;
-    if (Math.hypot(monster.x - x, monster.y - y) >= radius) return false;
-    const now = performance.now();
-    monster.lastKnown = { x, y };
-    monster.listenUntil = 0;                    // stop listening — it heard that
-    if (monster.mode === 'hunt') return true;
-    if (monster.mode === 'alert') { monster.modeSince = now; monster.path = []; monster.think = 0; }
-    else setMode('alert', now);
-    return true;
-  }
-
-  function openMusicBox() {
-    state.boxOpen = true;
-    state.boxEntry = [];
-    drawBoxSlots();
-    $('mbHint').textContent = state.notesRead.d
-      ? 'Keys 1–5, or tap. You can still look around.'
-      : 'You don\'t know the song. Somebody must have written it down.';
-    $('musicBox').classList.add('on');
-    $('prompt').classList.remove('on');
-  }
-  function closeMusicBox() {
-    if (!$('musicBox').classList.contains('on') && !(state && state.boxOpen)) return;
-    $('musicBox').classList.remove('on');
-    if (state) { state.boxOpen = false; state.boxEntry = []; }
-  }
-
-  function drawBoxSlots(bad) {
-    const el = $('mbSlots');
-    el.innerHTML = '';
-    for (let i = 0; i < TUNE_LEN; i++) {
-      const d = document.createElement('span');
-      d.className = 'slot' + (bad ? ' bad' : '');
-      const k = state.boxEntry[i];
-      d.textContent = k === undefined ? '·' : MB_KEYS[k].sym;
-      if (k !== undefined) d.classList.add('full');
-      el.appendChild(d);
-    }
-  }
-
-  function playBoxKey(k) {
-    if (!state.boxOpen || state.boxDone || !running) return;
-    const step = state.boxEntry.length;
-    if (k === state.tune[step]) {
-      state.boxEntry.push(k);
-      boxNote(MB_KEYS[k].hz);
-      noiseAt(player.x, player.y, BOX_NOTE_HEAR);
-      drawBoxSlots();
-      if (state.boxEntry.length === TUNE_LEN) finishBox();
-    } else {
-      boxClang(MB_KEYS[k].hz);
-      noiseAt(player.x, player.y, BOX_WRONG_HEAR);
-      state.boxEntry = [];
-      drawBoxSlots(true);
-      flashPrompt('A wrong note — and a loud one. From the top.', 2000);
-    }
-  }
-
-  function finishBox() {
-    state.boxDone = true;
-    noiseAt(player.x, player.y, BOX_DONE_HEAR);
-    // the box plays the whole song back by itself, then the locks let go
-    state.tune.forEach((k, i) => setTimeout(() => boxNote(MB_KEYS[k].hz, 0.7), 140 + i * 170));
-    setTimeout(boom, 140 + TUNE_LEN * 170 + 120);
-    flashPrompt('The song plays through. Somewhere on this floor, the levers unlock.', 2600);
-    setObjective();
-    setTimeout(closeMusicBox, 900);
-  }
-
-  // A music-box tine: a pure note with a faint octave on top, plucked and
-  // left to ring out.
-  function boxNote(hz, vol) {
-    const a = audio(); if (!a) return;
-    const t = a.currentTime, v = (vol || 1) * 0.16;
-    [[1, 1], [2, 0.28], [3.01, 0.08]].forEach(([mul, amp]) => {
-      const o = a.createOscillator(), g = a.createGain();
-      o.type = 'sine'; o.frequency.value = hz * mul;
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(v * amp, t + 0.006);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 1.4 / mul);
-      o.connect(g); g.connect(a.destination);
-      o.start(t); o.stop(t + 1.5);
-    });
-  }
-  // A wrong note: two tines struck out of tune, with a metal clatter.
-  function boxClang(hz) {
-    const a = audio(); if (!a) return;
-    const t = a.currentTime;
-    [hz * 0.94, hz * 1.07].forEach(f => {
-      const o = a.createOscillator(), g = a.createGain();
-      o.type = 'square'; o.frequency.value = f;
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(0.09, t + 0.005);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.7);
-      o.connect(g); g.connect(a.destination);
-      o.start(t); o.stop(t + 0.75);
-    });
-    const src = noise(a), f = a.createBiquadFilter();
-    f.type = 'highpass'; f.frequency.value = 2400;
-    src.connect(f);
-    const g2 = a.createGain();
-    g2.gain.setValueAtTime(0.12, t);
-    g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
-    f.connect(g2); g2.connect(a.destination);
-    src.start(t); src.stop(t + 0.32);
-  }
-
-  // ============================================================
   //  Objective text
   // ============================================================
   function setObjective() {
@@ -2707,9 +2543,6 @@
       ? 'Two terminals behind the wire. Bridge them with the Reacher.'
       : 'Something in here has a long enough arm to reach the terminals.';
     else if (!state.keypadDone) t = 'Find the door code and use the keypad';
-    else if (!state.boxDone) t = state.notesRead.d
-      ? 'Play Wink\'s song on the music box. It is loud.'
-      : 'The levers on this floor are locked to a tune. Find it.';
     else if (!state.leversDone) t = 'Three levers open the shutter — the order matters';
     else t = 'The shutter is open. GET OUT.';
     $('objText').textContent = t;
@@ -2722,7 +2555,6 @@
       (state.powerOn ? '<span class="item">⚡ power</span>' : '') +
       (state.elecOpen ? '<span class="item">🔌 circuit</span>' : '') +
       (state.keypadDone ? '<span class="item">🔑 door</span>' : '') +
-      (state.boxDone ? '<span class="item">🎵 song</span>' : '') +
       `<span class="item">📼 ${state.tapesPlayed.length}/${TAPES.length}</span>` +
       (state.tapes.length > state.tapesPlayed.length
         ? `<span class="item">🎞️ ${state.tapes.length - state.tapesPlayed.length} to watch</span>` : '');
@@ -2812,6 +2644,82 @@
     o.start(t); o2.start(t); o.stop(t + 0.9); o2.stop(t + 0.9);
   }
 
+  // ------------------------------------------------------------
+  //  It talks to you
+  //
+  //  Rare, quiet, and only when it is close. The same voice as tape six, so
+  //  the first time you hear it you already know who is speaking.
+  // ------------------------------------------------------------
+  const WHISPERS = [
+    'There you are.',
+    'I can hear you.',
+    'You are still awake.',
+    'It is very late.',
+    'Do not run. I only want to look after you.',
+    'Say goodnight.',
+    'Are you going to sleep now?',
+  ];
+  let nextWhisper = 0, lastWhisper = -1;
+
+  function whisper(now, dist) {
+    if (dread() < 0.5) return;                 // Mild never hears it speak
+    if (!canSpeak()) return;
+    if (dist > 6 || monster.mode !== 'hunt') return;
+    if (now < nextWhisper) return;
+    if (tapePlaying >= 0) return;              // don't talk over a tape
+    nextWhisper = now + 9000 + Math.random() * 11000;
+    let i = (Math.random() * WHISPERS.length) | 0;
+    if (i === lastWhisper) i = (i + 1) % WHISPERS.length;
+    lastWhisper = i;
+    try {
+      const u = new SpeechSynthesisUtterance(WHISPERS[i]);
+      const v = pickVoice(); if (v) u.voice = v;
+      u.rate = 0.55; u.pitch = 0.4; u.volume = 0.85;   // tape six's voice
+      speechSynthesis.speak(u);
+    } catch (e) {}
+  }
+
+  // ------------------------------------------------------------
+  //  The music box
+  //
+  //  A little lullaby that starts playing when it is hunting you — this was a
+  //  toy factory, after all. It runs slower and further out of tune the
+  //  closer the thing gets, so you can hear it coming before you see it.
+  // ------------------------------------------------------------
+  const LULLABY = [0, 4, 7, 4, 0, -3, 0, 2];    // an original little motif
+  let boxStep = 0, nextNote = 0;
+
+  function musicBox(now, dist) {
+    if (dread() < 0.5 || !soundOn) return;
+    if (monster.mode !== 'hunt' && monster.mode !== 'alert') { boxStep = 0; return; }
+    if (dist > 14) return;
+    const a = audio(); if (!a) return;
+    const near = Math.max(0, 1 - dist / 14);         // 0 far away, 1 on top of you
+    const gap = 620 - near * 150;                    // it speeds up as it nears
+    if (now < nextNote) return;
+    nextNote = now + gap;
+
+    const semi = LULLABY[boxStep % LULLABY.length];
+    boxStep++;
+    // it drifts out of tune the closer it is
+    const detune = (1 - near) * 0 + near * (Math.random() - 0.5) * 55;
+    const freq = 880 * Math.pow(2, semi / 12) * Math.pow(2, detune / 1200);
+    const t = a.currentTime;
+
+    const o = a.createOscillator(); o.type = 'triangle';
+    o.frequency.setValueAtTime(freq, t);
+    const o2 = a.createOscillator(); o2.type = 'sine';   // the tine's overtone
+    o2.frequency.setValueAtTime(freq * 2.02, t);
+    const f = a.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 3200;
+    o.connect(f); o2.connect(f);
+    const g = place(a, f, 0, panOf() * 0.5);
+    const vol = (0.045 + near * 0.085) * dread();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.1);   // like a struck tine
+    o.start(t); o2.start(t); o.stop(t + 1.15); o2.stop(t + 1.15);
+  }
+
   // Breathing when it's close, and a heartbeat that climbs with your fear.
   // Driven from the game loop, not a timer, so pausing really pauses it.
   let nextBreath = 0, nextBeat = 0;
@@ -2832,6 +2740,8 @@
       g.gain.exponentialRampToValueAtTime(0.0001, t + 0.65);
       src.start(t); src.stop(t + 0.7);
     }
+
+    musicBox(now, dist);
 
     if (state.fear > 0.35 && now > nextBeat) {
       nextBeat = now + 900 - state.fear * 420;      // faster as it gets worse
@@ -2920,7 +2830,6 @@
   function caught() {
     if (scaring) return;
     scaring = true;
-    closeMusicBox();
     state.caught++;
     running = false;
     screech();
@@ -3170,10 +3079,9 @@
     const n = NOTES[key];
     if (!n) return;
     state.notesRead[key] = true;
-    if (key === 'd' && !state.endless) setObjective();   // now you know what the levers want
     pauseRound();
     $('noteTitle').textContent = n.title;
-    $('noteText').innerHTML = typeof n.body === 'function' ? n.body() : n.body;
+    $('noteText').innerHTML = n.body;
     $('noteView').classList.add('on');
   }
   function closeNote() {
@@ -3203,30 +3111,16 @@
     if (now < flashUntil) {
       p.classList.add('on');
       p.textContent = flashMsg;
-    } else if (a && !state.keypadOpen && !state.boxOpen) {
+    } else if (a && !state.keypadOpen) {
       p.classList.add('on');
-      p.textContent = promptFor(a);
+      p.textContent = a.kind === 'fuse' ? 'Take the fuse'
+        : a.kind === 'note' ? 'Read it'
+        : a.kind === 'gen' ? (state.powerOn ? 'Running' : 'Start the generator')
+        : a.kind === 'pad' ? (state.keypadDone ? 'Unlocked' : 'Enter the code')
+        : 'Pull the lever';
     } else p.classList.remove('on');
     rafId = requestAnimationFrame(loop);
   }
-  function promptFor(a) {
-    switch (a.kind) {
-      case 'fuse':       return 'Take the fuse';
-      case 'note':       return 'Read it';
-      case 'gen':        return state.powerOn ? 'Running' : 'Start the generator';
-      case 'pad':        return state.keypadDone ? 'Unlocked' : 'Enter the code';
-      case 'lever':      return 'Pull the lever';
-      case 'tape':       return 'Take the tape';
-      case 'cage':       return 'Hook the tape out';
-      case 'reacher':    return 'Take the claw';
-      case 'socket':     return 'Bridge the terminal';
-      case 'tv':         return 'Put a tape in';
-      case 'musicbox':   return state.boxDone ? 'It has played its song' : 'Play the music box';
-      case 'outofreach': return state.reacher ? 'Too far — get closer' : 'Behind wire';
-      default:           return 'Use';
-    }
-  }
-
   function stopLoop() {
     if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null; }
     running = false;
@@ -3261,12 +3155,12 @@
   }
   // shut everything that pauses the round, without resuming it
   function closeOverlays() {
+    stopSpeech();
     tapePlaying = -1; cancelAnimationFrame(tapeRAF); stopSpeech(); tvHiss(false);
     $('tapeView').classList.remove('on');
     $('noteView').classList.remove('on');
     $('keypad').classList.remove('on');
     if (state) state.keypadOpen = false;
-    closeMusicBox();
     pausedForOverlay = false;
   }
   function anyOverlayOpen() {
@@ -3287,7 +3181,6 @@
     $('noteView').classList.remove('on');
     $('tapeView').classList.remove('on');
     $('keypad').classList.remove('on');
-    closeMusicBox();
     $('menu').style.display = 'none';
     $('results').classList.add('hidden');
     $('game').style.display = 'flex';
@@ -3305,10 +3198,6 @@
   window.addEventListener('keydown', e => {
     const k = e.key.toLowerCase();
     keys[k] = true;
-    if (state && state.boxOpen && running) {
-      if (k >= '1' && k <= '5') { playBoxKey(Number(k) - 1); e.preventDefault(); return; }
-      if (k === 'e' || k === 'escape') { closeMusicBox(); return; }
-    }
     if (k === 'e' && running) doAction();
     if (k === 'escape' && running) pressQuit();
     if (k === 'f' && !state.keypadOpen) toggleBig();
@@ -3362,7 +3251,7 @@
   }, { passive: true });
   view.addEventListener('touchend', () => { lookId = null; });
 
-  $('btnUse').addEventListener('click', e => { e.preventDefault(); if (running && !state.boxOpen) doAction(); });
+  $('btnUse').addEventListener('click', e => { e.preventDefault(); if (running) doAction(); });
   $('btnRun').addEventListener('touchstart', e => { e.preventDefault(); wantRun = true; }, { passive: false });
   $('btnRun').addEventListener('touchend', () => { wantRun = false; });
   $('btnRun').addEventListener('mousedown', () => { wantRun = true; });
@@ -3385,16 +3274,6 @@
     kpGrid.appendChild(b);
   });
   $('kpClose').addEventListener('click', closeKeypad);
-
-  // music box keys
-  MB_KEYS.forEach((key, i) => {
-    const b = document.createElement('button');
-    b.innerHTML = `<span class="sym">${key.sym}</span><span class="num">${i + 1}</span>`;
-    b.setAttribute('aria-label', key.name);
-    b.addEventListener('pointerdown', e => { e.preventDefault(); playBoxKey(i); });
-    $('mbKeys').appendChild(b);
-  });
-  $('mbClose').addEventListener('click', closeMusicBox);
 
   // ============================================================
   //  Menus
@@ -3635,6 +3514,7 @@
     drawSprite, reachableCells, nearbyAction,
     pickUpTape, showTape, closeTape, drawTapeFrame, TAPE_SCENES, TSUB, tapeWink,
     TVOICE, TVOICE_STYLE, speakTape, stopSpeech, canSpeak, pickVoice,
+    WHISPERS, whisper, musicBox, LULLABY, playerCanSee, DREAD, dread, STALK_MIN,
     get speakingLine() { return speakingLine; }, set speakingLine(v) { speakingLine = v; },
     get spokenTape() { return spokenTape; }, set spokenTape(v) { spokenTape = v; },
     get voicesOn() { return voicesOn; }, set voicesOn(v) { voicesOn = !!v; },
@@ -3647,9 +3527,7 @@
     get scareLevel() { return scareLevel; }, set scareLevel(v) { scareLevel = v; },
     get scaring() { return scaring; }, SCARES,
     get soundOn() { return soundOn; }, set soundOn(v) { soundOn = !!v; },
-    HUNT_MEMORY, SEARCH_TIME, LUNGE_RANGE,
-    MB_KEYS, TUNE_LEN, BOX_NOTE_HEAR, BOX_WRONG_HEAR, BOX_DONE_HEAR, makeTune, noiseAt,
-    openMusicBox, closeMusicBox, playBoxKey, promptFor
+    HUNT_MEMORY, SEARCH_TIME, LUNGE_RANGE
   };
 })();
 </script>
