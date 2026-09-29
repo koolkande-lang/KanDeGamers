@@ -193,6 +193,33 @@
     background:#2a1f18;color:var(--ink);border:1px solid var(--line)}
   #kpGrid button:active{background:var(--rust)}
 
+  /* The music box does NOT pause the round, so it sits low and see-through:
+     you keep the corridor in view while you play. */
+  #musicBox{
+    position:fixed;left:0;right:0;bottom:0;display:none;justify-content:center;
+    padding:0 10px max(10px,env(safe-area-inset-bottom));z-index:39;pointer-events:none;
+  }
+  #musicBox.on{display:flex}
+  #mbBox{
+    pointer-events:auto;background:rgba(40,18,16,.86);border:2px solid #8a5a2b;border-radius:10px;
+    padding:12px 14px 8px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.7);
+  }
+  #mbSlots{display:flex;gap:6px;justify-content:center;margin-bottom:10px}
+  #mbSlots .slot{width:34px;height:34px;line-height:34px;border-radius:50%;
+    background:#1a0d0b;border:1px solid #5b3a1e;color:#6b5844;font-size:1.1rem}
+  #mbSlots .slot.full{color:#f6d68a;border-color:#c9a24a}
+  #mbSlots .slot.bad{border-color:#ef4444;background:#3b0d0d}
+  #mbKeys{display:flex;gap:8px;justify-content:center}
+  #mbKeys button{width:clamp(48px,11vw,62px);height:clamp(56px,12vw,70px);border-radius:8px;
+    background:linear-gradient(180deg,#e9d9a8,#b9974f);color:#3b2412;border:1px solid #6b4a1e;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;touch-action:none}
+  #mbKeys button:active{filter:brightness(1.25);transform:translateY(2px)}
+  #mbKeys .sym{font-size:1.5rem;line-height:1}
+  #mbKeys .num{font-size:.6rem;opacity:.6;margin-top:3px}
+  #mbHint{margin:8px 0 0}
+  #mbClose{margin:6px auto 0;width:auto;padding:6px 18px}
+  #noteBox .tune{font-size:1.9em;letter-spacing:.25em;line-height:1.6}
+
   #noteView{
     position:fixed;inset:0;display:none;align-items:center;justify-content:center;
     background:rgba(0,0,0,.85);z-index:40;padding:20px;
@@ -275,8 +302,11 @@
       <p class="lbl">What you're doing</p>
       <p class="note" style="text-align:left">
         You are climbing six floors of a toy factory, and each one is locked.
-        The <b>power</b>, two <b>terminals</b>, a <b>door code</b> and the
-        <b>shutter</b> stand between you and the loading bay.<br><br>
+        The <b>power</b>, two <b>terminals</b>, a <b>door code</b>, a
+        <b>music box</b> and the <b>shutter</b> stand between you and the
+        loading bay.<br><br>
+        The music box plays <b>out loud</b>. The game keeps going while you
+        play it, so keep an ear out.<br><br>
         Read every <b>note</b> — the codes are written down somewhere. Find the
         <b>Reacher</b> on the stuffing floor; it gets you things behind wire.<br><br>
         <b>WINK is in here with you.</b> It hunts by sound. Walk when it's close,
@@ -373,6 +403,13 @@
   <button class="ghost" id="kpClose" style="margin-top:10px">CLOSE</button>
 </div></div>
 
+<div id="musicBox"><div id="mbBox">
+  <div id="mbSlots"></div>
+  <div id="mbKeys"></div>
+  <p class="note" id="mbHint"></p>
+  <button class="ghost" id="mbClose">STEP AWAY</button>
+</div></div>
+
 <div id="noteView"><div id="noteBox">
   <h3 id="noteTitle">NOTE</h3>
   <div id="noteText"></div>
@@ -404,7 +441,7 @@
   //
   //  Set into a wall, so nothing is ever left standing in mid-air:
   //  G  generator         P  keypad panel     L  lever
-  //  V  television + video player
+  //  V  television + video player    B  the music box
   //  s  power terminal behind wire, U  tape in a cage — Reacher only
   //
   //  Six floors of the Hushabye Toy Co., stacked up the building. Each floor
@@ -457,9 +494,9 @@
     '#.#.###.#.#.###.#.#.###.#.#.##..#',
     '#.#.#...#.#.....#.....#...#.#...#',
     '#.#.#.###.##L#######U#V##.#.#.###',
-    '#...#.#.....#.......#...#.#.#...#',
+    '#...#.#.....#.......#...#.#.#...B',
     '#####.##I##.#.#####.#.#.##L.#####',
-    '#.......#...#.#...#...#...#.....#',
+    '#.......#n..#.#...#...#...#.....#',
     '#.#####.#####.#.#.####L##..####.#',
     '#.............#.#...............#',
     '#############################S###',
@@ -485,7 +522,7 @@
   const H = MAP_SRC.length, W = MAP_SRC[0].length;
   const grid = MAP_SRC.map(r => r.split(''));
 
-  const SOLID = new Set(['#', '+', 'E', 'K', 'S', 'I', 's', 'U', 'G', 'P', 'L', 'V']);
+  const SOLID = new Set(['#', '+', 'E', 'K', 'S', 'I', 's', 'U', 'G', 'P', 'L', 'V', 'B']);
 
   // ============================================================
   //  The world — a fixed building, or an endless one
@@ -636,6 +673,13 @@
          'Loading bay shutter needs all three levers.<br>' +
          'Left first. Then right. Then the middle one.<br>' +
          'Get it wrong and it resets. Get it right and RUN.' },
+    // Written out fresh each game, because the tune is different every game.
+    d: { title: 'PINNED TO THE CAGE — CONTAINMENT', body: () =>
+         'Wink\'s song. The one we play it to sleep with.<br>' +
+         'The levers stay locked until the box has played it through.<br><br>' +
+         '<span class="tune">' + state.tune.map(i => MB_KEYS[i].sym).join(' ') + '</span><br>' +
+         'Wrong note and it starts again from the top.<br><br>' +
+         '<b>It is LOUD.</b> Look behind you before you start.' },
     reacher: { title: 'THE REACHER', body:
          'A maintenance claw on a spring wire. The line workers used them to ' +
          'fish parts out of the machines without stopping the belt.<br><br>' +
@@ -695,6 +739,7 @@
       fuses: 0, powerOn: false, doorOpen: false,
       code: '4712', keypadOpen: false, keypadDone: false,
       leverOrder: [], leversDone: false,
+      tune: makeTune(), boxEntry: [], boxDone: false, boxOpen: false,   // the music box
       notesRead: {}, caught: 0, started: 0, fear: 0,
       reacher: false,            // have you found it yet
       sockets: {},               // which power terminals you've bridged
@@ -732,7 +777,7 @@
       mode: 'wander', lastKnown: null, modeSince: 0, listenUntil: 0,
       stepPhase: 0, headTurn: 0, jaw: 0, lunge: 0, moved: 0, seenAt: 0 };
     if (full) state = freshState();
-    else { state.leverOrder = []; state.fear = 0; }
+    else { state.leverOrder = []; state.boxEntry = []; state.boxOpen = false; state.fear = 0; }
     // put already-solved things back the way they were
     if (state.powerOn) openDoors('+');
     if (state.keypadDone) openDoors('K');
@@ -994,6 +1039,27 @@
       box(27, 20, 10, 5, rgb(190, 70, 45));          // red grip
       box(24, 20, 2, 2, rgb(120, 122, 120));
       box(38, 20, 2, 2, rgb(120, 122, 120));
+    });
+
+    // The music box: a painted wooden box on a wall shelf, lid open, a brass
+    // comb inside, the winding key on the side and a tiny Wink on the lid.
+    textures['B'] = panel(55, (px, box) => {
+      box(8, 44, 48, 4, rgb(70, 52, 36));            // shelf
+      box(10, 48, 4, 8, rgb(60, 44, 30));            // brackets
+      box(50, 48, 4, 8, rgb(60, 44, 30));
+      box(12, 28, 40, 16, rgb(128, 48, 52));         // box body, faded red
+      box(12, 28, 40, 2, rgb(160, 70, 70));
+      for (let i = 0; i < 5; i++) box(16 + i * 7, 36, 4, 4, rgb(206, 176, 96)); // painted stars
+      box(14, 30, 36, 3, rgb(176, 150, 80));         // brass comb
+      for (let i = 0; i < 12; i++) box(15 + i * 3, 33, 1, 2, rgb(200, 180, 110));
+      box(12, 12, 40, 16, rgb(110, 40, 44));         // open lid, leaning back
+      box(14, 14, 36, 12, rgb(70, 26, 30));          // lid lining
+      box(28, 16, 8, 7, rgb(150, 124, 92));          // tiny Wink: body
+      box(29, 12, 6, 5, rgb(170, 140, 104));         // head
+      box(30, 13, 1, 1, rgb(20, 20, 20));            // button eyes
+      box(33, 13, 1, 1, rgb(20, 20, 20));
+      box(52, 32, 4, 2, rgb(180, 160, 90));          // winding key
+      box(55, 29, 2, 8, rgb(200, 176, 100));
     });
 
     // A television on a bracket, with the video player slung under it.
@@ -1574,6 +1640,13 @@
   }
 
   function updatePlayer(dt) {
+    if (state && state.boxOpen) {
+      player.speed = 0;                     // standing still, hands on the box
+      if (keys['arrowleft']) player.a -= 2.2 * dt;
+      if (keys['arrowright']) player.a += 2.2 * dt;
+      player.a += look; look = 0;
+      return;
+    }
     let fx = 0, fy = 0;
     if (keys['w'] || keys['arrowup']) fy += 1;
     if (keys['s'] || keys['arrowdown']) fy -= 1;
@@ -1813,7 +1886,7 @@
   }
 
   const ACTIONS = { f: 'fuse', n: 'note', G: 'gen', P: 'pad', L: 'lever',
-                    T: 'tape', R: 'reacher', V: 'tv' };
+                    T: 'tape', R: 'reacher', V: 'tv', B: 'musicbox' };
   const ARM_ONLY = { s: 'socket', U: 'cage' };
 
   function nearbyAction() {
@@ -1912,6 +1985,10 @@
 
     } else if (a.kind === 'lever') {
       pullLever(a.c);
+
+    } else if (a.kind === 'musicbox') {
+      if (state.boxDone) { flashPrompt('It has played its song. The levers are free.'); return; }
+      openMusicBox();
     }
   }
 
@@ -1919,7 +1996,7 @@
   // both halves of the door code always turn up before the door that needs it.
   // (They used to be picked by a hash of the position, which after the Reacher
   //  card was added could hand you the same card twice and never the code.)
-  const NOTE_ORDER = ['a', 'b', 'c'];
+  const NOTE_ORDER = ['a', 'b', 'c', 'd'];
   function noteKeyFor(c) {
     const cells = [];
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++)
@@ -2437,6 +2514,13 @@
   // Left, then right, then middle — the order is on a note.
   function pullLever(c) {
     if (state.leversDone) return;
+    if (!state.boxDone) {
+      beep(110, 0.18);
+      flashPrompt(state.notesRead.d
+        ? 'Locked. The music box has to play Wink\'s song first.'
+        : 'Locked. A brass plate on it says: PLAY ME TO SLEEP.', 2200);
+      return;
+    }
     const all = [];
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++)
       if (MAP_SRC[y][x] === 'L') all.push({ x, y });
@@ -2463,6 +2547,148 @@
   }
 
   // ============================================================
+  //  The music box
+  //
+  //  Five keys, a six-note tune on a card, and the round does NOT pause while
+  //  you play. Every note is a sound WINK can hear. A wrong note is a clang it
+  //  can hear from much further off, and it sends you back to the start.
+  //  Playing the whole song unlocks the levers — and the last chord carries
+  //  across most of the floor.
+  // ============================================================
+  const MB_KEYS = [
+    { sym: '☾\uFE0E', name: 'moon',   hz: 523.25 },
+    { sym: '★\uFE0E', name: 'star',   hz: 587.33 },
+    { sym: '☁\uFE0E', name: 'cloud',  hz: 659.25 },
+    { sym: '♥\uFE0E', name: 'heart',  hz: 783.99 },
+    { sym: '✿\uFE0E', name: 'flower', hz: 880.00 },
+  ];
+  const TUNE_LEN = 6;
+  const BOX_NOTE_HEAR = 6.5;     // a right note: about as loud as a brisk walk
+  const BOX_WRONG_HEAR = 12;     // a wrong note: louder than running
+  const BOX_DONE_HEAR = 16;      // the last chord: most of the floor
+
+  // A new tune every game. Never the same key three times running, so it
+  // always sounds like a tune rather than a stuck key.
+  function makeTune() {
+    const t = [];
+    while (t.length < TUNE_LEN) {
+      const k = (Math.random() * MB_KEYS.length) | 0;
+      if (t.length >= 2 && t[t.length - 1] === k && t[t.length - 2] === k) continue;
+      t.push(k);
+    }
+    return t;
+  }
+
+  // Something made a noise at (x, y). If WINK is in earshot, it comes to look.
+  function noiseAt(x, y, radius) {
+    if (!monster) return false;
+    if (Math.hypot(monster.x - x, monster.y - y) >= radius) return false;
+    const now = performance.now();
+    monster.lastKnown = { x, y };
+    monster.listenUntil = 0;                    // stop listening — it heard that
+    if (monster.mode === 'hunt') return true;
+    if (monster.mode === 'alert') { monster.modeSince = now; monster.path = []; monster.think = 0; }
+    else setMode('alert', now);
+    return true;
+  }
+
+  function openMusicBox() {
+    state.boxOpen = true;
+    state.boxEntry = [];
+    drawBoxSlots();
+    $('mbHint').textContent = state.notesRead.d
+      ? 'Keys 1–5, or tap. You can still look around.'
+      : 'You don\'t know the song. Somebody must have written it down.';
+    $('musicBox').classList.add('on');
+    $('prompt').classList.remove('on');
+  }
+  function closeMusicBox() {
+    if (!$('musicBox').classList.contains('on') && !(state && state.boxOpen)) return;
+    $('musicBox').classList.remove('on');
+    if (state) { state.boxOpen = false; state.boxEntry = []; }
+  }
+
+  function drawBoxSlots(bad) {
+    const el = $('mbSlots');
+    el.innerHTML = '';
+    for (let i = 0; i < TUNE_LEN; i++) {
+      const d = document.createElement('span');
+      d.className = 'slot' + (bad ? ' bad' : '');
+      const k = state.boxEntry[i];
+      d.textContent = k === undefined ? '·' : MB_KEYS[k].sym;
+      if (k !== undefined) d.classList.add('full');
+      el.appendChild(d);
+    }
+  }
+
+  function playBoxKey(k) {
+    if (!state.boxOpen || state.boxDone || !running) return;
+    const step = state.boxEntry.length;
+    if (k === state.tune[step]) {
+      state.boxEntry.push(k);
+      boxNote(MB_KEYS[k].hz);
+      noiseAt(player.x, player.y, BOX_NOTE_HEAR);
+      drawBoxSlots();
+      if (state.boxEntry.length === TUNE_LEN) finishBox();
+    } else {
+      boxClang(MB_KEYS[k].hz);
+      noiseAt(player.x, player.y, BOX_WRONG_HEAR);
+      state.boxEntry = [];
+      drawBoxSlots(true);
+      flashPrompt('A wrong note — and a loud one. From the top.', 2000);
+    }
+  }
+
+  function finishBox() {
+    state.boxDone = true;
+    noiseAt(player.x, player.y, BOX_DONE_HEAR);
+    // the box plays the whole song back by itself, then the locks let go
+    state.tune.forEach((k, i) => setTimeout(() => boxNote(MB_KEYS[k].hz, 0.7), 140 + i * 170));
+    setTimeout(boom, 140 + TUNE_LEN * 170 + 120);
+    flashPrompt('The song plays through. Somewhere on this floor, the levers unlock.', 2600);
+    setObjective();
+    setTimeout(closeMusicBox, 900);
+  }
+
+  // A music-box tine: a pure note with a faint octave on top, plucked and
+  // left to ring out.
+  function boxNote(hz, vol) {
+    const a = audio(); if (!a) return;
+    const t = a.currentTime, v = (vol || 1) * 0.16;
+    [[1, 1], [2, 0.28], [3.01, 0.08]].forEach(([mul, amp]) => {
+      const o = a.createOscillator(), g = a.createGain();
+      o.type = 'sine'; o.frequency.value = hz * mul;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(v * amp, t + 0.006);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 1.4 / mul);
+      o.connect(g); g.connect(a.destination);
+      o.start(t); o.stop(t + 1.5);
+    });
+  }
+  // A wrong note: two tines struck out of tune, with a metal clatter.
+  function boxClang(hz) {
+    const a = audio(); if (!a) return;
+    const t = a.currentTime;
+    [hz * 0.94, hz * 1.07].forEach(f => {
+      const o = a.createOscillator(), g = a.createGain();
+      o.type = 'square'; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.09, t + 0.005);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.7);
+      o.connect(g); g.connect(a.destination);
+      o.start(t); o.stop(t + 0.75);
+    });
+    const src = noise(a), f = a.createBiquadFilter();
+    f.type = 'highpass'; f.frequency.value = 2400;
+    src.connect(f);
+    const g2 = a.createGain();
+    g2.gain.setValueAtTime(0.12, t);
+    g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+    f.connect(g2); g2.connect(a.destination);
+    src.start(t); src.stop(t + 0.32);
+  }
+
+  // ============================================================
   //  Objective text
   // ============================================================
   function setObjective() {
@@ -2481,6 +2707,9 @@
       ? 'Two terminals behind the wire. Bridge them with the Reacher.'
       : 'Something in here has a long enough arm to reach the terminals.';
     else if (!state.keypadDone) t = 'Find the door code and use the keypad';
+    else if (!state.boxDone) t = state.notesRead.d
+      ? 'Play Wink\'s song on the music box. It is loud.'
+      : 'The levers on this floor are locked to a tune. Find it.';
     else if (!state.leversDone) t = 'Three levers open the shutter — the order matters';
     else t = 'The shutter is open. GET OUT.';
     $('objText').textContent = t;
@@ -2493,6 +2722,7 @@
       (state.powerOn ? '<span class="item">⚡ power</span>' : '') +
       (state.elecOpen ? '<span class="item">🔌 circuit</span>' : '') +
       (state.keypadDone ? '<span class="item">🔑 door</span>' : '') +
+      (state.boxDone ? '<span class="item">🎵 song</span>' : '') +
       `<span class="item">📼 ${state.tapesPlayed.length}/${TAPES.length}</span>` +
       (state.tapes.length > state.tapesPlayed.length
         ? `<span class="item">🎞️ ${state.tapes.length - state.tapesPlayed.length} to watch</span>` : '');
@@ -2690,6 +2920,7 @@
   function caught() {
     if (scaring) return;
     scaring = true;
+    closeMusicBox();
     state.caught++;
     running = false;
     screech();
@@ -2939,9 +3170,10 @@
     const n = NOTES[key];
     if (!n) return;
     state.notesRead[key] = true;
+    if (key === 'd' && !state.endless) setObjective();   // now you know what the levers want
     pauseRound();
     $('noteTitle').textContent = n.title;
-    $('noteText').innerHTML = n.body;
+    $('noteText').innerHTML = typeof n.body === 'function' ? n.body() : n.body;
     $('noteView').classList.add('on');
   }
   function closeNote() {
@@ -2971,16 +3203,30 @@
     if (now < flashUntil) {
       p.classList.add('on');
       p.textContent = flashMsg;
-    } else if (a && !state.keypadOpen) {
+    } else if (a && !state.keypadOpen && !state.boxOpen) {
       p.classList.add('on');
-      p.textContent = a.kind === 'fuse' ? 'Take the fuse'
-        : a.kind === 'note' ? 'Read it'
-        : a.kind === 'gen' ? (state.powerOn ? 'Running' : 'Start the generator')
-        : a.kind === 'pad' ? (state.keypadDone ? 'Unlocked' : 'Enter the code')
-        : 'Pull the lever';
+      p.textContent = promptFor(a);
     } else p.classList.remove('on');
     rafId = requestAnimationFrame(loop);
   }
+  function promptFor(a) {
+    switch (a.kind) {
+      case 'fuse':       return 'Take the fuse';
+      case 'note':       return 'Read it';
+      case 'gen':        return state.powerOn ? 'Running' : 'Start the generator';
+      case 'pad':        return state.keypadDone ? 'Unlocked' : 'Enter the code';
+      case 'lever':      return 'Pull the lever';
+      case 'tape':       return 'Take the tape';
+      case 'cage':       return 'Hook the tape out';
+      case 'reacher':    return 'Take the claw';
+      case 'socket':     return 'Bridge the terminal';
+      case 'tv':         return 'Put a tape in';
+      case 'musicbox':   return state.boxDone ? 'It has played its song' : 'Play the music box';
+      case 'outofreach': return state.reacher ? 'Too far — get closer' : 'Behind wire';
+      default:           return 'Use';
+    }
+  }
+
   function stopLoop() {
     if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null; }
     running = false;
@@ -3020,6 +3266,7 @@
     $('noteView').classList.remove('on');
     $('keypad').classList.remove('on');
     if (state) state.keypadOpen = false;
+    closeMusicBox();
     pausedForOverlay = false;
   }
   function anyOverlayOpen() {
@@ -3040,6 +3287,7 @@
     $('noteView').classList.remove('on');
     $('tapeView').classList.remove('on');
     $('keypad').classList.remove('on');
+    closeMusicBox();
     $('menu').style.display = 'none';
     $('results').classList.add('hidden');
     $('game').style.display = 'flex';
@@ -3057,6 +3305,10 @@
   window.addEventListener('keydown', e => {
     const k = e.key.toLowerCase();
     keys[k] = true;
+    if (state && state.boxOpen && running) {
+      if (k >= '1' && k <= '5') { playBoxKey(Number(k) - 1); e.preventDefault(); return; }
+      if (k === 'e' || k === 'escape') { closeMusicBox(); return; }
+    }
     if (k === 'e' && running) doAction();
     if (k === 'escape' && running) pressQuit();
     if (k === 'f' && !state.keypadOpen) toggleBig();
@@ -3110,7 +3362,7 @@
   }, { passive: true });
   view.addEventListener('touchend', () => { lookId = null; });
 
-  $('btnUse').addEventListener('click', e => { e.preventDefault(); if (running) doAction(); });
+  $('btnUse').addEventListener('click', e => { e.preventDefault(); if (running && !state.boxOpen) doAction(); });
   $('btnRun').addEventListener('touchstart', e => { e.preventDefault(); wantRun = true; }, { passive: false });
   $('btnRun').addEventListener('touchend', () => { wantRun = false; });
   $('btnRun').addEventListener('mousedown', () => { wantRun = true; });
@@ -3133,6 +3385,16 @@
     kpGrid.appendChild(b);
   });
   $('kpClose').addEventListener('click', closeKeypad);
+
+  // music box keys
+  MB_KEYS.forEach((key, i) => {
+    const b = document.createElement('button');
+    b.innerHTML = `<span class="sym">${key.sym}</span><span class="num">${i + 1}</span>`;
+    b.setAttribute('aria-label', key.name);
+    b.addEventListener('pointerdown', e => { e.preventDefault(); playBoxKey(i); });
+    $('mbKeys').appendChild(b);
+  });
+  $('mbClose').addEventListener('click', closeMusicBox);
 
   // ============================================================
   //  Menus
@@ -3385,7 +3647,9 @@
     get scareLevel() { return scareLevel; }, set scareLevel(v) { scareLevel = v; },
     get scaring() { return scaring; }, SCARES,
     get soundOn() { return soundOn; }, set soundOn(v) { soundOn = !!v; },
-    HUNT_MEMORY, SEARCH_TIME, LUNGE_RANGE
+    HUNT_MEMORY, SEARCH_TIME, LUNGE_RANGE,
+    MB_KEYS, TUNE_LEN, BOX_NOTE_HEAR, BOX_WRONG_HEAR, BOX_DONE_HEAR, makeTune, noiseAt,
+    openMusicBox, closeMusicBox, playBoxKey, promptFor
   };
 })();
 </script>
