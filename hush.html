@@ -880,6 +880,148 @@
   const textures = {};
   const rgb = (r, g, b) => (255 << 24) | (b << 16) | (g << 8) | r;   // little-endian RGBA
 
+  // ------------------------------------------------------------
+  //  The concrete floor
+  //
+  //  Generated, like everything else — but at 256x256 rather than 64, because
+  //  it is the surface you spend the whole game looking at.
+  //
+  //  It has to TILE. The same square is repeated across the entire factory,
+  //  so every bit of noise wraps around the edges, and anything that makes a
+  //  recognisable SHAPE is kept deliberately weak: a big branching crack
+  //  would be spotted repeating within seconds. Fine grain tiles invisibly;
+  //  memorable detail does not.
+  // ------------------------------------------------------------
+  const CONCRETE_N = 256;
+
+  function cHash(ix, iy, period, seed) {
+    ix = ((ix % period) + period) % period;
+    iy = ((iy % period) + period) % period;
+    let n = Math.imul(ix, 374761393) ^ Math.imul(iy, 668265263) ^ Math.imul(seed, 1442695041);
+    n = Math.imul(n ^ (n >>> 13), 1274126177);
+    return ((n ^ (n >>> 16)) >>> 0) / 4294967295;
+  }
+  // Each octave lives on a small grid of random values, stretched up to full
+  // size. Doing that as one tight loop per octave — rather than working out
+  // each pixel on demand — is the difference between 430ms and 20ms.
+  const latCache = new Map();
+  function lattice(px, py, seed) {
+    const key = px + 'x' + py + ':' + seed;
+    let L = latCache.get(key);
+    if (L) return L;
+    L = new Float32Array(px * py);
+    for (let y = 0; y < py; y++)
+      for (let x = 0; x < px; x++) L[y * px + x] = cHash(x, y, px + py * 31, seed);
+    latCache.set(key, L);
+    return L;
+  }
+
+  // One octave of wrapping value noise, at full size. cx and cy are how many
+  // cells it spans across and down — different values stretch the pattern,
+  // which is how the scuff marks get their direction.
+  function layer(N, cx, cy, seed) {
+    cx = Math.max(1, cx | 0); cy = Math.max(1, cy | 0);
+    const L = lattice(cx, cy, seed);
+    const out = new Float32Array(N * N);
+    for (let y = 0; y < N; y++) {
+      const gy = y * cy / N, y0 = Math.floor(gy), fy = gy - y0;
+      const sy = fy * fy * (3 - 2 * fy);
+      const ya = y0 % cy, yb = (ya + 1) % cy;
+      const rowA = ya * cx, rowB = yb * cx;
+      for (let x = 0; x < N; x++) {
+        const gx = x * cx / N, x0 = Math.floor(gx), fx = gx - x0;
+        const sx = fx * fx * (3 - 2 * fx);
+        const xa = x0 % cx, xb = (xa + 1) % cx;
+        const a = L[rowA + xa], b = L[rowA + xb];
+        const c = L[rowB + xa], d = L[rowB + xb];
+        out[y * N + x] = a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
+      }
+    }
+    return out;
+  }
+
+  // the single-sample version, kept for anything that just wants one value
+  function cNoise(x, y, period, seed) {
+    period = Math.max(1, period | 0);
+    const L = lattice(period, period, seed);
+    const x0 = Math.floor(x), y0 = Math.floor(y);
+    const fx = x - x0, fy = y - y0;
+    const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+    const xa = ((x0 % period) + period) % period, xb = (xa + 1) % period;
+    const ya = ((y0 % period) + period) % period, yb = (ya + 1) % period;
+    const a = L[ya * period + xa], b = L[ya * period + xb];
+    const c = L[yb * period + xa], d = L[yb * period + xb];
+    return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
+  }
+
+  function makeConcrete(N, joints) {
+    const out = new Uint32Array(N * N);
+
+    // hairline cracks — short and faint, for the reason above
+    const crack = new Float32Array(N * N);
+    let cs = 12345;
+    const rnd = () => (cs = (Math.imul(cs, 1103515245) + 12345) & 0x7fffffff) / 0x7fffffff;
+    const nCracks = Math.max(3, (N / 28) | 0);
+    for (let c = 0; c < nCracks; c++) {
+      let x = rnd() * N, y = rnd() * N, a = rnd() * 6.28;
+      const len = N * 0.05 + rnd() * N * 0.1;
+      for (let k = 0; k < len; k++) {
+        a += (rnd() - 0.5) * 0.7;
+        x = (x + Math.cos(a) + N) % N;
+        y = (y + Math.sin(a) + N) % N;
+        const depth = Math.min(1, (len - k) / len * 1.4) * 0.22;
+        const ix = x | 0, iy = y | 0;
+        crack[iy * N + ix] = Math.max(crack[iy * N + ix], depth);
+      }
+    }
+
+    // every layer of noise this texture needs, built up front
+    const blotch = [layer(N,2,2,11), layer(N,4,4,28), layer(N,8,8,45)];
+    const mottle = [layer(N,8,8,29), layer(N,16,16,46), layer(N,32,32,63), layer(N,64,64,80)];
+    const grain  = layer(N, N/2, N/2, 71);
+    const agg    = layer(N, N*0.375, N*0.375, 91);
+    const agg2   = layer(N, N*0.7, N*0.7, 143);
+    const scuff  = layer(N, 6, 52, 131);          // stretched, so it streaks
+    const gw = Math.max(2, (N / 85) | 0);
+
+    for (let y = 0; y < N; y++) {
+      for (let x = 0; x < N; x++) {
+        const i = y * N + x;
+
+        const bl = blotch[0][i] * 0.5 + blotch[1][i] * 0.25 + blotch[2][i] * 0.125;
+        const mo = mottle[0][i] * 0.5 + mottle[1][i] * 0.25
+                 + mottle[2][i] * 0.125 + mottle[3][i] * 0.0625;
+
+        let v = 106
+              + (bl - 0.4375) * 13 / 0.875
+              + (mo - 0.46875) * 20 / 0.9375
+              + (grain[i] - 0.5) * 26;
+
+        // aggregate — the little stones in the mix, pale and dark
+        const ag = agg[i];
+        if (ag > 0.74) v += (ag - 0.74) * 190;
+        else if (ag < 0.22) v -= (0.22 - ag) * 150;
+        v += (agg2[i] - 0.5) * 20;
+
+        // expansion joints, on the tile edge so they line up into a grid
+        if (joints) {
+          const dj = Math.min(x, N - 1 - x, y, N - 1 - y);
+          if (dj < gw) v *= 0.52 + dj * (0.4 / gw);         // the groove
+          else if (dj < gw + 2) v *= 1.06;                  // lip catching light
+        }
+
+        // long faint drag marks
+        v -= Math.max(0, scuff[i] - 0.70) * 30;
+
+        v *= 1 - crack[i] * 0.55;
+        // concrete is grey, but very slightly warm
+        out[i] = rgb(Math.min(255, v * 1.02) | 0, Math.min(255, v) | 0,
+                     Math.min(255, v * 0.955) | 0);
+      }
+    }
+    return out;
+  }
+
   function makeTextures() {
     const noise = (x, y, s) => {
       const n = Math.sin(x * 12.9898 + y * 78.233 + s) * 43758.5453;
@@ -911,15 +1053,11 @@
     textures['K'] = tint(brick, 1.35, 1.15, 0.55);  // coded door — brass
     textures['S'] = tint(brick, 0.7, 0.95, 1.5);    // shutter — cold steel
 
-    // floor: worn concrete with scuffs
-    const floor = new Uint32Array(TEX * TEX);
-    for (let y = 0; y < TEX; y++) for (let x = 0; x < TEX; x++) {
-      const n = noise(x, y, 7) * 0.5 + noise((x / 8) | 0, (y / 8) | 0, 3) * 0.5;
-      const v = 26 + n * 26;
-      const tileLine = (x % 32 === 0 || y % 32 === 0) ? 0.7 : 1;
-      floor[y * TEX + x] = rgb((v * 1.05 * tileLine) | 0, (v * tileLine) | 0, (v * 0.9 * tileLine) | 0);
-    }
+    // floor: the same concrete as the 3D engine, at the size this one needs
+    const floor = makeConcrete(TEX, true);
     textures.floor = floor;
+    // The big 256x256 slab is only made if the 3D engine actually starts, so
+    // a device on the fallback never pays for detail it cannot show.
 
     // ceiling: darker, with panel seams
     const ceil = new Uint32Array(TEX * TEX);
@@ -1120,6 +1258,7 @@
   //  One map cell is 1 unit across. Rooms are taller than they are wide,
   //  the way real ones are.
   const WALL_H = 1.45;        // ceiling height, in cells
+  const FLOOR_SPAN = 3;       // how many squares one slab of concrete covers
   const EYE_H  = 0.90;        // how high up you are looking from
   const FACES = [
     { face: 'e', dx:  1, dy:  0 },
@@ -1206,10 +1345,12 @@
 
   // our procedural textures, handed to the graphics card
   function glTexture(key) {
+    if (key === 'concrete' && !textures.concrete) textures.concrete = makeConcrete(CONCRETE_N, true);
     const src = textures[key];
     if (!src) return null;
+    const n = Math.round(Math.sqrt(src.length));      // concrete is bigger than the rest
     const px = new Uint8Array(src.buffer.slice(0));
-    const t = new THREE.DataTexture(px, TEX, TEX, THREE.RGBAFormat);
+    const t = new THREE.DataTexture(px, n, n, THREE.RGBAFormat);
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
     t.magFilter = THREE.NearestFilter;
     t.minFilter = THREE.LinearMipmapLinearFilter;
@@ -1219,11 +1360,24 @@
   }
 
   const glMats = {};
+  let concreteMap = null;
+  // Each floor of the factory is a different colour of paint over the same
+  // concrete, so one texture is shared and just tinted — far cheaper than six.
+  const ZONE_HEX = [0xd8cfc0, 0xb9c2cc, 0xd0b492, 0xa6b3a4, 0x9a9aa4, 0xc0b49a];
+
   function glMat(key) {
     if (glMats[key]) return glMats[key];
-    const map = glTexture(key);
-    const m = new THREE.MeshLambertMaterial({ map: map || null,
-      color: map ? 0xffffff : 0x555555 });
+    let m;
+    if (key.indexOf('floor') === 0) {
+      if (!concreteMap) concreteMap = glTexture('concrete');
+      const z = parseInt(key.slice(5), 10) || 0;
+      m = new THREE.MeshLambertMaterial({ map: concreteMap,
+        color: ZONE_HEX[z] !== undefined ? ZONE_HEX[z] : 0xc8c4bc });
+    } else {
+      const map = glTexture(key);
+      m = new THREE.MeshLambertMaterial({ map: map || null,
+        color: map ? 0xffffff : 0x555555 });
+    }
     glMats[key] = m;
     return m;
   }
@@ -1284,9 +1438,16 @@
       (fByTex[f.floorTex] = fByTex[f.floorTex] || []).push(f);
       (cByTex[f.ceilTex]  = cByTex[f.ceilTex]  || []).push(f);
     }
+    // One slab of concrete covers FLOOR_SPAN squares, so the pattern doesn't
+    // restart at every step. The texture coordinates come from where the
+    // square is in the world, not from the square itself.
+    const S = FLOOR_SPAN;
     for (const tex in fByTex) {
       const quads = fByTex[tex].map(f => ({
-        v: [[f.x,0,f.y],[f.x+1,0,f.y],[f.x+1,0,f.y+1],[f.x,0,f.y+1]], n: [0,1,0] }));
+        v: [[f.x,0,f.y],[f.x+1,0,f.y],[f.x+1,0,f.y+1],[f.x,0,f.y+1]],
+        n: [0,1,0],
+        uv: [[f.x/S, f.y/S], [(f.x+1)/S, f.y/S],
+             [(f.x+1)/S, (f.y+1)/S], [f.x/S, (f.y+1)/S]] }));
       root.add(mergeQuads(quads, glMat(tex)));
     }
     for (const tex in cByTex) {
@@ -4045,6 +4206,12 @@
   // ============================================================
   state = freshState();
   makeTextures();          // must happen before the first frame is drawn
+  // The big concrete slab is only needed by the 3D engine. Make it while the
+  // menu is up, so pressing PLAY never stutters even on a slow tablet.
+  setTimeout(() => {
+    try { if (!textures.concrete && hasWebGL()) textures.concrete = makeConcrete(CONCRETE_N, true); }
+    catch (e) {}
+  }, 250);
   buildShadeTables();      // ...and the shade tables are built from them
   resetLevel(true);
   buildSettings();
@@ -4072,8 +4239,9 @@
     updateMonster, updatePlayer, tryMove, fitScreen, kpPress,
     get kpEntry() { return kpEntry; },
     HEAR_WALK, HEAR_RUN, SEE, SCARE_CFG, sizeScareCanvas, TV_FRAMES,
-    ZONE_NAMES, zoneOf, TAPES, REACH_ARM,
-    buildSceneSpec, sceneBounds, WALL_H, EYE_H, WALL_TEX, FIXTURES, DOOR_CH, noteKeyFor, NOTES, SPRITE_OF, ACTIONS,
+    ZONE_NAMES, zoneOf, TAPES, REACH_ARM, makeConcrete, CONCRETE_N, cNoise,
+    buildSceneSpec, sceneBounds, WALL_H, EYE_H, FLOOR_SPAN, ZONE_HEX, lattice, layer,
+    concreteFor: () => textures.concrete || (textures.concrete = makeConcrete(CONCRETE_N, true)), WALL_TEX, FIXTURES, DOOR_CH, noteKeyFor, NOTES, SPRITE_OF, ACTIONS,
     drawSprite, reachableCells, nearbyAction,
     pickUpTape, showTape, closeTape, drawTapeFrame, TAPE_SCENES, TSUB, tapeWink,
     render3D, render2D, initGL, startEngine, buildWorld3D, makeWink3D,

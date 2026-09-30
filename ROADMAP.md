@@ -595,6 +595,52 @@ flagship was **WINK**. The slogan was *"Wink never sleeps — so you can."*
 Every floor is painted differently — walls, floor and ceiling are tinted per
 zone — so you always know where you are, and the HUD names the floor you're on.
 
+### 🧱 Round 13 — a real concrete floor
+
+The floor was 64×64 of random noise with a grid drawn on it. It's now a proper
+**256×256 concrete slab** — four times the detail, on the surface you spend the
+whole game looking at.
+
+What's in it: big damp patches, general cloudiness, fine grain, **aggregate**
+(the pale and dark chips of stone in the mix), **expansion joints** forming a
+grid of slabs, faint **drag marks**, and **hairline cracks**. All generated —
+still no image files.
+
+**The hard part is that it has to tile.** The same square is repeated across
+the whole factory, so:
+
+- every layer of noise **wraps around the edges**, giving no seam. Measured: the
+  step across the join is *smaller* than the average step inside the texture.
+- anything that makes a **recognisable shape** is kept deliberately weak. My
+  first attempt had a big branching crack in it — and the moment I looked at it
+  tiled 3×3, the same crack was staring back from all nine squares. Cracks are
+  now short and faint, big blotches are damped right down, and the detail lives
+  in the grain instead. Measured: grain variation 14.1 against big-shape
+  variation 2.1.
+- one slab covers **three squares**, not one, so the pattern doesn't restart at
+  every step. The texture coordinates come from where a square sits in the
+  world rather than from the square itself.
+- each floor of the building **tints the same concrete** a different colour —
+  six materials, one texture.
+
+> ⚡ **Two performance problems, both found by measuring rather than guessing.**
+>
+> **1.** Generating it pushed the game's startup from ~200ms to **2.8 seconds**.
+> The noise was hashing four times per pixel per octave — about 2.9 million
+> hashes. Each octave is now built as one whole array in a tight loop, and the
+> big slab is only made **if the 3D engine actually starts**, and made **while
+> the menu is on screen** so pressing PLAY never stutters.
+>
+> **2.** While fixing that I found the test harness runs code **about 14 times
+> slower** than a browser does — the same loop takes 12ms natively and 172ms
+> inside the sandbox. So every "milliseconds per frame" figure in this file is
+> a pessimistic one. Worth knowing before optimising something that was never
+> actually slow.
+
+**`floorlab.html`** is a little preview page that renders the floor on its own,
+tiled 3×3 to check for seams, and in perspective. It runs the **exact code**
+lifted out of the game, so what it shows is what you get.
+
 ### 🧊 Round 12 — Hush is properly 3D
 
 Hush was a **raycaster** — the Wolfenstein trick, where flat columns are drawn
@@ -1282,7 +1328,7 @@ drag-to-look on a tablet.
 
 ## ⚠️ What still needs doing
 
-**Upload it, then play it with real people.** All **23 test suites — 1,398 checks
+**Upload it, then play it with real people.** All **23 test suites — 1,425 checks
 — pass**, but no human has actually played any of this yet. Things worth
 watching for:
 

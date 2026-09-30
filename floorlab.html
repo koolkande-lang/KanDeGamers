@@ -26,103 +26,106 @@
 //  It has to TILE, because the same square metre is repeated across the
 //  whole factory — so every bit of noise wraps around the edges.
 // ---------------------------------------------------------------
-const N = 256;
+// ---------------------------------------------------------------
+//  This is the EXACT code the game uses, lifted straight out of hush.html,
+//  so what you see here is what the factory floor actually looks like.
+// ---------------------------------------------------------------
+const rgb = (r, g, b) => (255 << 24) | (b << 16) | (g << 8) | r;   // little-endian RGBA
+  const CONCRETE_N = 256;
 
-// value noise on a lattice that wraps, so the texture has no seams
-function hash(ix, iy, period, seed) {
-  ix = ((ix % period) + period) % period;
-  iy = ((iy % period) + period) % period;
-  let n = Math.imul(ix, 374761393) ^ Math.imul(iy, 668265263) ^ Math.imul(seed, 1442695041);
-  n = Math.imul(n ^ (n >>> 13), 1274126177);
-  return ((n ^ (n >>> 16)) >>> 0) / 4294967295;
-}
-function vnoise(x, y, period, seed) {
-  const x0 = Math.floor(x), y0 = Math.floor(y);
-  const fx = x - x0, fy = y - y0;
-  const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
-  const a = hash(x0, y0, period, seed),     b = hash(x0 + 1, y0, period, seed);
-  const c = hash(x0, y0 + 1, period, seed), d = hash(x0 + 1, y0 + 1, period, seed);
-  return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
-}
-// several octaves stacked up: big blotches down to fine grain
-function fbm(x, y, baseCells, octaves, seed) {
-  let v = 0, amp = 0.5, cells = baseCells;
-  for (let o = 0; o < octaves; o++) {
-    v += vnoise(x / N * cells, y / N * cells, cells, seed + o * 17) * amp;
-    cells *= 2; amp *= 0.5;
+  function cHash(ix, iy, period, seed) {
+    ix = ((ix % period) + period) % period;
+    iy = ((iy % period) + period) % period;
+    let n = Math.imul(ix, 374761393) ^ Math.imul(iy, 668265263) ^ Math.imul(seed, 1442695041);
+    n = Math.imul(n ^ (n >>> 13), 1274126177);
+    return ((n ^ (n >>> 16)) >>> 0) / 4294967295;
   }
-  return v;
-}
-
-function makeConcrete() {
-  const px = new Uint8ClampedArray(N * N * 4);
-
-  // ---- hairline cracks ----
-  // Kept short and faint on purpose. A big branching crack is a SHAPE, and a
-  // shape you can recognise gives the tiling away the moment the floor
-  // repeats — which it does, every few paces. Fine detail tiles invisibly;
-  // memorable detail does not.
-  const crack = new Float32Array(N * N);
-  let cs = 12345;
-  const rnd = () => (cs = (Math.imul(cs, 1103515245) + 12345) & 0x7fffffff) / 0x7fffffff;
-  for (let c = 0; c < 9; c++) {
-    let x = rnd() * N, y = rnd() * N, a = rnd() * 6.28;
-    const len = 12 + rnd() * 26;
-    for (let i = 0; i < len; i++) {
-      a += (rnd() - 0.5) * 0.7;
-      x = (x + Math.cos(a) + N) % N;
-      y = (y + Math.sin(a) + N) % N;
-      const depth = Math.min(1, (len - i) / len * 1.4) * 0.22;
-      const ix = x | 0, iy = y | 0;
-      crack[iy * N + ix] = Math.max(crack[iy * N + ix], depth);
+  // value noise on a lattice that wraps, so there are no seams
+  function cNoise(x, y, period, seed) {
+    const x0 = Math.floor(x), y0 = Math.floor(y);
+    const fx = x - x0, fy = y - y0;
+    const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+    const a = cHash(x0, y0, period, seed),     b = cHash(x0 + 1, y0, period, seed);
+    const c = cHash(x0, y0 + 1, period, seed), d = cHash(x0 + 1, y0 + 1, period, seed);
+    return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
+  }
+  function cFbm(x, y, N, baseCells, octaves, seed) {
+    let v = 0, amp = 0.5, cells = baseCells;
+    for (let o = 0; o < octaves; o++) {
+      v += cNoise(x / N * cells, y / N * cells, cells, seed + o * 17) * amp;
+      cells *= 2; amp *= 0.5;
     }
+    return v;
   }
 
-  for (let y = 0; y < N; y++) {
-    for (let x = 0; x < N; x++) {
-      const i = y * N + x;
+  function makeConcrete(N, joints) {
+    const out = new Uint32Array(N * N);
 
-      // ---- the concrete itself ----
-      const blotch = fbm(x, y, 2, 3, 11);        // big damp patches
-      const mottle = fbm(x, y, 8, 4, 29);        // the general cloudiness
-      const grain  = vnoise(x / N * 128, y / N * 128, 128, 71);   // fine grain
-
-      // Big soft variation is kept low: it is the part that reads as a
-      // repeating pattern. The fine grain carries the detail instead.
-      let v = 106
-            + (blotch - 0.5) * 13
-            + (mottle - 0.5) * 20
-            + (grain  - 0.5) * 26;
-
-      // ---- aggregate: the little stones in the mix ----
-      const agg = vnoise(x / N * 96, y / N * 96, 96, 91);
-      if (agg > 0.74) v += (agg - 0.74) * 190;          // pale chips
-      else if (agg < 0.22) v -= (0.22 - agg) * 150;     // dark chips
-      // a second, finer pass so the surface has real tooth to it
-      const agg2 = vnoise(x / N * 180, y / N * 180, 180, 143);
-      v += (agg2 - 0.5) * 20;
-
-      // ---- expansion joints, at the edge so they line up when tiled ----
-      const dj = Math.min(x, N - 1 - x, y, N - 1 - y);
-      if (dj < 3) v *= 0.52 + dj * 0.13;                // the groove
-      else if (dj < 5) v *= 1.06;                       // lip catching the light
-
-      // ---- scuffs: long faint drag marks ----
-      const scuff = vnoise(x / N * 6, y / N * 52, 52, 131);
-      v -= Math.max(0, scuff - 0.70) * 30;
-
-      // ---- cracks ----
-      v *= 1 - crack[i] * 0.55;
-
-      // concrete is grey, but very slightly warm
-      const r = v * 1.02, g = v * 1.00, b = v * 0.955;
-      px[i*4] = r; px[i*4+1] = g; px[i*4+2] = b; px[i*4+3] = 255;
+    // hairline cracks — short and faint, for the reason above
+    const crack = new Float32Array(N * N);
+    let cs = 12345;
+    const rnd = () => (cs = (Math.imul(cs, 1103515245) + 12345) & 0x7fffffff) / 0x7fffffff;
+    const nCracks = Math.max(3, (N / 28) | 0);
+    for (let c = 0; c < nCracks; c++) {
+      let x = rnd() * N, y = rnd() * N, a = rnd() * 6.28;
+      const len = N * 0.05 + rnd() * N * 0.1;
+      for (let k = 0; k < len; k++) {
+        a += (rnd() - 0.5) * 0.7;
+        x = (x + Math.cos(a) + N) % N;
+        y = (y + Math.sin(a) + N) % N;
+        const depth = Math.min(1, (len - k) / len * 1.4) * 0.22;
+        const ix = x | 0, iy = y | 0;
+        crack[iy * N + ix] = Math.max(crack[iy * N + ix], depth);
+      }
     }
-  }
-  return new ImageData(px, N, N);
-}
 
-const img = makeConcrete();
+    for (let y = 0; y < N; y++) {
+      for (let x = 0; x < N; x++) {
+        const i = y * N + x;
+        const blotch = cFbm(x, y, N, 2, 3, 11);      // damp patches
+        const mottle = cFbm(x, y, N, 8, 4, 29);      // general cloudiness
+        const grain  = cNoise(x / N * (N / 2), y / N * (N / 2), N / 2, 71);
+
+        let v = 106
+              + (blotch - 0.5) * 13
+              + (mottle - 0.5) * 20
+              + (grain  - 0.5) * 26;
+
+        // aggregate — the little stones in the mix, pale and dark
+        const agg = cNoise(x / N * (N * 0.375), y / N * (N * 0.375), (N * 0.375) | 0, 91);
+        if (agg > 0.74) v += (agg - 0.74) * 190;
+        else if (agg < 0.22) v -= (0.22 - agg) * 150;
+        const agg2 = cNoise(x / N * (N * 0.7), y / N * (N * 0.7), (N * 0.7) | 0, 143);
+        v += (agg2 - 0.5) * 20;
+
+        // expansion joints, on the tile edge so they line up into a grid
+        if (joints) {
+          const dj = Math.min(x, N - 1 - x, y, N - 1 - y);
+          const gw = Math.max(2, (N / 85) | 0);
+          if (dj < gw) v *= 0.52 + dj * (0.4 / gw);         // the groove
+          else if (dj < gw + 2) v *= 1.06;                  // lip catching light
+        }
+
+        // long faint drag marks
+        const scuff = cNoise(x / N * 6, y / N * 52, 52, 131);
+        v -= Math.max(0, scuff - 0.70) * 30;
+
+        v *= 1 - crack[i] * 0.55;
+        // concrete is grey, but very slightly warm
+        out[i] = rgb(Math.min(255, v * 1.02) | 0, Math.min(255, v) | 0,
+                     Math.min(255, v * 0.955) | 0);
+      }
+    }
+    return out;
+  }
+
+
+const N = CONCRETE_N;
+function toImageData(buf, n){
+  const px = new Uint8ClampedArray(buf.buffer.slice(0));
+  return new ImageData(px, n, n);
+}
+const img = toImageData(makeConcrete(N, true), N);
 document.getElementById('one').getContext('2d').putImageData(img, 0, 0);
 
 // tiled, to prove the edges match
