@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Concrete floor</title>
+<style>
+  :root{color-scheme:light}
+  body{margin:0;background:#f4f4f6;color:#222;font:13px system-ui,sans-serif;padding:14px}
+  h2{margin:0 0 4px;font-size:14px;letter-spacing:.06em}
+  p{margin:0 0 10px;color:#666;font-size:12px}
+  .row{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start}
+  figure{margin:0}
+  figcaption{font-size:11px;color:#555;margin-top:4px;text-align:center}
+  canvas{display:block;border:1px solid #bbb;image-rendering:pixelated;background:#000}
+</style></head>
+<body>
+<h2>CONCRETE FLOOR</h2>
+<p>Left: the texture on its own. Middle: tiled 3&times;3 &mdash; the seams must be invisible.
+   Right: laid out in perspective, roughly how it looks underfoot.</p>
+<div class="row">
+  <figure><canvas id="one" width="256" height="256"></canvas><figcaption>256&times;256 tile</figcaption></figure>
+  <figure><canvas id="tile" width="384" height="384"></canvas><figcaption>tiled 3&times;3 (seam check)</figcaption></figure>
+  <figure><canvas id="persp" width="420" height="300"></canvas><figcaption>in perspective, lit by a torch</figcaption></figure>
+</div>
+
+<script>
+// ---------------------------------------------------------------
+//  A concrete slab floor, generated rather than downloaded.
+//  It has to TILE, because the same square metre is repeated across the
+//  whole factory — so every bit of noise wraps around the edges.
+// ---------------------------------------------------------------
+const N = 256;
+
+// value noise on a lattice that wraps, so the texture has no seams
+function hash(ix, iy, period, seed) {
+  ix = ((ix % period) + period) % period;
+  iy = ((iy % period) + period) % period;
+  let n = Math.imul(ix, 374761393) ^ Math.imul(iy, 668265263) ^ Math.imul(seed, 1442695041);
+  n = Math.imul(n ^ (n >>> 13), 1274126177);
+  return ((n ^ (n >>> 16)) >>> 0) / 4294967295;
+}
+function vnoise(x, y, period, seed) {
+  const x0 = Math.floor(x), y0 = Math.floor(y);
+  const fx = x - x0, fy = y - y0;
+  const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+  const a = hash(x0, y0, period, seed),     b = hash(x0 + 1, y0, period, seed);
+  const c = hash(x0, y0 + 1, period, seed), d = hash(x0 + 1, y0 + 1, period, seed);
+  return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
+}
+// several octaves stacked up: big blotches down to fine grain
+function fbm(x, y, baseCells, octaves, seed) {
+  let v = 0, amp = 0.5, cells = baseCells;
+  for (let o = 0; o < octaves; o++) {
+    v += vnoise(x / N * cells, y / N * cells, cells, seed + o * 17) * amp;
+    cells *= 2; amp *= 0.5;
+  }
+  return v;
+}
+
+function makeConcrete() {
+  const px = new Uint8ClampedArray(N * N * 4);
+
+  // ---- hairline cracks ----
+  // Kept short and faint on purpose. A big branching crack is a SHAPE, and a
+  // shape you can recognise gives the tiling away the moment the floor
+  // repeats — which it does, every few paces. Fine detail tiles invisibly;
+  // memorable detail does not.
+  const crack = new Float32Array(N * N);
+  let cs = 12345;
+  const rnd = () => (cs = (Math.imul(cs, 1103515245) + 12345) & 0x7fffffff) / 0x7fffffff;
+  for (let c = 0; c < 9; c++) {
+    let x = rnd() * N, y = rnd() * N, a = rnd() * 6.28;
+    const len = 12 + rnd() * 26;
+    for (let i = 0; i < len; i++) {
+      a += (rnd() - 0.5) * 0.7;
+      x = (x + Math.cos(a) + N) % N;
+      y = (y + Math.sin(a) + N) % N;
+      const depth = Math.min(1, (len - i) / len * 1.4) * 0.22;
+      const ix = x | 0, iy = y | 0;
+      crack[iy * N + ix] = Math.max(crack[iy * N + ix], depth);
+    }
+  }
+
+  for (let y = 0; y < N; y++) {
+    for (let x = 0; x < N; x++) {
+      const i = y * N + x;
+
+      // ---- the concrete itself ----
+      const blotch = fbm(x, y, 2, 3, 11);        // big damp patches
+      const mottle = fbm(x, y, 8, 4, 29);        // the general cloudiness
+      const grain  = vnoise(x / N * 128, y / N * 128, 128, 71);   // fine grain
+
+      // Big soft variation is kept low: it is the part that reads as a
+      // repeating pattern. The fine grain carries the detail instead.
+      let v = 106
+            + (blotch - 0.5) * 13
+            + (mottle - 0.5) * 20
+            + (grain  - 0.5) * 26;
+
+      // ---- aggregate: the little stones in the mix ----
+      const agg = vnoise(x / N * 96, y / N * 96, 96, 91);
+      if (agg > 0.74) v += (agg - 0.74) * 190;          // pale chips
+      else if (agg < 0.22) v -= (0.22 - agg) * 150;     // dark chips
+      // a second, finer pass so the surface has real tooth to it
+      const agg2 = vnoise(x / N * 180, y / N * 180, 180, 143);
+      v += (agg2 - 0.5) * 20;
+
+      // ---- expansion joints, at the edge so they line up when tiled ----
+      const dj = Math.min(x, N - 1 - x, y, N - 1 - y);
+      if (dj < 3) v *= 0.52 + dj * 0.13;                // the groove
+      else if (dj < 5) v *= 1.06;                       // lip catching the light
+
+      // ---- scuffs: long faint drag marks ----
+      const scuff = vnoise(x / N * 6, y / N * 52, 52, 131);
+      v -= Math.max(0, scuff - 0.70) * 30;
+
+      // ---- cracks ----
+      v *= 1 - crack[i] * 0.55;
+
+      // concrete is grey, but very slightly warm
+      const r = v * 1.02, g = v * 1.00, b = v * 0.955;
+      px[i*4] = r; px[i*4+1] = g; px[i*4+2] = b; px[i*4+3] = 255;
+    }
+  }
+  return new ImageData(px, N, N);
+}
+
+const img = makeConcrete();
+document.getElementById('one').getContext('2d').putImageData(img, 0, 0);
+
+// tiled, to prove the edges match
+{
+  const c = document.getElementById('tile'), g = c.getContext('2d');
+  const tmp = document.createElement('canvas'); tmp.width = tmp.height = N;
+  tmp.getContext('2d').putImageData(img, 0, 0);
+  for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++)
+    g.drawImage(tmp, x * 128, y * 128, 128, 128);
+}
+
+// a rough perspective view with a torch on it
+{
+  const c = document.getElementById('persp'), g = c.getContext('2d');
+  const W = c.width, Hh = c.height;
+  const tmp = document.createElement('canvas'); tmp.width = tmp.height = N;
+  tmp.getContext('2d').putImageData(img, 0, 0);
+  const src = tmp.getContext('2d').getImageData(0, 0, N, N).data;
+  const out = g.createImageData(W, Hh);
+  const horizon = Hh * 0.30;
+  for (let y = 0; y < Hh; y++) {
+    if (y < horizon) {
+      for (let x = 0; x < W; x++) { const o = (y*W+x)*4;
+        out.data[o]=6; out.data[o+1]=7; out.data[o+2]=9; out.data[o+3]=255; }
+      continue;
+    }
+    const p = y - horizon;
+    const dist = (Hh * 0.55) / p;                  // how far away this row is
+    for (let x = 0; x < W; x++) {
+      const camX = (x / W - 0.5) * 2;
+      const wx = camX * dist * 1.6, wz = dist;
+      const tx = (((wx * 48) | 0) % N + N) % N;
+      const ty = (((wz * 48) | 0) % N + N) % N;
+      const s = (ty * N + tx) * 4;
+      const beam = Math.max(0, 1 - Math.abs(camX) * 1.05);
+      const lit = Math.min(1.25, (0.10 + beam * beam * 1.35) / (1 + dist * dist * 0.05));
+      const o = (y * W + x) * 4;
+      out.data[o]   = src[s]   * lit;
+      out.data[o+1] = src[s+1] * lit;
+      out.data[o+2] = src[s+2] * lit;
+      out.data[o+3] = 255;
+    }
+  }
+  g.putImageData(out, 0, 0);
+}
+</script>
+</body></html>
