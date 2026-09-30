@@ -4296,5 +4296,26 @@
 })();
 </script>
 
+<script>
+// PREVIEW COPY ONLY: skips the menu and walks straight into the factory,
+// facing down a corridor, so the 3D view can be seen without clicking about.
+window.addEventListener('load', () => setTimeout(() => {
+  const b = document.getElementById('btnPlay'); if (b) b.click();
+  setTimeout(() => {
+    const A = window.__hush; if (!A) return;
+    // find the longest clear view from the start, and face it
+    let best = 0, bestA = 0;
+    for (let a = 0; a < 6.283; a += 0.05) {
+      let d = 0; while (d < 20 && !A.isWall(A.player.x + Math.cos(a) * d, A.player.y + Math.sin(a) * d)) d += 0.1;
+      if (d > best) { best = d; bestA = a; }
+    }
+    A.player.a = bestA; A.pitch = -0.12;
+    const note = document.createElement('div');
+    note.textContent = (A.GL ? '3D ENGINE: ON (WebGL)' : '3D ENGINE: OFF — flat fallback') + ' · preview copy';
+    note.style.cssText = 'position:fixed;top:6px;left:6px;z-index:99;background:#000c;color:#7f7;font:11px monospace;padding:4px 7px;border-radius:4px';
+    document.body.appendChild(note);
+  }, 400);
+}, 300));
+</script>
 </body>
 </html>
