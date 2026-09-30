@@ -73,11 +73,16 @@
 
   /* ---------------- game ---------------- */
   #game{display:none;flex-direction:column;align-items:center;touch-action:none;position:relative}
-  #view{
+  #view,#view3d{
     display:block;background:#000;border:1px solid #2a211b;border-radius:4px;
     width:min(94vw,80vh,900px);height:auto;aspect-ratio:16/10;
-    image-rendering:pixelated;touch-action:none;
+    touch-action:none;
   }
+  #view{image-rendering:pixelated}
+  /* only one of the two engines is ever on screen */
+  #view3d{position:absolute;inset:0;width:100%;height:100%;display:none}
+  body.gl #view3d{display:block}
+  body.gl #view{visibility:hidden}
   #hud{
     position:absolute;inset:0;pointer-events:none;display:flex;flex-direction:column;
     justify-content:space-between;padding:clamp(8px,1.8vh,16px);
@@ -135,7 +140,7 @@
   }
   body.big.playing #game{width:100%;height:100%;justify-content:center;gap:0}
   body.big.playing #viewWrap{width:100%;height:100%}
-  body.big.playing #view{
+  body.big.playing #view,body.big.playing #view3d{
     width:100%;height:100%;max-width:none;aspect-ratio:auto;
     border:none;border-radius:0;
   }
@@ -267,10 +272,12 @@
     <div id="howToPanel" class="screen hidden">
       <h2 class="title">❓ How to play</h2>
       <p class="note" style="text-align:left">
-        <b>Keyboard:</b> <b>W A S D</b> to move · mouse or <b>←→</b> to look ·
-        <b>E</b> to use things · <b>Shift</b> to run.<br><br>
-        <b>Touch:</b> left stick to move · drag anywhere on the right to look ·
-        <b>USE</b> to interact · <b>RUN</b> to sprint.
+        <b>Keyboard:</b> <b>W A S D</b> to move · mouse to look (click first) ·
+        <b>←→</b> to turn · <b>R</b> / <b>V</b> to look up and down, <b>C</b> to
+        centre · <b>E</b> to use things · <b>Shift</b> to run · <b>F</b> fullscreen.<br><br>
+        <b>Touch:</b> left stick to move · drag on the right to look around —
+        drag up and down to look up and down · <b>USE</b> to interact ·
+        <b>RUN</b> to sprint.
       </p>
       <p class="lbl">What you're doing</p>
       <p class="note" style="text-align:left">
@@ -336,6 +343,7 @@
   <div id="game">
     <div id="viewWrap" style="position:relative">
       <canvas id="view" width="480" height="300"></canvas>
+      <canvas id="view3d" width="480" height="300"></canvas>
       <div id="hud">
         <div id="hudTop">
           <div id="objective"><b>OBJECTIVE</b><span id="objText">Find a way out.</span>
@@ -391,6 +399,7 @@
   </div>
 </div></div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 (function () {
   'use strict';
@@ -584,12 +593,23 @@
     return chunkAt(cx, cy)[y - cy * CH][x - cx * CH];
   }
 
+  // taking something off the floor removes it from the 3D world too
+  function removeProp3D(x, y) {
+    if (!GL) return;
+    const k = x + ',' + y;
+    for (const map of [GL.props, GL.fixtures]) {
+      const o = map.get(k);
+      if (o) { GL.scene.remove(o); disposeTree(o); map.delete(k); }
+    }
+  }
+
   function setCell(x, y, ch) {
     if (worldMode === 'story') {
       if (x >= 0 && y >= 0 && x < W && y < H) grid[y][x] = ch;
     } else {
       edits.set(x + ',' + y, ch);
     }
+    if (ch === '.') removeProp3D(x, y);   // it's been picked up — take it away
   }
 
   const isWall = (x, y) => SOLID.has(at(x, y));
@@ -746,6 +766,7 @@
   function openDoors(ch) {
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++)
       if (grid[y][x] === ch) grid[y][x] = '.';
+    if (GL) rebuildWorld3D();          // the door has to actually disappear
   }
 
   // ============================================================
@@ -1088,7 +1109,433 @@
       (amb + beam * beam * 1.25 * flicker) / (1 + dist * dist * 0.045)));
   }
 
-  function render(now) {
+  // ============================================================
+  //  The scene, as plain data
+  // ============================================================
+  //  Everything the world is made of, worked out from the map and handed
+  //  over as a list. No drawing happens here and nothing here knows what
+  //  Three.js is — which is the point: it can be checked by a test on a
+  //  machine with no graphics card at all.
+  //
+  //  One map cell is 1 unit across. Rooms are taller than they are wide,
+  //  the way real ones are.
+  const WALL_H = 1.45;        // ceiling height, in cells
+  const EYE_H  = 0.90;        // how high up you are looking from
+  const FACES = [
+    { face: 'e', dx:  1, dy:  0 },
+    { face: 'w', dx: -1, dy:  0 },
+    { face: 's', dx:  0, dy:  1 },
+    { face: 'n', dx:  0, dy: -1 },
+  ];
+  // what a wall of each kind is skinned with
+  const WALL_TEX = { '+': '+', 'E': 'E', 'K': 'K', 'S': 'S',
+                     'I': 'I', 's': 's', 'U': 'U',
+                     'G': 'G', 'P': 'P', 'L': 'L', 'V': 'V' };
+  const FIXTURES = { G: 'gen', P: 'pad', L: 'lever', V: 'tv' };
+  const DOOR_CH  = { '+': 'power', 'E': 'electric', 'K': 'keypad', 'S': 'shutter' };
+
+  // Build the world inside a rectangle of the map. Story mode passes the whole
+  // building; the endless one passes a window around you and rebuilds as you
+  // walk, because that map never ends.
+  function buildSceneSpec(bounds) {
+    const b = bounds || { x0: 0, y0: 0, x1: W - 1, y1: H - 1 };
+    const walls = [], floors = [], props = [], fixtures = [], doors = [];
+
+    for (let y = b.y0; y <= b.y1; y++) {
+      for (let x = b.x0; x <= b.x1; x++) {
+        const c = at(x, y);
+        const solid = SOLID.has(c);
+
+        if (!solid) {
+          // somewhere you can stand: it needs a floor and a ceiling
+          const z = (worldMode === 'story') ? zoneOf(y) : 0;
+          floors.push({ x, y, floorTex: 'floor' + z, ceilTex: 'ceil' + z });
+          const kind = SPRITE_OF[c];
+          if (kind) props.push({ kind, x, y, ch: c });
+          continue;
+        }
+
+        // A solid cell only needs the faces that something can actually see.
+        // Skipping the buried ones takes the building from ~4,000 faces to
+        // well under a thousand.
+        const open = [];
+        for (const f of FACES) if (!SOLID.has(at(x + f.dx, y + f.dy))) open.push(f);
+        if (!open.length) continue;
+
+        const zone = (worldMode === 'story') ? zoneOf(y) : 0;
+        const tex = WALL_TEX[c] || ('#' + zone);
+        for (const f of open) walls.push({ x, y, face: f.face, tex, ch: c });
+
+        if (DOOR_CH[c]) doors.push({ kind: DOOR_CH[c], ch: c, x, y });
+        if (FIXTURES[c]) {
+          // it faces out of the one side you can stand at
+          fixtures.push({ kind: FIXTURES[c], ch: c, x, y, face: open[0].face });
+        }
+        if (c === 's') fixtures.push({ kind: 'socket', ch: c, x, y, face: open[0].face });
+        if (c === 'U') fixtures.push({ kind: 'cagedtape', ch: c, x, y, face: open[0].face });
+      }
+    }
+    return { walls, floors, props, fixtures, doors, wallH: WALL_H, eyeH: EYE_H };
+  }
+
+  // In the endless world we only build what is near you.
+  function sceneBounds() {
+    if (worldMode === 'story') return { x0: 0, y0: 0, x1: W - 1, y1: H - 1 };
+    const r = 26, px = Math.floor(player.x), py = Math.floor(player.y);
+    return { x0: px - r, y0: py - r, x1: px + r, y1: py + r };
+  }
+
+  // ============================================================
+  //  The 3D engine
+  // ============================================================
+  //  Turns the scene description above into real geometry. Nothing in the
+  //  game knows this exists — if it can't start, the old flat renderer takes
+  //  over and everything still works.
+  let GL = null;          // { renderer, scene, camera, torch, ... } once started
+  let glFailed = false;
+  let pitch = 0;          // looking up and down, which the old engine can't do
+  const PITCH_MAX = 1.1;
+
+  const hasWebGL = () => {
+    try {
+      if (typeof THREE === 'undefined') return false;
+      const c = document.createElement('canvas');
+      return !!(c.getContext('webgl') || c.getContext('experimental-webgl'));
+    } catch (e) { return false; }
+  };
+
+  // our procedural textures, handed to the graphics card
+  function glTexture(key) {
+    const src = textures[key];
+    if (!src) return null;
+    const px = new Uint8Array(src.buffer.slice(0));
+    const t = new THREE.DataTexture(px, TEX, TEX, THREE.RGBAFormat);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.magFilter = THREE.NearestFilter;
+    t.minFilter = THREE.LinearMipmapLinearFilter;
+    t.generateMipmaps = true;
+    t.needsUpdate = true;
+    return t;
+  }
+
+  const glMats = {};
+  function glMat(key) {
+    if (glMats[key]) return glMats[key];
+    const map = glTexture(key);
+    const m = new THREE.MeshLambertMaterial({ map: map || null,
+      color: map ? 0xffffff : 0x555555 });
+    glMats[key] = m;
+    return m;
+  }
+
+  // Build one merged mesh out of a pile of quads. Doing this by hand avoids
+  // pulling in a second library, and one mesh per texture instead of one per
+  // wall is the difference between smooth and a slideshow.
+  function mergeQuads(quads, material) {
+    const n = quads.length;
+    const pos = new Float32Array(n * 18);     // 6 vertices, 3 floats each
+    const nor = new Float32Array(n * 18);
+    const uv  = new Float32Array(n * 12);
+    let p = 0, q = 0;
+    for (const Q of quads) {
+      const [a, b, c, d] = Q.v, N = Q.n;
+      // two triangles: a-b-c and a-c-d
+      for (const v of [a, b, c, a, c, d]) {
+        pos[p] = v[0]; pos[p+1] = v[1]; pos[p+2] = v[2];
+        nor[p] = N[0]; nor[p+1] = N[1]; nor[p+2] = N[2];
+        p += 3;
+      }
+      const U = Q.uv || [[0,1],[1,1],[1,0],[0,0]];
+      for (const k of [0,1,2,0,2,3]) { uv[q] = U[k][0]; uv[q+1] = U[k][1]; q += 2; }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('normal',   new THREE.BufferAttribute(nor, 3));
+    g.setAttribute('uv',       new THREE.BufferAttribute(uv, 2));
+    g.computeBoundingSphere();
+    const mesh = new THREE.Mesh(g, material);
+    mesh.receiveShadow = true;
+    return mesh;
+  }
+
+  // the four sides of a cell, as quads standing from the floor to the ceiling
+  function wallQuad(x, y, face, h) {
+    const x0 = x, x1 = x + 1, z0 = y, z1 = y + 1;
+    if (face === 'e') return { v: [[x1,h,z0],[x1,h,z1],[x1,0,z1],[x1,0,z0]], n: [1,0,0] };
+    if (face === 'w') return { v: [[x0,h,z1],[x0,h,z0],[x0,0,z0],[x0,0,z1]], n: [-1,0,0] };
+    if (face === 's') return { v: [[x1,h,z1],[x0,h,z1],[x0,0,z1],[x1,0,z1]], n: [0,0,1] };
+    return              { v: [[x0,h,z0],[x1,h,z0],[x1,0,z0],[x0,0,z0]], n: [0,0,-1] };
+  }
+
+  function buildWorld3D(spec) {
+    const root = new THREE.Group();
+
+    // ---- walls, one merged mesh per texture ----
+    const byTex = {};
+    for (const w of spec.walls) (byTex[w.tex] = byTex[w.tex] || []).push(w);
+    for (const tex in byTex) {
+      const quads = byTex[tex].map(w => wallQuad(w.x, w.y, w.face, spec.wallH));
+      root.add(mergeQuads(quads, glMat(tex)));
+    }
+
+    // ---- floors and ceilings, likewise ----
+    const fByTex = {}, cByTex = {};
+    for (const f of spec.floors) {
+      (fByTex[f.floorTex] = fByTex[f.floorTex] || []).push(f);
+      (cByTex[f.ceilTex]  = cByTex[f.ceilTex]  || []).push(f);
+    }
+    for (const tex in fByTex) {
+      const quads = fByTex[tex].map(f => ({
+        v: [[f.x,0,f.y],[f.x+1,0,f.y],[f.x+1,0,f.y+1],[f.x,0,f.y+1]], n: [0,1,0] }));
+      root.add(mergeQuads(quads, glMat(tex)));
+    }
+    for (const tex in cByTex) {
+      const h = spec.wallH;
+      const quads = cByTex[tex].map(f => ({
+        v: [[f.x,h,f.y+1],[f.x+1,h,f.y+1],[f.x+1,h,f.y],[f.x,h,f.y]], n: [0,-1,0] }));
+      root.add(mergeQuads(quads, glMat(tex)));
+    }
+    return root;
+  }
+
+  function initGL() {
+    if (GL || glFailed) return GL;
+    if (!hasWebGL()) { glFailed = true; return null; }
+    try {
+      const canvas = $('view3d');
+      const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
+      renderer.setPixelRatio(1);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x05060a);
+      scene.fog = new THREE.FogExp2(0x05060a, 0.16);
+
+      const camera = new THREE.PerspectiveCamera(72, 16 / 10, 0.05, 60);
+
+      // your torch: a real cone of light that throws shadows about
+      const torch = new THREE.SpotLight(0xffe3b0, 1.5, 22, 0.62, 0.45, 1.2);
+      torch.castShadow = true;
+      torch.shadow.mapSize.width = 512;
+      torch.shadow.mapSize.height = 512;
+      torch.shadow.camera.near = 0.1;
+      torch.shadow.camera.far = 22;
+      scene.add(torch, torch.target);
+
+      // barely anything else, so the dark stays dark
+      const ambient = new THREE.AmbientLight(0x2a3040, 0.30);
+      scene.add(ambient);
+
+      GL = { renderer, scene, camera, torch, ambient, world: null,
+             monster: null, props: new Map(), fixtures: new Map(),
+             builtFor: null, size: { w: 0, h: 0 } };
+      return GL;
+    } catch (e) {
+      glFailed = true;
+      return null;
+    }
+  }
+
+  // (Re)build the world. Called at the start of a round, and again whenever a
+  // door opens or you walk far enough in the endless factory.
+  function rebuildWorld3D() {
+    if (!GL) return;
+    if (GL.world) { GL.scene.remove(GL.world); disposeTree(GL.world); }
+    const b = sceneBounds();
+    const spec = buildSceneSpec(b);
+    GL.world = buildWorld3D(spec);
+    GL.scene.add(GL.world);
+    GL.builtFor = b;
+    buildProps3D(spec);
+  }
+
+  function disposeTree(obj) {
+    obj.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+  }
+
+  // ------------------------------------------------------------
+  //  Things standing in the world
+  // ------------------------------------------------------------
+  const boxAt = (w, h, d, colour) =>
+    new THREE.Mesh(new THREE.BoxGeometry(w, h, d),
+                   new THREE.MeshLambertMaterial({ color: colour }));
+
+  function makeProp3D(kind) {
+    const g = new THREE.Group();
+    if (kind === 'fuse') {
+      const body = boxAt(0.16, 0.055, 0.055, 0xc6baa2);
+      const capL = boxAt(0.035, 0.065, 0.065, 0xb08a3a);
+      const capR = capL.clone();
+      capL.position.x = -0.095; capR.position.x = 0.095;
+      g.add(body, capL, capR);
+      g.position.y = 0.035;
+    } else if (kind === 'note') {
+      const card = boxAt(0.17, 0.22, 0.006, 0xe2dac4);
+      card.rotation.set(-1.15, 0.2, -0.1);
+      g.add(card); g.position.y = 0.04;
+    } else if (kind === 'tape') {
+      const shell = boxAt(0.22, 0.045, 0.13, 0x1a1818);
+      const label = boxAt(0.19, 0.005, 0.055, 0xd6cdb2);
+      label.position.set(0, 0.026, -0.02);
+      g.add(shell, label); g.position.y = 0.03;
+    } else if (kind === 'reacher') {
+      const handle = boxAt(0.13, 0.04, 0.04, 0x343230);
+      const jaw = boxAt(0.10, 0.02, 0.06, 0xc49e38);
+      jaw.position.x = 0.11;
+      g.add(handle, jaw); g.position.y = 0.035;
+    } else if (kind === 'exit') {
+      const frame = boxAt(0.62, 1.15, 0.10, 0x0f2a18);
+      const glow = new THREE.Mesh(
+        new THREE.BoxGeometry(0.44, 0.95, 0.04),
+        new THREE.MeshBasicMaterial({ color: 0x3ecf6a }));
+      glow.position.z = 0.05;
+      const lamp = new THREE.PointLight(0x4cff88, 1.4, 6);
+      lamp.position.set(0, 0.6, 0.3);
+      g.add(frame, glow, lamp);
+      g.position.y = 0.58;
+    }
+    g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    return g;
+  }
+
+  // Wall fixtures sit flat against the wall face they open onto.
+  const FACE_YAW = { e: -Math.PI / 2, w: Math.PI / 2, s: 0, n: Math.PI };
+  function makeFixture3D(kind) {
+    const g = new THREE.Group();
+    const plate = (w, h, d, c) => boxAt(w, h, d, c);
+    if (kind === 'gen') {
+      g.add(plate(0.72, 0.95, 0.22, 0x3e4244));
+      const gauge = plate(0.2, 0.18, 0.04, 0x8c9678); gauge.position.set(0.16, 0.16, 0.12);
+      const sw = plate(0.14, 0.08, 0.05, 0x963c28);   sw.position.set(0.16, -0.16, 0.13);
+      const lamp = plate(0.08, 0.08, 0.05, 0xd2aa3c); lamp.position.set(-0.2, -0.2, 0.13);
+      g.add(gauge, sw, lamp);
+      g.position.y = 0.52;
+    } else if (kind === 'pad') {
+      g.add(plate(0.30, 0.42, 0.10, 0x3a3c3e));
+      const disp = plate(0.22, 0.09, 0.03, 0x1e2a1e); disp.position.set(0, 0.13, 0.06);
+      g.add(disp); g.position.y = 0.95;
+    } else if (kind === 'lever') {
+      g.add(plate(0.26, 0.40, 0.09, 0x38393c));
+      const grip = plate(0.12, 0.07, 0.16, 0xbe4630); grip.position.set(0, 0.12, 0.10);
+      g.add(grip); g.position.y = 0.85;
+    } else if (kind === 'tv') {
+      g.add(plate(0.58, 0.44, 0.34, 0x2e2c2a));
+      const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.44, 0.31),
+        new THREE.MeshBasicMaterial({ map: glTexture('V0') }));
+      screen.position.z = 0.18;
+      screen.userData.isScreen = true;
+      const vcr = plate(0.5, 0.13, 0.3, 0x262422); vcr.position.y = -0.30;
+      const glowLamp = new THREE.PointLight(0x9fb4c8, 0.5, 3.2);
+      glowLamp.position.z = 0.5;
+      g.add(screen, vcr, glowLamp);
+      g.position.y = 1.0;
+    } else if (kind === 'socket') {
+      g.add(plate(0.30, 0.30, 0.12, 0x2a2622));
+      const wire = plate(0.26, 0.26, 0.03, 0x6e6a60); wire.position.z = 0.08;
+      g.add(wire); g.position.y = 0.95;
+    } else if (kind === 'cagedtape') {
+      g.add(plate(0.32, 0.30, 0.14, 0x2a2622));
+      const t = plate(0.2, 0.05, 0.12, 0x1a1818); t.position.z = 0.02;
+      const bars = plate(0.28, 0.26, 0.02, 0x6e6a60); bars.position.z = 0.08;
+      g.add(t, bars); g.position.y = 0.8;
+    }
+    g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    return g;
+  }
+
+  function buildProps3D(spec) {
+    for (const [, o] of GL.props) { GL.scene.remove(o); disposeTree(o); }
+    for (const [, o] of GL.fixtures) { GL.scene.remove(o); disposeTree(o); }
+    GL.props.clear(); GL.fixtures.clear();
+
+    for (const p of spec.props) {
+      const m = makeProp3D(p.kind);
+      if (!m) continue;
+      m.position.x = p.x + 0.5; m.position.z = p.y + 0.5;
+      GL.scene.add(m);
+      GL.props.set(p.x + ',' + p.y, m);
+    }
+    for (const f of spec.fixtures) {
+      const m = makeFixture3D(f.kind);
+      if (!m) continue;
+      const o = FACES.find(q => q.face === f.face) || FACES[0];
+      // sit it on the face of the wall, looking out into the room
+      m.position.x = f.x + 0.5 + o.dx * 0.42;
+      m.position.z = f.y + 0.5 + o.dy * 0.42;
+      m.rotation.y = FACE_YAW[f.face] || 0;
+      GL.scene.add(m);
+      GL.fixtures.set(f.x + ',' + f.y, m);
+    }
+  }
+
+  // ------------------------------------------------------------
+  //  WINK, in three dimensions
+  // ------------------------------------------------------------
+  function makeWink3D() {
+    const g = new THREE.Group();
+    const cloth = 0x74303e, dark = 0x4a1e28, patch = 0x604a34;
+    const part = (w, h, d, c) => {
+      const m = boxAt(w, h, d, c);
+      m.castShadow = true; m.receiveShadow = true;
+      return m;
+    };
+    const torso = part(0.34, 0.5, 0.22, cloth);  torso.position.y = 0.86;
+    const hips  = part(0.30, 0.10, 0.20, dark);  hips.position.y = 0.60;
+    const pat   = part(0.13, 0.15, 0.01, patch); pat.position.set(-0.06, 0.82, 0.115);
+
+    // limbs hang from a pivot, so they can swing properly
+    const mkLimb = (w, len, c) => {
+      const pivot = new THREE.Group();
+      const m = part(w, len, w, c);
+      m.position.y = -len / 2;
+      pivot.add(m);
+      return pivot;
+    };
+    const legL = mkLimb(0.11, 0.58, cloth), legR = mkLimb(0.11, 0.58, dark);
+    legL.position.set(-0.08, 0.60, 0); legR.position.set(0.08, 0.60, 0);
+    const armL = mkLimb(0.10, 0.62, cloth), armR = mkLimb(0.10, 0.62, cloth);
+    armL.position.set(-0.22, 1.06, 0); armR.position.set(0.22, 1.06, 0);
+
+    const head = new THREE.Group();
+    head.position.y = 1.20;
+    const skull = part(0.34, 0.30, 0.28, 0x87374a);
+    const eyeMat = new THREE.MeshBasicMaterial({ color: 0xfff0b8 });
+    const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.055, 10, 8), eyeMat);
+    const eyeR = new THREE.Mesh(new THREE.SphereGeometry(0.070, 10, 8), eyeMat);
+    eyeL.position.set(-0.09, 0.03, 0.15); eyeR.position.set(0.09, 0.04, 0.15);
+    const jaw = part(0.22, 0.05, 0.16, 0x160a0d);
+    jaw.position.set(0, -0.13, 0.08);
+    head.add(skull, eyeL, eyeR, jaw);
+
+    g.add(torso, hips, pat, legL, legR, armL, armR, head);
+    g.userData = { legL, legR, armL, armR, head, jaw, eyeL, eyeR };
+    return g;
+  }
+
+  function updateWink3D(now) {
+    if (!GL.monster) { GL.monster = makeWink3D(); GL.scene.add(GL.monster); }
+    const m = GL.monster, u = m.userData;
+    m.position.set(monster.x, 0, monster.y);
+    m.rotation.y = -monster.a + Math.PI / 2;
+
+    const gait = Math.min(1, monster.moved / 1.4);
+    const sw = Math.sin(monster.stepPhase) * 0.55 * gait;
+    u.legL.rotation.x =  sw;  u.legR.rotation.x = -sw;
+    u.armL.rotation.x = -sw * 0.8 - monster.lunge * 0.7;
+    u.armR.rotation.x =  sw * 0.8 - monster.lunge * 0.7;
+    u.head.rotation.y = monster.headTurn * 0.5;
+    u.jaw.position.y = -0.13 - monster.jaw * 0.09;
+    m.rotation.z = 0;
+    // it leans in as it charges
+    const lean = (monster.mode === 'hunt' ? 0.08 : 0.01) + monster.lunge * 0.16;
+    u.head.rotation.x = lean;
+    // eyes catch the light even in the pitch dark
+    const glow = monster.mode === 'hunt' ? 1 : 0.6;
+    u.eyeL.material.color.setRGB(1, 0.94 * glow, 0.72 * glow);
+  }
+
+  function render2D(now) {
     if (!img) allocBuffers();
     // the torch is old; it wavers
     // The torch is old and it wavers. It also gives out badly when the thing
@@ -1189,6 +1636,100 @@
     ctx.putImageData(img, 0, 0);
     drawSprites(now);
     drawGrain(now);
+  }
+
+  // ------------------------------------------------------------
+  //  Drawing a frame in 3D
+  // ------------------------------------------------------------
+  function render3D(now) {
+    const g = GL;
+    // keep the picture the same shape as the box it's shown in
+    const r = $('view3d').getBoundingClientRect();
+    const w = Math.max(160, Math.round(r.width || 480));
+    const h = Math.max(100, Math.round(r.height || 300));
+    if (g.size.w !== w || g.size.h !== h) {
+      g.renderer.setSize(w, h, false);
+      g.camera.aspect = w / h;
+      g.camera.updateProjectionMatrix();
+      g.size = { w, h };
+    }
+
+    // the endless factory is rebuilt as you walk out of what's already there
+    if (worldMode === 'endless' && g.builtFor) {
+      const b = g.builtFor;
+      const px = Math.floor(player.x), py = Math.floor(player.y);
+      if (px < b.x0 + 8 || px > b.x1 - 8 || py < b.y0 + 8 || py > b.y1 - 8) rebuildWorld3D();
+    }
+
+    // ---- the camera is your head ----
+    const bob = Math.sin(player.bob) * 0.012;
+    g.camera.position.set(player.x, EYE_H + bob, player.y);
+    g.camera.rotation.order = 'YXZ';
+    g.camera.rotation.y = -player.a - Math.PI / 2;
+    g.camera.rotation.x = pitch;
+
+    // ---- the torch, pointing wherever you look ----
+    const flick = torchFlicker(now);
+    g.torch.position.copy(g.camera.position);
+    const dir = new THREE.Vector3(0, 0, -1).applyEuler(g.camera.rotation);
+    g.torch.target.position.copy(g.camera.position).add(dir.multiplyScalar(6));
+    g.torch.target.updateMatrixWorld();
+    g.torch.intensity = 1.55 * flick;
+    g.ambient.intensity = (state && state.powerOn ? 0.34 : 0.16) * (0.7 + flick * 0.3);
+    // the dark closes in as the fear rises
+    g.scene.fog.density = 0.16 + (state ? state.fear : 0) * 0.10 * dread();
+
+    // ---- the television screens are alive ----
+    const frame = ((now / 90) | 0) % TV_FRAMES;
+    if (g.tvFrame !== frame) {
+      g.tvFrame = frame;
+      const tex = glTexture('V' + frame);
+      for (const [, f] of g.fixtures)
+        f.traverse(o => { if (o.userData && o.userData.isScreen) {
+          if (o.material.map) o.material.map.dispose();
+          o.material.map = tex; o.material.needsUpdate = true; } });
+    }
+
+    updateWink3D(now);
+    g.renderer.render(g.scene, g.camera);
+  }
+
+  // shared by both engines, so the torch behaves the same either way
+  function torchFlicker(now) {
+    let f = 0.93 + Math.sin(now / 70) * 0.03 + Math.sin(now / 13) * 0.02;
+    if (monster && state && !state.endless) {
+      const near = Math.max(0, 1 - Math.hypot(player.x - monster.x, player.y - monster.y) / 9);
+      const panic = near * dread();
+      if (panic > 0.05) {
+        f *= 1 - panic * 0.35 * (0.5 + Math.abs(Math.sin(now / 41)) * 0.5);
+        if (Math.sin(now / 137) > 0.985 - panic * 0.02) f *= 0.25;
+      }
+    }
+    return f;
+  }
+
+  // The one the game actually calls. It does not care which engine answers.
+  function render(now) {
+    if (GL) {
+      try { render3D(now); return; }
+      catch (e) {
+        // never leave the player staring at a black screen: drop back to the
+        // engine we know works and carry on
+        glFailed = true; GL = null;
+        document.body.classList.remove('gl');
+        flashPrompt('Switched to the simple graphics');
+      }
+    }
+    render2D(now);
+  }
+
+  // Turn 3D on if the machine can manage it. Called when a round starts.
+  function startEngine() {
+    if (glFailed) return false;
+    if (!initGL()) { document.body.classList.remove('gl'); return false; }
+    rebuildWorld3D();
+    document.body.classList.add('gl');
+    return true;
   }
 
   // Same DDA as before, but taking a direction vector — which is what the
@@ -1605,6 +2146,12 @@
 
     if (keys['arrowleft']) player.a -= 2.2 * dt;
     if (keys['arrowright']) player.a += 2.2 * dt;
+    // look up and down on a keyboard, for anyone not using the mouse
+    if (GL) {
+      if (keys['pageup'] || keys['r']) pitch = Math.min(PITCH_MAX, pitch + 1.6 * dt);
+      if (keys['pagedown'] || keys['v']) pitch = Math.max(-PITCH_MAX, pitch - 1.6 * dt);
+      if (keys['c']) pitch += (0 - pitch) * Math.min(1, dt * 8);   // recentre
+    }
     player.a += look; look = 0;
 
     const cos = Math.cos(player.a), sin = Math.sin(player.a);
@@ -3186,6 +3733,7 @@
     $('game').style.display = 'flex';
     document.body.classList.add('playing');
     sizeView();                        // match the buffer to the shape on screen
+    startEngine();                     // 3D if this machine can, flat if not
     disarmQuit();
     setObjective();
     scheduleFit();
@@ -3208,12 +3756,16 @@
   // mouse look
   view.addEventListener('click', () => { if (running && view.requestPointerLock) view.requestPointerLock(); });
   document.addEventListener('mousemove', e => {
-    if (document.pointerLockElement === view && running) look += e.movementX * 0.0022;
+    if (document.pointerLockElement !== view || !running) return;
+    look += e.movementX * 0.0022;
+    // 3D lets you look up and down, which the flat engine never could
+    if (GL) pitch = clampPitch(pitch - e.movementY * 0.0022);
   });
+  const clampPitch = v => Math.max(-PITCH_MAX, Math.min(PITCH_MAX, v));
 
   // touch: left stick, right side drags to look
   const stick = $('stick'), nub = $('stickNub');
-  let stickId = null, lookId = null, lookLast = 0;
+  let stickId = null, lookId = null, lookLast = 0, lookLastY = 0;
   function stickStart(e) {
     const t = e.changedTouches ? e.changedTouches[0] : e;
     stickId = t.identifier !== undefined ? t.identifier : 'mouse';
@@ -3240,16 +3792,26 @@
 
   view.addEventListener('touchstart', e => {
     const t = e.changedTouches[0];
-    lookId = t.identifier; lookLast = t.clientX;
+    lookId = t.identifier; lookLast = t.clientX; lookLastY = t.clientY;
   }, { passive: true });
   view.addEventListener('touchmove', e => {
     for (const t of e.changedTouches) {
       if (t.identifier !== lookId) continue;
       look += (t.clientX - lookLast) * 0.006;
-      lookLast = t.clientX;
+      if (GL) pitch = clampPitch(pitch - (t.clientY - lookLastY) * 0.005);
+      lookLast = t.clientX; lookLastY = t.clientY;
     }
   }, { passive: true });
   view.addEventListener('touchend', () => { lookId = null; });
+  // the 3D canvas covers the flat one, so it needs the same controls
+  ['click','touchstart','touchmove','touchend'].forEach(ev => {
+    $('view3d').addEventListener(ev, e => {
+      const clone = new Event(ev);
+      // forward the real touch data straight through
+      view.dispatchEvent(Object.assign(clone, {
+        changedTouches: e.changedTouches, clientX: e.clientX, clientY: e.clientY }));
+    }, { passive: true });
+  });
 
   $('btnUse').addEventListener('click', e => { e.preventDefault(); if (running) doAction(); });
   $('btnRun').addEventListener('touchstart', e => { e.preventDefault(); wantRun = true; }, { passive: false });
@@ -3510,9 +4072,15 @@
     updateMonster, updatePlayer, tryMove, fitScreen, kpPress,
     get kpEntry() { return kpEntry; },
     HEAR_WALK, HEAR_RUN, SEE, SCARE_CFG, sizeScareCanvas, TV_FRAMES,
-    ZONE_NAMES, zoneOf, TAPES, REACH_ARM, noteKeyFor, NOTES, SPRITE_OF, ACTIONS,
+    ZONE_NAMES, zoneOf, TAPES, REACH_ARM,
+    buildSceneSpec, sceneBounds, WALL_H, EYE_H, WALL_TEX, FIXTURES, DOOR_CH, noteKeyFor, NOTES, SPRITE_OF, ACTIONS,
     drawSprite, reachableCells, nearbyAction,
     pickUpTape, showTape, closeTape, drawTapeFrame, TAPE_SCENES, TSUB, tapeWink,
+    render3D, render2D, initGL, startEngine, buildWorld3D, makeWink3D,
+    makeProp3D, makeFixture3D, mergeQuads, wallQuad, torchFlicker, hasWebGL,
+    rebuildWorld3D, removeProp3D, FACE_YAW,
+    get GL() { return GL; }, get glFailed() { return glFailed; },
+    get pitch() { return pitch; }, set pitch(v) { pitch = v; }, PITCH_MAX,
     TVOICE, TVOICE_STYLE, speakTape, stopSpeech, canSpeak, pickVoice,
     WHISPERS, whisper, musicBox, LULLABY, playerCanSee, DREAD, dread, STALK_MIN,
     get speakingLine() { return speakingLine; }, set speakingLine(v) { speakingLine = v; },

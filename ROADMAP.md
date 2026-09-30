@@ -595,6 +595,64 @@ flagship was **WINK**. The slogan was *"Wink never sleeps — so you can."*
 Every floor is painted differently — walls, floor and ceiling are tinted per
 zone — so you always know where you are, and the HUD names the floor you're on.
 
+### 🧊 Round 12 — Hush is properly 3D
+
+Hush was a **raycaster** — the Wolfenstein trick, where flat columns are drawn
+at a height based on distance. It looks 3D but it isn't: no real geometry, no
+looking up or down, and every object is a flat cut-out that spins to face you.
+
+It now runs on **real 3D** (WebGL, via Three.js).
+
+**The important part: the game didn't change.** The renderer is ~776 lines of
+the 3,100. The other ~2,364 — six floors, the puzzles, the Reacher, the tapes,
+WINK's four moods, the whispers, the music box — don't care how anything is
+drawn. Of 96 test sections, 78 carried over untouched.
+
+**What's new on screen**
+
+| | Before | Now |
+|---|---|---|
+| Rooms | flat columns, fixed height | real geometry, ceilings 1.45 cells high |
+| Looking | left and right only | **up and down too** (mouse, drag, or R/V/C) |
+| Torch | a shaded cone faked in maths | a **real spotlight that throws moving shadows** |
+| Objects | flat cut-outs facing you | solid models you can **walk around** |
+| WINK | a drawing | a **jointed model** — same walk cycle, now with real depth |
+| The dark | a painted-on vignette | **fog**, thickening as your fear rises |
+
+**How it's kept fast.** Only wall faces that something can actually see get
+built — 1,914 instead of 4,000+ — and they're **merged into one mesh per
+texture** rather than one per wall. The existing procedural textures are handed
+straight to the graphics card, so there are still no image files.
+
+**The old engine is still there.** If a device can't do WebGL, or the graphics
+card falls over mid-game, it **drops back to the raycaster** and carries on
+rather than showing a black screen. Both paths are tested.
+
+### 🧪 Testing 3D without a graphics card
+
+The trick was splitting it in two. `buildSceneSpec()` turns the map into a
+**plain list** of walls, floors, fixtures and props with real coordinates — no
+Three.js anywhere near it. That list is just numbers, and numbers can be
+checked on a test runner with no GPU at all.
+
+For the rest, `glstub.js` is a **stand-in for Three.js** that records every
+shape the game builds and where it puts it. `gltest.js` then checks 83 things:
+that an east-facing wall really sits on the east edge of its square, that walls
+run floor to ceiling, that merged geometry has exactly six vertices per quad,
+that props sit in the middle of their square and on the floor, that a door
+disappears when opened, and that a picked-up fuse leaves the world.
+
+> **The bug this caught.** Facing the wrong way is the classic 3D mistake, and
+> the stub can't catch it. So there's a test that works the camera's direction
+> out from its own yaw angle and compares it with the way the game thinks you
+> are pointing — at six different angles, and four more for WINK. It passes,
+> which means the orientation maths is right rather than just looking right.
+
+> ⚠️ **What I could not check.** I have no graphics card here, so I have
+> **not seen it render**. The geometry, the camera, the fallback and the AI are
+> all proven; whether it actually *looks* good is something you'll have to tell
+> me. Open Hush and see.
+
 ### 🕯️ Round 11 — WINK gets properly frightening
 
 Five changes, and none of them are just "make it faster".
@@ -1224,7 +1282,7 @@ drag-to-look on a tablet.
 
 ## ⚠️ What still needs doing
 
-**Upload it, then play it with real people.** All **22 test suites — 1,313 checks
+**Upload it, then play it with real people.** All **23 test suites — 1,398 checks
 — pass**, but no human has actually played any of this yet. Things worth
 watching for:
 
